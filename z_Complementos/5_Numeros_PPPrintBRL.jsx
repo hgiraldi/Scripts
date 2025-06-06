@@ -38,6 +38,45 @@ function criarCaixaDialogo() {
 var orientacaoEscolhida;
 criarCaixaDialogo();
 
+function createNumberHorizontalConver(number, left, top) {
+    var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    if (number < 10) {
+        textFrame.contents = "0" + number.toString();
+    } else {
+        textFrame.contents = number.toString();
+    }
+    textFrame.left = left + objectWidth + 10;
+    textFrame.top = top;
+    textFrame.textRange.characterAttributes.size = 2 * 2.83464567; // 2 mm in points
+    textFrame.textRange.characterAttributes.textFont = app.textFonts.getByName("Arial-BoldMT");
+}
+
+function createNumberVerticalNegative90Conver(number, left, top) {
+    var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    if (number < 10) {
+        textFrame.contents = "0" + number.toString();
+    } else {
+        textFrame.contents = number.toString();
+    }
+    textFrame.left = left + objectWidth + 10;
+    textFrame.top = top;
+    textFrame.textRange.characterAttributes.size = 2 * 2.83464567; // 2 mm in points
+    textFrame.textRange.characterAttributes.textFont = app.textFonts.getByName("Arial-BoldMT");
+}
+
+function createNumberVertical90Conver(number, left, top) {
+    var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    if (number < 10) {
+        textFrame.contents = "0" + number.toString();
+    } else {
+        textFrame.contents = number.toString();
+    }
+    textFrame.left = left + objectWidth + 10;
+    textFrame.top = top;
+    textFrame.textRange.characterAttributes.size = 2 * 2.83464567; // 2 mm in points
+    textFrame.textRange.characterAttributes.textFont = app.textFonts.getByName("Arial-BoldMT");
+}
+
 // Function to create and position a number
 function createNumberHorizontal(number, left, top) {
     var textFrame = app.activeDocument.textFrames.add(numbersLayer);
@@ -88,11 +127,23 @@ for (var r = 0; r < repetitions; r++) {
 
         // variável orientacaoEscolhida em um if
         if (orientacaoEscolhida === "horizontal") {
-            createNumberHorizontal(currentNumber, left, top);
+            if (folder == "conver") {
+                createNumberHorizontalConver(currentNumber, left, top);
+            } else {
+                createNumberHorizontal(currentNumber, left, top);
+            }
         } else if (orientacaoEscolhida === "verticalDireita") {
-            createNumberVertical90(currentNumber, left, top);
+            if (folder == "conver") {
+                createNumberVertical90Conver(currentNumber, left, top);
+            } else {
+                createNumberVertical90(currentNumber, left, top);
+            }
         } else if (orientacaoEscolhida === "verticalEsquerda") {
-            createNumberVerticalNegative90(currentNumber, left, top);
+            if (folder == "conver") {
+                createNumberVerticalNegative90Conver(currentNumber, left, top);
+            } else {
+                createNumberVerticalNegative90(currentNumber, left, top);
+            }
         }
     }
 
@@ -170,7 +221,7 @@ var destinoDaCopia = new File(folderPathCopy + "/" + nomeArquivoTxtCopy + ".xml"
 if (arquivoTxt.copy(destinoDaCopia)) {
 
 } else {
-   // alert("VERIFICAR SE ESTA CONECTADO COM O AUTOMATION");
+    // alert("VERIFICAR SE ESTA CONECTADO COM O AUTOMATION");
 }
 
 
@@ -181,21 +232,21 @@ if (arquivoTxt.copy(destinoDaCopia)) {
 function getCurrentDateTime() {
     var now = new Date();
     return now.getFullYear() + "-" +
-           ("0" + (now.getMonth() + 1)).slice(-2) + "-" +
-           ("0" + now.getDate()).slice(-2) + " " +
-           ("0" + now.getHours()).slice(-2) + ":" +
-           ("0" + now.getMinutes()).slice(-2) + ":" +
-           ("0" + now.getSeconds()).slice(-2);
+        ("0" + (now.getMonth() + 1)).slice(-2) + "-" +
+        ("0" + now.getDate()).slice(-2) + " " +
+        ("0" + now.getHours()).slice(-2) + ":" +
+        ("0" + now.getMinutes()).slice(-2) + ":" +
+        ("0" + now.getSeconds()).slice(-2);
 }
 
 // Dados para o CSV
 var linhaCSV = resultadoOperadorNome + "," +
-               nomeScript + "," +
-               serviceOrderNumber + "," +
-               cliente + "," +
-               banda + "," +
-               "1," +
-               getCurrentDateTime() + "\n";
+    nomeScript + "," +
+    serviceOrderNumber + "," +
+    cliente + "," +
+    banda + "," +
+    "1," +
+    getCurrentDateTime() + "\n";
 
 // Caminho do arquivo CSV
 var arquivoCSV = new File(pastaDestino + "/data_records.csv");
@@ -204,4 +255,3 @@ var arquivoCSV = new File(pastaDestino + "/data_records.csv");
 arquivoCSV.open("a");
 arquivoCSV.write(linhaCSV);
 arquivoCSV.close();
-
