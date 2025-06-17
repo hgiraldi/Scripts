@@ -376,7 +376,7 @@ function main() {
 }
 
 
-if (folder != "ingaflex") {
+if ((folder != "ingaflex") || (folder != "grafica_goncalves")) {
 
     extrairNumerosDeTexto(doc);
 
@@ -753,7 +753,7 @@ function occurrences(string, subString, allowOverlapping) {
 
 
 //Checar se possui o label
-if (folder !== "ingaflex") {
+if ((folder != "ingaflex") || (folder != "grafica_goncalves")) {
 
     main();
 
@@ -772,13 +772,13 @@ if (folder !== "ingaflex") {
         labelOK = true;
     }
 } else {
-    alert("CLIENTE INGAFLEX - NÃO CHECADO LABEL POR CONTA DE SER ARQUIVO PRONTO (MUITOS OBJETOS)");
+    alert("CLIENTE PRONTO - NÃO CHECADO LABEL POR CONTA DE SER ARQUIVO PRONTO (MUITOS OBJETOS)");
     labelOK = true;
 }
 
 //Checagem para verificar se o nome do cliente esta no label
 
-if (folder !== "ingaflex") {
+if ((folder != "ingaflex") || (folder != "grafica_goncalves")) {
 
     var allFonts = extractTextFromDocument(doc);
     var allFontsString = allFonts.join("");
