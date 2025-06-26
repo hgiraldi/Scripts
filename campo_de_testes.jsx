@@ -175,7 +175,7 @@ for (var prop in clickObj) {
 
 
 // Gera conteúdo JSON "manual"
-var jsonSafe = '"T0001"';
+var jsonSafe = '"F0001"';
 
 
 
