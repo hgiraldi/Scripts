@@ -239,6 +239,7 @@ var cores = [];
 var coresD = [];
 var coresSemVernizBranco = [];
 var dotShape = [];
+var referenciaCor = [];
 
 for (i = 0; i < ncores; i++) {
     cores.push(jsonObject.Inks[0].Ink[i].@attributes.Name);
@@ -246,6 +247,7 @@ for (i = 0; i < ncores; i++) {
     coresD.push(jsonObject.Inks[0].Ink[i].@attributes.Name);
     uScreen.push(jsonObject.Inks[0].Ink[i].@attributes.uScreen);
     dotShape.push(jsonObject.Inks[0].Ink[i].@attributes.DotShape);
+    referenciaCor.push(jsonObject.Inks[0].Ink[i].@attributes.Ref);
 }
 
 
