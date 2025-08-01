@@ -7846,7 +7846,7 @@ function montagens(cust) {
     var pCli = (type.indexOf("o Cliente") >= 0)
     var cArquivo = (type.indexOf("Conforme Arquivo") >= 0)
 
-    if ((cust.indexOf("limpack") >= 0) && pCli) {
+    if (((cust.indexOf("limpack") >= 0) || (cust.indexOf("valipack_lima") >= 0)) && pCli) {
         montagemLimpack();
 
     } else if (((cust.indexOf("rioplastic") >= 0) || (cust.indexOf("embalagens_doma") >= 0)) && pCli) {
