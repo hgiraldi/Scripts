@@ -53,6 +53,7 @@ function createNumberHorizontalConver(number, left, top) {
 
 function createNumberVerticalNegative90Conver(number, left, top) {
     var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    textFrame.rotate(-90);
     if (number < 10) {
         textFrame.contents = "0" + number.toString();
     } else {
@@ -66,6 +67,7 @@ function createNumberVerticalNegative90Conver(number, left, top) {
 
 function createNumberVertical90Conver(number, left, top) {
     var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    textFrame.rotate(90);
     if (number < 10) {
         textFrame.contents = "0" + number.toString();
     } else {
@@ -89,22 +91,22 @@ function createNumberHorizontal(number, left, top) {
 
 function createNumberVertical90(number, left, top) {
     var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    textFrame.rotate(90);
     textFrame.contents = "- " + number.toString();
     textFrame.left = left + objectWidth + 10;
     textFrame.top = top;
     textFrame.textRange.characterAttributes.size = 2 * 2.83464567; // 2 mm in points
     textFrame.textRange.characterAttributes.textFont = app.textFonts.getByName("Futura-Bold");
-    textFrame.rotate(90);
 }
 
 function createNumberVerticalNegative90(number, left, top) {
     var textFrame = app.activeDocument.textFrames.add(numbersLayer);
+    textFrame.rotate(-90);
     textFrame.contents = "- " + number.toString();
     textFrame.left = left + objectWidth + 10;
     textFrame.top = top;
     textFrame.textRange.characterAttributes.size = 2 * 2.83464567; // 2 mm in points
     textFrame.textRange.characterAttributes.textFont = app.textFonts.getByName("Futura-Bold");
-    textFrame.rotate(-90);
 }
 
 // Create numbers for each repetition and lane
