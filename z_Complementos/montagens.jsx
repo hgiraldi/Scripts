@@ -6428,12 +6428,12 @@ function montagemPinhoPack() {
 
     //Grupo do Cameron
     var mainGroup = app.activeDocument.groupItems.add();
-    //groupDuplicateUpD.move(mainGroup, ElementPlacement.PLACEATEND);
-    //groupDuplicateDownD.move(mainGroup, ElementPlacement.PLACEATEND);
     finalGroupD.move(mainGroup, ElementPlacement.PLACEATEND);
+    cameronD.move(mainGroup, ElementPlacement.PLACEATEND);
+    groupDuplicateUpD.move(mainGroup, ElementPlacement.PLACEATEND);
+    groupDuplicateDownD.move(mainGroup, ElementPlacement.PLACEATEND);
     grupoDeRetangulosD.move(mainGroup, ElementPlacement.PLACEATEND);
     //brancoCameronD.move(mainGroup, ElementPlacement.PLACEATEND);
-    cameronD.move(mainGroup, ElementPlacement.PLACEATEND);
 
     mainGroup.position = [mainGroup.position[0] + distanceBetweenRectangles - (larguraMarcaDeCorte - sizeCameron), mainGroup.position[1]];
     mainGroup.rotate(180);
