@@ -753,7 +753,7 @@ function occurrences(string, subString, allowOverlapping) {
 
 
 //Checar se possui o label
-if ((folder != "ingaflex") || (folder != "grafica_goncalves")) {
+if ((folder != "ingaflex") || (folder != "grafica_goncalves") || (folder != "penha_sa")) {
 
     main();
 
@@ -778,7 +778,7 @@ if ((folder != "ingaflex") || (folder != "grafica_goncalves")) {
 
 //Checagem para verificar se o nome do cliente esta no label
 
-if ((folder != "ingaflex") || (folder != "grafica_goncalves")) {
+if ((folder != "ingaflex") || (folder != "grafica_goncalves") || (folder != "penha_sa")) {
 
     var allFonts = extractTextFromDocument(doc);
     var allFontsString = allFonts.join("");
