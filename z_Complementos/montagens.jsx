@@ -19,42 +19,66 @@ function label(cust) {
         var texto = doc.textFrames.add();
         texto.contents = cliente + " - " + produto + " - " + cpc + " - " + formatarData(new Date()) + " - ";
         texto.textRange.paragraphAttributes.justification = Justification.RIGHT;
-        texto.textRange.characterAttributes.size = 5; // Tamanho de 1,7 mm
+        texto.textRange.characterAttributes.size = 5; // ~1,7 mm
         texto.textRange.fillColor = registrationColor;
 
-        // Posicione o texto conforme necessário
+        // Posiciona o texto base
         texto.position = [5, -5];
 
         var grupoLabel = app.activeDocument.groupItems.add();
         texto.move(grupoLabel, ElementPlacement.PLACEATEND);
 
-        // Crie um objeto de texto para cada parte de cores
-        var coresTexto = [];
+        // --- checa se é Bellissima COM algum coresD != "C"
+        var isBellissima = (mode == "Bellissima");
+        var hasNonC = false;
+        if (isBellissima && coresD && coresD.length) {
+            for (var j = 0; j < coresD.length; j++) {
+                if (coresD[j] !== "C") {
+                    hasNonC = true;
+                    break;
+                }
+            }
+        }
 
+        // Cria um textFrame por cor já com o conteúdo correto (uScreen ou mix)
+        var coresTexto = [];
         for (var i = 0; i < cores.length; i++) {
             var corTexto = doc.textFrames.add();
-            corTexto.contents = uScreen[i];
+
+            if (isBellissima && hasNonC) {
+
+                if (dotShape[i] == "C") {
+                    corTexto.contents = uScreen[i];
+                    alert("Aqui")
+                } else {
+                    corTexto.contents = coresD[i];
+                    alert("Aqui 2")
+                }
+            } else {
+                // Advantage ou Bellissima sem não-C: usa uScreen puro
+                corTexto.contents = uScreen[i];
+            }
+
             coresTexto.push(corTexto);
         }
 
-        // Aplique a cor a cada parte do texto com base na sequência de coresComuns
-        for (var i = 0; i < coresComuns.length; i++) {
-            aplicarCorTexto(coresTexto[i], coresComuns[i]);
+        // Aplica cor conforme coresComuns
+        for (var j = 0; j < coresComuns.length && j < coresTexto.length; j++) {
+            aplicarCorTexto(coresTexto[j], coresComuns[j]);
         }
 
-        // Combine todas as partes do texto em um único objeto de texto
-        var textoCores = doc.textFrames.add();
+        // Posiciona as tags de cor na sequência
+        var textoCores = doc.textFrames.add(); // (mantido se você usa em outro lugar)
         var xPosition = texto.width + 5;
 
-        for (var i = 0; i < coresTexto.length; i++) {
-            var corTexto = coresTexto[i];
-            corTexto.textRange.size = 5;
-            corTexto.position = [xPosition, -5];
-            xPosition += corTexto.width + 1; // Ajuste a posição horizontal para a próxima parte
-            corTexto.move(grupoLabel, ElementPlacement.PLACEATEND);
-
-
+        for (var k = 0; k < coresTexto.length; k++) {
+            var t = coresTexto[k];
+            t.textRange.characterAttributes.size = 5;
+            t.position = [xPosition, -5];
+            xPosition += t.width + 1; // espaçamento
+            t.move(grupoLabel, ElementPlacement.PLACEATEND);
         }
+
 
 
     } else if (((cust.indexOf("rioplastic") >= 0) || (cust.indexOf("embalagens_doma") >= 0)) && (mode == "HD Flexo")) {
@@ -2263,7 +2287,7 @@ function montagemEdiprint() {
         cameronCentralGroup.left = centerX - cameronCentralGroup.width / 2;
         cameronCentralGroup.top = centerY + cameronCentralGroup.height / 2 + displacementBetweenLanes / 2;
 
-         var circuloPretoCores = sizeCameron * 0.9;
+        var circuloPretoCores = sizeCameron * 0.9;
         var distanciaPreto = 0.3;
         var yCoordPreto = 10 + (circuloPretoCores * 1.1);
 
@@ -2389,8 +2413,8 @@ function montagemEdiprint() {
         //marcar de corte cameron
         var larguraMarcaDeCorte = sizeCameron * 1.5;
         var alturaMarceDeCorte = 0.1 / 0.35277777777782;
-        var marcaDeCorte = createBlackRectangle((sizeCameron - larguraMarcaDeCorte), (-alturaMarceDeCorte / 2) - sizeCameron/2, larguraMarcaDeCorte, alturaMarceDeCorte);
-        
+        var marcaDeCorte = createBlackRectangle((sizeCameron - larguraMarcaDeCorte), (-alturaMarceDeCorte / 2) - sizeCameron / 2, larguraMarcaDeCorte, alturaMarceDeCorte);
+
         // Duplicar o objeto para cima
         var marcaDeCorteDuplicada = marcaDeCorte.duplicate();
         marcaDeCorteDuplicada.top = marcaDeCorte.top - cylinderSize; // Posição duplicada para cima
@@ -2539,7 +2563,7 @@ function montagemEdiprint() {
         retanguloCirculosCores.left = 0.25 / 0.35277777777782;
         grupoCirculosColoridos.left = 0.275 / 0.35277777777782;
 
-        
+
 
         retanguloCirculosCores.zOrder(ZOrderMethod.SENDBACKWARD);
 
@@ -2640,9 +2664,9 @@ function montagemEdiprint() {
         var grupoLabelFinal = app.activeDocument.groupItems.add();
         grupoLabel.move(grupoLabelFinal, ElementPlacement.PLACEATEND);
         retangulo.move(grupoLabelFinal, ElementPlacement.PLACEATEND);
-    
+
         grupoLabelFinal.left = 0.25 / 0.35277777777782;
-        
+
 
 
         //marcar de corte cameron
@@ -2650,7 +2674,7 @@ function montagemEdiprint() {
         var alturaMarceDeCorte = 0.1 / 0.35277777777782;
         var marcaDeCorte = createBlackRectangle((sizeCameron - larguraMarcaDeCorte), (-alturaMarceDeCorte / 2), larguraMarcaDeCorte, alturaMarceDeCorte);
         marcaDeCorte.left = 0;
-        
+
         // Duplicar o objeto para cima
         var marcaDeCorteDuplicada = marcaDeCorte.duplicate();
         marcaDeCorteDuplicada.top = marcaDeCorte.top - cylinderSize; // Posição duplicada para cima
