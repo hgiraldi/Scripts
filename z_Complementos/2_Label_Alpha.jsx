@@ -222,43 +222,65 @@ function label(cust) {
         var texto = doc.textFrames.add();
         texto.contents = cliente + " - " + produto + " - " + cpc + " - " + formatarData(new Date()) + " - ";
         texto.textRange.paragraphAttributes.justification = Justification.RIGHT;
-        texto.textRange.characterAttributes.size = 5; // Tamanho de 1,7 mm
+        texto.textRange.characterAttributes.size = 5; // ~1,7 mm
         texto.textRange.fillColor = registrationColor;
 
-        // Posicione o texto conforme necessário
+        // Posiciona o texto base
         texto.position = [5, -5];
 
         var grupoLabel = app.activeDocument.groupItems.add();
         texto.move(grupoLabel, ElementPlacement.PLACEATEND);
 
-        // Crie um objeto de texto para cada parte de cores
-        var coresTexto = [];
+        // --- checa se é Bellissima COM algum coresD != "C"
+        var isBellissima = (mode == "Bellissima");
+        var hasNonC = false;
+        if (isBellissima && coresD && coresD.length) {
+            for (var j = 0; j < coresD.length; j++) {
+                if ( coresD[j] !== "C") {
+                    hasNonC = true;
+                    break;
+                }
+            }
+        }
 
+        // Cria um textFrame por cor já com o conteúdo correto (uScreen ou mix)
+        var coresTexto = [];
         for (var i = 0; i < cores.length; i++) {
             var corTexto = doc.textFrames.add();
-            corTexto.contents = uScreen[i];
+
+            if (isBellissima && hasNonC) {
+                
+                if (dotShape[i] == "C") {
+                    corTexto.contents = uScreen[i];
+                    alert("Aqui")
+                } else {
+                    corTexto.contents = coresD[i];
+                    alert("Aqui 2")
+                }
+            } else {
+                // Advantage ou Bellissima sem não-C: usa uScreen puro
+                corTexto.contents = uScreen[i];
+            }
+
             coresTexto.push(corTexto);
         }
 
-        // Aplique a cor a cada parte do texto com base na sequência de coresComuns
-        for (var i = 0; i < coresComuns.length; i++) {
-            aplicarCorTexto(coresTexto[i], coresComuns[i]);
+        // Aplica cor conforme coresComuns
+        for (var j = 0; j < coresComuns.length && j < coresTexto.length; j++) {
+            aplicarCorTexto(coresTexto[j], coresComuns[j]);
         }
 
-        // Combine todas as partes do texto em um único objeto de texto
-        var textoCores = doc.textFrames.add();
+        // Posiciona as tags de cor na sequência
+        var textoCores = doc.textFrames.add(); // (mantido se você usa em outro lugar)
         var xPosition = texto.width + 5;
 
-        for (var i = 0; i < coresTexto.length; i++) {
-            var corTexto = coresTexto[i];
-            corTexto.textRange.size = 5;
-            corTexto.position = [xPosition, -5];
-            xPosition += corTexto.width + 1; // Ajuste a posição horizontal para a próxima parte
-            corTexto.move(grupoLabel, ElementPlacement.PLACEATEND);
-
-
+        for (var k = 0; k < coresTexto.length; k++) {
+            var t = coresTexto[k];
+            t.textRange.characterAttributes.size = 5;
+            t.position = [xPosition, -5];
+            xPosition += t.width + 1; // espaçamento
+            t.move(grupoLabel, ElementPlacement.PLACEATEND);
         }
-
 
     } else if (((cust.indexOf("rioplastic") >= 0) || (cust.indexOf("embalagens_doma") >= 0)) && (mode == "HD Flexo")) {
 
@@ -884,7 +906,7 @@ function label(cust) {
         texto.move(grupoLabel, ElementPlacement.PLACEATEND);
 
 
-   } else if (cust.indexOf("ceti") >= 0) {
+    } else if (cust.indexOf("ceti") >= 0) {
 
         var texto = doc.textFrames.add();
         texto.contents = cliente + " - " + nomeArte + " - " + produto + " - " + formatarData(new Date()) + " - ";
@@ -1173,21 +1195,21 @@ if (arquivoTxt.copy(destinoDaCopia)) {
 function getCurrentDateTime() {
     var now = new Date();
     return now.getFullYear() + "-" +
-           ("0" + (now.getMonth() + 1)).slice(-2) + "-" +
-           ("0" + now.getDate()).slice(-2) + " " +
-           ("0" + now.getHours()).slice(-2) + ":" +
-           ("0" + now.getMinutes()).slice(-2) + ":" +
-           ("0" + now.getSeconds()).slice(-2);
+        ("0" + (now.getMonth() + 1)).slice(-2) + "-" +
+        ("0" + now.getDate()).slice(-2) + " " +
+        ("0" + now.getHours()).slice(-2) + ":" +
+        ("0" + now.getMinutes()).slice(-2) + ":" +
+        ("0" + now.getSeconds()).slice(-2);
 }
 
 // Dados para o CSV
 var linhaCSV = resultadoOperadorNome + "," +
-               nomeScript + "," +
-               serviceOrderNumber + "," +
-               cliente + "," +
-               banda + "," +
-               "1," +
-               getCurrentDateTime() + "\n";
+    nomeScript + "," +
+    serviceOrderNumber + "," +
+    cliente + "," +
+    banda + "," +
+    "1," +
+    getCurrentDateTime() + "\n";
 
 // Caminho do arquivo CSV
 var arquivoCSV = new File(pastaDestino + "/data_records.csv");
@@ -1196,4 +1218,3 @@ var arquivoCSV = new File(pastaDestino + "/data_records.csv");
 arquivoCSV.open("a");
 arquivoCSV.write(linhaCSV);
 arquivoCSV.close();
-
