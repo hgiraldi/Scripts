@@ -224,15 +224,6 @@ dlg.orientation = 'column';
 dlg.alignChildren = ['fill', 'top'];
 dlg.margins = 14;
 
-// Dimensões
-var pDim = dlg.add('panel', undefined, 'Dimensões (mm)');
-pDim.orientation = 'column';
-pDim.alignChildren = ['left', 'top'];
-pDim.margins = 12;
-dlg.edAbaSup = addRow(pDim, 'Altura da ABA SUPERIOR:', '');
-dlg.edPainel = addRow(pDim, 'Altura do PAINEL:', '');
-dlg.edAbaInf = addRow(pDim, 'Altura da ABA INFERIOR:', '');
-
 // Larguras
 var pLarg = dlg.add('panel', undefined, 'Larguras dos 4 Painéis (mm)');
 pLarg.orientation = 'column';
@@ -242,6 +233,17 @@ dlg.edP1 = addRow(pLarg, 'Largura PAINEL 1:', '');
 dlg.edP2 = addRow(pLarg, 'Largura PAINEL 2:', '');
 dlg.edP3 = addRow(pLarg, 'Largura PAINEL 3:', '');
 dlg.edP4 = addRow(pLarg, 'Largura PAINEL 4:', '');
+
+
+// Dimensões
+var pDim = dlg.add('panel', undefined, 'Dimensões (mm)');
+pDim.orientation = 'column';
+pDim.alignChildren = ['left', 'top'];
+pDim.margins = 12;
+dlg.edAbaSup = addRow(pDim, 'Altura da ABA SUPERIOR:', '');
+dlg.edPainel = addRow(pDim, 'Altura do PAINEL:', '');
+dlg.edAbaInf = addRow(pDim, 'Altura da ABA INFERIOR:', '');
+
 
 // Lap
 var pLap = dlg.add('panel', undefined, 'Lap');
@@ -262,7 +264,7 @@ dlg.rbEsq.value = true; // padrão
 dlg.okButton = dlg.add('button', undefined, 'OK');
 dlg.cancelButton = dlg.add('button', undefined, 'Cancelar');
 
-dlg.edAbaSup.active = true;
+dlg.edP1.active = true;
 
 // ---- Ação OK (salva nas VARS GLOBAIS e fecha) ----
 dlg.okButton.onClick = function() {
