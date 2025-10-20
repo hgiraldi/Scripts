@@ -206,7 +206,7 @@ function chamaMicroponto() {
     if ((folder.indexOf("videplast") >= 0)) {
         micropontoVideplast();
 
-    } else if ((folder.indexOf("fortplast") >= 0)) {
+    } else if ((folder.indexOf("fortplast") >= 0) || (folder.indexOf("olimplastic") >= 0)) {
         micropontoFortplast();
 
     } else if ((folder.indexOf("valfilm_passa_4") >= 0)) {
