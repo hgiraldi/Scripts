@@ -3,18 +3,18 @@
 /**
  * 10_Medicao_Ondulado.jsx
  * Mede cada layer pelo conteúdo VISÍVEL real:
- * - Respeita máscaras de recorte (clipping) em qualquer nível
+ * - Respeita máscaras de recorte (clipping) em qualquer nível (inclui Compound Path como máscara)
  * - Para grupos clipped, usa a INTERSEÇÃO entre a máscara e o conteúdo visível
  * - Ignora paths “vazios” (sem fill e sem stroke) e itens com opacity == 0
  * - Não altera a arte (sem group/ungroup); gera o XML no _log da O.S.
  *
  * Observações:
  * - Usa geometricBounds para não contar “engorda” por stroke.
- *   Se quiser considerar o stroke visível, troque geometricBounds -> visibleBounds
+ *   Se quiser considerar stroke visível, troque geometricBounds -> visibleBounds
  *   nas partes indicadas (itens não-grupo).
  * - Opacity Mask (máscara de opacidade) não é exposta na API; este método não a considera.
- * - Variáveis externas esperadas como no seu fluxo: serviceOrderNumber, resultadoOperadorNome,
- *   resultadoOperador, cliente, folder.
+ * - Variáveis externas esperadas: serviceOrderNumber, resultadoOperadorNome,
+ *   resultadoOperador, cliente, folder (mantidas).
  */
 
 // === Helpers existentes ===
@@ -66,7 +66,7 @@ function unionBounds(acc, b) {
     if (!b) return acc;
     if (!acc) return [b[0], b[1], b[2], b[3]];
     var left   = Math.min(acc[0], b[0]);
-    var top    = Math.max(acc[1], b[1]); // top = maior
+    var top    = Math.max(acc[1], b[1]); // top = maior (sistema do Illustrator)
     var right  = Math.max(acc[2], b[2]);
     var bottom = Math.min(acc[3], b[3]); // bottom = menor
     return [left, top, right, bottom];
@@ -78,8 +78,8 @@ function intersectBounds(a, b) {
     if (!a || !b) return null;
     var left   = Math.max(a[0], b[0]);
     var right  = Math.min(a[2], b[2]);
-    var top    = Math.min(a[1], b[1]); // INTERSEÇÃO: top é o menor dos tops
-    var bottom = Math.max(a[3], b[3]); // INTERSEÇÃO: bottom é o maior dos bottoms
+    var top    = Math.min(a[1], b[1]); // para a interseção, top = menor(topA, topB)
+    var bottom = Math.max(a[3], b[3]); // para a interseção, bottom = maior(bottomA, bottomB)
     if (left >= right || bottom >= top) return null;
     return [left, top, right, bottom];
 }
@@ -98,7 +98,7 @@ function shouldIgnoreItemByStyle(it) {
         return false;
     }
 
-    // CompoundPathItem: verifica se há AO MENOS um path filho preenchido ou com stroke
+    // CompoundPathItem: ao menos um path filho precisa ter fill/stroke
     if (it.typename === "CompoundPathItem") {
         try {
             if (it.pathItems && it.pathItems.length > 0) {
@@ -118,11 +118,41 @@ function shouldIgnoreItemByStyle(it) {
     return false;
 }
 
+// Procura a BOUND da máscara de recorte em um GroupItem clipped,
+// cobrindo casos em que a máscara é PathItem OU CompoundPathItem.
+function findMaskBoundsInGroup(grp) {
+    var i, p, cp, k;
+
+    // 1) PathItem com clipping == true
+    for (i = 0; i < grp.pathItems.length; i++) {
+        p = grp.pathItems[i];
+        try {
+            if (p.clipping) return p.geometricBounds;
+        } catch (e1) {}
+    }
+
+    // 2) CompoundPathItem contendo ao menos um PathItem com clipping == true
+    for (i = 0; i < grp.compoundPathItems.length; i++) {
+        cp = grp.compoundPathItems[i];
+        try {
+            for (k = 0; k < cp.pathItems.length; k++) {
+                p = cp.pathItems[k];
+                try {
+                    if (p.clipping) return p.geometricBounds;
+                } catch (e2) {}
+            }
+        } catch (e3) {}
+    }
+
+    // 3) Fallback raríssimo: se nada marcado como clipping, volta bounds do grupo
+    return grp.geometricBounds;
+}
+
 /**
  * Retorna bounds visíveis REAIS de QUALQUER item, descendo na hierarquia.
  * Regras:
  * 1) GroupItem.clipped == true:
- *    - encontra a máscara (clipping path) -> maskB
+ *    - encontra a máscara (Path ou Compound Path) -> maskB
  *    - une bounds visíveis dos filhos (EXCETO a própria máscara), ignorando itens “vazios”
  *    - retorna a INTERSEÇÃO: intersectBounds(maskB, childrenB)
  *
@@ -140,36 +170,37 @@ function getVisibleBoundsDeep(it) {
         if (it.typename === "GroupItem") {
             // Grupo com máscara de recorte
             if (it.clipped) {
-                var maskB = null;
-                // 1) encontra mask
-                for (var j = 0; j < it.pathItems.length; j++) {
-                    var p = it.pathItems[j];
-                    if (p.clipping) {
-                        maskB = p.geometricBounds; // base do recorte
-                        break;
-                    }
-                }
-                // fallback (raro): se não achou flag clipping, considera bounds do grupo
-                if (!maskB) maskB = it.geometricBounds;
+                var maskB = findMaskBoundsInGroup(it);
 
-                // 2) une conteúdo visível (exceto a máscara)
+                // Une conteúdo visível (exceto a máscara)
                 var childrenB = null;
-                for (var k = 0; k < it.pageItems.length; k++) {
-                    var child = it.pageItems[k];
+                for (var j = 0; j < it.pageItems.length; j++) {
+                    var child = it.pageItems[j];
 
-                    // pular a própria máscara
+                    // pular a própria máscara (Path ou Path dentro de CompoundPath)
                     if (child.typename === "PathItem") {
                         try { if (child.clipping) continue; } catch (e0) {}
                     }
+                    if (child.typename === "CompoundPathItem") {
+                        // se QUALQUER path do compound tiver clipping, considera que é a máscara
+                        var isMask = false;
+                        try {
+                            for (var kk = 0; kk < child.pathItems.length; kk++) {
+                                var pp = child.pathItems[kk];
+                                try { if (pp.clipping) { isMask = true; break; } } catch (e01) {}
+                            }
+                        } catch (e02) {}
+                        if (isMask) continue;
+                    }
 
                     // ignorar itens vazios
-                    if (shouldIgnoreItemByStyle(child)) continue;
+                    if (shouldIgnoreItemByStyle(child) && child.typename !== "GroupItem") continue;
 
                     var cb = getVisibleBoundsDeep(child);
                     childrenB = unionBounds(childrenB, cb);
                 }
 
-                // 3) retorna interseção: conteúdo ∩ máscara
+                // Interseção: conteúdo ∩ máscara
                 if (!childrenB) return null;
                 var inter = intersectBounds(maskB, childrenB);
                 return inter ? inter : null;
@@ -190,7 +221,7 @@ function getVisibleBoundsDeep(it) {
         if (shouldIgnoreItemByStyle(it)) return null;
 
         // geometricBounds não conta engorda de stroke
-        return it.geometricBounds;
+        return it.geometricBounds; // troque por it.visibleBounds se quiser contar stroke
 
     } catch (e) {
         // Alguns itens de plugin podem lançar exceção; ignoramos
