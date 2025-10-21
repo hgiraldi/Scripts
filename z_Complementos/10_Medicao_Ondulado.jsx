@@ -1,5 +1,23 @@
 #include "Xml_upload.jsx"
 
+/**
+ * 10_Medicao_Ondulado.jsx
+ * Mede cada layer pelo conteúdo VISÍVEL real:
+ * - Respeita máscaras de recorte (clipping) em qualquer nível
+ * - Para grupos clipped, usa a INTERSEÇÃO entre a máscara e o conteúdo visível
+ * - Ignora paths “vazios” (sem fill e sem stroke) e itens com opacity == 0
+ * - Não altera a arte (sem group/ungroup); gera o XML no _log da O.S.
+ *
+ * Observações:
+ * - Usa geometricBounds para não contar “engorda” por stroke.
+ *   Se quiser considerar o stroke visível, troque geometricBounds -> visibleBounds
+ *   nas partes indicadas (itens não-grupo).
+ * - Opacity Mask (máscara de opacidade) não é exposta na API; este método não a considera.
+ * - Variáveis externas esperadas como no seu fluxo: serviceOrderNumber, resultadoOperadorNome,
+ *   resultadoOperador, cliente, folder.
+ */
+
+// === Helpers existentes ===
 function LayerInfo(name, width, height) {
     this.name = name;
     this.width = width;
@@ -7,114 +25,273 @@ function LayerInfo(name, width, height) {
 }
 
 function pointsToMM(points) {
-    return (points * 0.35278).toFixed(1); // Converte pontos para mm e formata com 1 casa decimal
+    return (points * 0.35278).toFixed(1); // 1pt = 0,35278 mm
 }
 
 function pointsToCM(points) {
-    return (points * 0.035278).toFixed(0); // Converte pontos para cm e formata para inteiro
+    return (points * 0.035278).toFixed(0); // 1pt = 0,035278 cm
 }
 
 function saveXMLToFile(xmlContent, filePath) {
     var file = new File(filePath);
-    file.encoding = "UTF-8"; // Define a codificação UTF-8 para o arquivo XML
-    file.open("w"); // Abre o arquivo para escrita
-    file.write(xmlContent); // Escreve o conteúdo XML no arquivo
-    file.close(); // Fecha o arquivo
+    file.encoding = "UTF-8";
+    file.open("w");
+    file.write(xmlContent);
+    file.close();
 }
 
-// Function to get platform-specific folder path
+// === Caminho de saída no _log (mantido) ===
 function getFolderPathCopyLog() {
     var folderPathCopy = "";
-
-    // Check the operating system
     if ($.os.indexOf("Windows") !== -1) {
-        // Windows folder path
         folderPathCopy = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
     } else {
-        // Mac folder path
         folderPathCopy = "/Engine/_Jobfolder/" + serviceOrderNumber + "/_log/";
     }
-
     return folderPathCopy;
 }
-
-// Obtém o caminho para a pasta de destino
 var folderPathCopy = getFolderPathCopyLog();
 
-// Defina o nome do arquivo XML aqui
-var xmlFileName = serviceOrderNumber + "_AI_STAGGERED.xml"; // Substitua pelo nome desejado
+// Nome do XML (mantido)
+var xmlFileName = serviceOrderNumber + "_AI_STAGGERED.xml";
 
-// Definir a margem em milímetros
-var margemMM = 0; // Substitua pelo valor de margem desejado
-var margemCM = (margemMM / 10).toFixed(1); // Converte a margem para centímetros
+// Margem adicional (em mm / cm)
+var margemMM = 0; // ajuste se desejar
+var margemCM = (margemMM / 10).toFixed(1);
 
+// ===================== BLOCO: Medição VISÍVEL =====================
+
+// Une bounds [L, T, R, B]
+function unionBounds(acc, b) {
+    if (!b) return acc;
+    if (!acc) return [b[0], b[1], b[2], b[3]];
+    var left   = Math.min(acc[0], b[0]);
+    var top    = Math.max(acc[1], b[1]); // top = maior
+    var right  = Math.max(acc[2], b[2]);
+    var bottom = Math.min(acc[3], b[3]); // bottom = menor
+    return [left, top, right, bottom];
+}
+
+// Interseção de dois retângulos [L, T, R, B]; retorna null se não há interseção
+// (No Illustrator: top > bottom)
+function intersectBounds(a, b) {
+    if (!a || !b) return null;
+    var left   = Math.max(a[0], b[0]);
+    var right  = Math.min(a[2], b[2]);
+    var top    = Math.min(a[1], b[1]); // INTERSEÇÃO: top é o menor dos tops
+    var bottom = Math.max(a[3], b[3]); // INTERSEÇÃO: bottom é o maior dos bottoms
+    if (left >= right || bottom >= top) return null;
+    return [left, top, right, bottom];
+}
+
+// Testa se um item deve ser ignorado por ser “invisível” para medição
+function shouldIgnoreItemByStyle(it) {
+    try {
+        if (it.opacity === 0) return true;
+    } catch (e) {}
+
+    // PathItem
+    if (it.typename === "PathItem") {
+        try {
+            if (!it.filled && !it.stroked) return true;
+        } catch (e1) {}
+        return false;
+    }
+
+    // CompoundPathItem: verifica se há AO MENOS um path filho preenchido ou com stroke
+    if (it.typename === "CompoundPathItem") {
+        try {
+            if (it.pathItems && it.pathItems.length > 0) {
+                var anyVis = false;
+                for (var i = 0; i < it.pathItems.length; i++) {
+                    var p = it.pathItems[i];
+                    try { if (p.opacity === 0) continue; } catch (e0) {}
+                    if (p.filled || p.stroked) { anyVis = true; break; }
+                }
+                return !anyVis;
+            }
+        } catch (e2) {}
+        return false;
+    }
+
+    // TextFrame, PlacedItem, RasterItem, SymbolItem, MeshItem etc.: mantemos (a não ser opacity 0)
+    return false;
+}
+
+/**
+ * Retorna bounds visíveis REAIS de QUALQUER item, descendo na hierarquia.
+ * Regras:
+ * 1) GroupItem.clipped == true:
+ *    - encontra a máscara (clipping path) -> maskB
+ *    - une bounds visíveis dos filhos (EXCETO a própria máscara), ignorando itens “vazios”
+ *    - retorna a INTERSEÇÃO: intersectBounds(maskB, childrenB)
+ *
+ * 2) GroupItem (sem clipping):
+ *    - une recursivamente bounds dos filhos visíveis, ignorando itens “vazios”
+ *
+ * 3) Demais tipos (Path/CompoundPath/etc.):
+ *    - se “vazio” (sem fill e sem stroke) -> ignora (null)
+ *    - senão retorna geometricBounds (troque para visibleBounds se quiser contar stroke)
+ */
+function getVisibleBoundsDeep(it) {
+    if (!it || it.hidden || it.locked) return null;
+
+    try {
+        if (it.typename === "GroupItem") {
+            // Grupo com máscara de recorte
+            if (it.clipped) {
+                var maskB = null;
+                // 1) encontra mask
+                for (var j = 0; j < it.pathItems.length; j++) {
+                    var p = it.pathItems[j];
+                    if (p.clipping) {
+                        maskB = p.geometricBounds; // base do recorte
+                        break;
+                    }
+                }
+                // fallback (raro): se não achou flag clipping, considera bounds do grupo
+                if (!maskB) maskB = it.geometricBounds;
+
+                // 2) une conteúdo visível (exceto a máscara)
+                var childrenB = null;
+                for (var k = 0; k < it.pageItems.length; k++) {
+                    var child = it.pageItems[k];
+
+                    // pular a própria máscara
+                    if (child.typename === "PathItem") {
+                        try { if (child.clipping) continue; } catch (e0) {}
+                    }
+
+                    // ignorar itens vazios
+                    if (shouldIgnoreItemByStyle(child)) continue;
+
+                    var cb = getVisibleBoundsDeep(child);
+                    childrenB = unionBounds(childrenB, cb);
+                }
+
+                // 3) retorna interseção: conteúdo ∩ máscara
+                if (!childrenB) return null;
+                var inter = intersectBounds(maskB, childrenB);
+                return inter ? inter : null;
+            }
+
+            // Grupo normal: desce e une filhos
+            var b = null;
+            for (var i = 0; i < it.pageItems.length; i++) {
+                var child2 = it.pageItems[i];
+                if (shouldIgnoreItemByStyle(child2) && child2.typename !== "GroupItem") continue;
+                var cb2 = getVisibleBoundsDeep(child2);
+                b = unionBounds(b, cb2);
+            }
+            return b;
+        }
+
+        // Itens não-grupo
+        if (shouldIgnoreItemByStyle(it)) return null;
+
+        // geometricBounds não conta engorda de stroke
+        return it.geometricBounds;
+
+    } catch (e) {
+        // Alguns itens de plugin podem lançar exceção; ignoramos
+        return null;
+    }
+}
+
+// Calcula bounds visíveis agregadas dos itens de topo da layer (recursivo nos grupos).
+function getLayerVisibleBounds(layer) {
+    var bounds = null;
+    for (var i = 0; i < layer.pageItems.length; i++) {
+        var topItem = layer.pageItems[i];
+        if (topItem.hidden || topItem.locked) continue;
+        if (shouldIgnoreItemByStyle(topItem) && topItem.typename !== "GroupItem") continue;
+        var b = getVisibleBoundsDeep(topItem);
+        bounds = unionBounds(bounds, b);
+    }
+    return bounds; // null se nada válido
+}
+
+// Converte bounds [L, T, R, B] em números nas 3 unidades (sem arredondar aqui)
+function boundsToDims(bounds) {
+    var widthPt  = bounds[2] - bounds[0];
+    var heightPt = bounds[1] - bounds[3];
+    return {
+        wPt: widthPt,
+        hPt: heightPt,
+        wMM: (widthPt  * 0.35278),
+        hMM: (heightPt * 0.35278),
+        wCM: (widthPt  * 0.035278),
+        hCM: (heightPt * 0.035278)
+    };
+}
+
+// ===================== Principal =====================
 function groupLayersAndGenerateXML() {
     var doc = app.activeDocument;
     var layerInfoArray = [];
 
-    // Contador de jobColors baseado no prefixo das layers
-    var jobColorsCount = {}; // Armazenará as cores únicas
-    var uniqueColorCount = 0; // Contador de cores únicas
+    // Contagem de cores únicas por prefixo (ex.: "azul1", "azul2" => "azul")
+    var jobColorsCount = {};
+    var uniqueColorCount = 0;
 
-    // Percorre todas as layers no documento
+    // Percorre layers do documento
     for (var i = 0; i < doc.layers.length; i++) {
         var layer = doc.layers[i];
 
-        if (layer.pageItems.length > 0) {
-            layer.hasSelectedArtwork = true;
-            var group = app.executeMenuCommand('group');
-            group = doc.selection[0];
+        // Pula layers realmente vazias
+        if (layer.pageItems.length === 0) continue;
 
-            // Converte as medidas do grupo para mm e cm
-            var widthInMM = (parseFloat(pointsToMM(group.width)) + parseFloat(margemMM)).toFixed(1);
-            var heightInMM = (parseFloat(pointsToMM(group.height)) + parseFloat(margemMM)).toFixed(1);
-            var widthInCM = (parseFloat(pointsToCM(group.width)) + parseFloat(margemCM)).toFixed(0);
-            var heightInCM = (parseFloat(pointsToCM(group.height)) + parseFloat(margemCM)).toFixed(0);
+        // Mede bounds visíveis da layer (sem agrupar nada)
+        var lb = getLayerVisibleBounds(layer);
+        if (!lb) continue; // só itens ocultos/travados/vazios etc.
 
-            // Armazenar o prefixo do nome para contar cores (ex: azul1, azul2 -> azul)
-            var colorPrefix = layer.name.replace(/\d+$/, ''); // Remove dígitos finais do nome
+        var dims = boundsToDims(lb);
 
-            // Contabiliza cores únicas
-            if (!jobColorsCount[colorPrefix]) {
-                jobColorsCount[colorPrefix] = true; // Marca o prefixo como visto
-                uniqueColorCount++; // Incrementa o contador de cores únicas
-            }
+        // Aplica margem (somando nas grandezas em mm/cm)
+        var widthInMM  = (dims.wMM + parseFloat(margemMM)).toFixed(1);
+        var heightInMM = (dims.hMM + parseFloat(margemMM)).toFixed(1);
+        var widthInCM  = (dims.wCM + parseFloat(margemCM)).toFixed(0);
+        var heightInCM = (dims.hCM + parseFloat(margemCM)).toFixed(0);
 
-            var layerInfo = new LayerInfo(layer.name, widthInMM, heightInMM);
-            layerInfoArray.push({
-                name: layer.name,
-                widthInMM: widthInMM,
-                heightInMM: heightInMM,
-                widthInCM: widthInCM,
-                heightInCM: heightInCM
-            });
-
-            group.name = layer.name;
-            doc.selection = null;
+        // Conta cor única pelo prefixo sem o sufixo numérico
+        var colorPrefix = layer.name.replace(/\d+$/, '');
+        if (!jobColorsCount[colorPrefix]) {
+            jobColorsCount[colorPrefix] = true;
+            uniqueColorCount++;
         }
+
+        // Guarda info para o XML
+        layerInfoArray.push({
+            name: layer.name,
+            widthInMM:  widthInMM,
+            heightInMM: heightInMM,
+            widthInCM:  widthInCM,
+            heightInCM: heightInCM
+        });
     }
 
-    // Contar as layers (Plates)
+    // Quantidade de chapas = nº de layers medidas
     var platesCount = layerInfoArray.length;
 
-    // Gerar o XML
+    // ===================== Geração do XML (mantida) =====================
     var xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<Billing>\n';
     xml += '    <Customer Billed="0" Operador="' + resultadoOperadorNome + '" Folder="' + folder + '" JobColors="' + uniqueColorCount + '" Name="' + cliente + '" Order="' + serviceOrderNumber + '" Plates="' + platesCount + '" crop="" mb="" ml="" mr="" mt="" operator="' + resultadoOperador + '" spetialcrop=""/>\n';
 
     for (var j = 0; j < layerInfoArray.length; j++) {
         var info = layerInfoArray[j];
-        var plateType = j === 0 ? "PARTIALPLATE" : "PARTIALPLATE";
+        var plateType = "PARTIALPLATE"; // mantendo igual ao seu
+        // data="idx_nome_ALTURAxLARGURA" (mantida sua convenção altura x largura)
         xml += '    <' + plateType + ' Name="' + info.name + '" data="' + (j+1) + '_' + info.name + '_' + info.heightInMM + 'x' + info.widthInMM + '" n="1" x="' + info.widthInCM + '" xmm="' + info.widthInMM + '" y="' + info.heightInCM + '" ymm="' + info.heightInMM + '"/>\n';
     }
 
     xml += '</Billing>';
 
-    // Salva o XML no arquivo
+    // Salva o XML
     saveXMLToFile(xml, folderPathCopy + xmlFileName);
 
-    // Mensagem de sucesso
     alert("MEDIDAS GERADAS");
 }
 
+// Executa
 groupLayersAndGenerateXML();
