@@ -200,6 +200,7 @@ function removerAcentos(texto) {
 //VARIAVEIS GLOBAIS===========================================================================//
 
 var cliente = jsonObject.Customer[0].@attributes.Name.replace(/,/g, ' ');
+var medicao = jsonObject.Job[0].Automation[0].@attributes.Medicao;
 var status = jsonObject.Job[0].Work[0].@attributes.Status;
 var scriptAlpha = jsonObject.Job[0].Automation[0].@attributes.Scripalpha;
 var depto = jsonObject.Job[0].Automation[0].@attributes.Depto || 0;

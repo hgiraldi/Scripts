@@ -218,9 +218,9 @@ var facaOK = true;
 var montagemOK = false;
 var linksChecados = true;
 var fezMontagemDist = false;
-var eOndulado = false;
-if (depto == "ondulado") {
-    eOndulado = true;
+var medicaoScript = false;
+if (medicao == "MS") {
+    medicaoScript = true;
 } else {
 
 }
@@ -945,7 +945,7 @@ if (eScriptObrigatorio) {
 var scriptLayerondulado = checkIfFileExistsLayerOnd();
 var scriptMedicaoOndulado = checkIfFileExistsMedicao();
 
-if (eOndulado && categoria == "Produção") {
+if (medicaoScript && categoria == "Produção") {
     if (scriptLayerondulado && scriptMedicaoOndulado) {
         fezMedicaoLayers = true;
     } else {
