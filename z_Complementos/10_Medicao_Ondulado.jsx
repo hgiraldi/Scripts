@@ -1,7 +1,5 @@
 // Prompt para obter o número de ordem de serviço
-var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
-
-#include "z_Complementos/Xml_upload.jsx"
+#include "Xml_upload.jsx"
 
 (function() {
 
