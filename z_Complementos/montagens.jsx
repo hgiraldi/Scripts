@@ -5545,81 +5545,194 @@ function montagemMajicplast() {
         escalas.move(groupEscalasCores, ElementPlacement.PLACEATEND);
     }
 
-    // Loop para duplicar o grupo de Escalas com base no numero de cores
-    for (var i = 0; i < coresSemVernizBranco.length; i++) {
+    // Cores consideradas "especiais"
+    var coresEspeciais0 = ["yellow", "black", "magenta", "cyan"];
 
-        var group = groupEscalasCores.duplicate();
-        group.top = (i + 1) * ((2 / 0.35277777777782) + groupEscalasCores.width);
-        group.name = "groupEscalasCores" + cores[i];
-        group.move(groupEscalasCoresFinal, ElementPlacement.PLACEATEND);
+    // Saídas
+    var coresQuadrados = [];
+    var porcentagensQuadrados = [];
 
-    }
-
-    groupEscalasCoresFinal.translate(0, 0)
-    groupEscalasCores.remove();
-
-    function applyColorToGroup(group, fillColor, strokeColor) {
-        for (var i = 0; i < group.pageItems.length; i++) {
-            var square = group.pageItems[i];
-            square.fillColor = fillColor;
-            square.strokeColor = strokeColor;
-        }
-    }
+    // Tabela de porcentagens para especiais
+    var porcentagensEspeciais = [100, 75, 50, 25, 2];
 
     for (var i = 0; i < coresSemVernizBranco.length; i++) {
-        var groupName = "groupEscalasCores" + coresSemVernizBranco[i];
-        var group = null;
+        var cor = coresSemVernizBranco[i];
 
-        // Verifique se o grupo existe antes de tentar acessá-lo
-        for (var j = 0; j < app.activeDocument.groupItems.length; j++) {
-            if (app.activeDocument.groupItems[j].name === groupName) {
-                group = app.activeDocument.groupItems[j];
+        // VERIFICA SE É ESPECIAL
+        var ehEspecial = false;
+        for (var j = 0; j < coresEspeciais0.length; j++) {
+            if (cor.toLowerCase() === coresEspeciais0[j].toLowerCase()) {
+                ehEspecial = true;
                 break;
             }
         }
 
-        if (group) {
-            var cor = coresSemVernizBranco[i];
-            var swatchColor = null;
-
-            for (var k = 0; k < doc.spots.length; k++) {
-                var swatch = doc.spots[k];
-                var nomeCor = swatch.name.toLowerCase();
-
-                if (nomeCor === cor.toLowerCase()) {
-                    swatchColor = new SpotColor();
-                    swatchColor.spot = swatch;
-                    swatchColor.tint = 100;
-                    break;
-                } else {
-                    var nomeCorProcess = nomeCor.replace(/process /g, '').replace(/pantone /g, '').replace(/ c/g, '');
-                    if (nomeCorProcess === cor.toLowerCase()) {
-                        swatchColor = new SpotColor();
-                        swatchColor.spot = swatch;
-                        swatchColor.tint = 100;
-                        break;
-                    }
-                }
-            }
-
-            if (swatchColor) {
-                for (var j = 0; j < group.pageItems.length; j++) {
-                    var square = group.pageItems[j];
-
-                    // Mantenha as porcentagens de preenchimento e traço
-                    var fillTint = square.fillColor.tint;
-                    var strokeTint = square.strokeColor.tint;
-
-                    square.fillColor = swatchColor;
-                    square.strokeColor = swatchColor;
-
-                    // Restaure as porcentagens de preenchimento e traço
-                    square.fillColor.tint = fillTint;
-                    square.strokeColor.tint = strokeTint;
-                }
+        // SE FOR ESPECIAL → 5 repetições com porcentagens diferentes
+        if (ehEspecial) {
+            for (var p = 0; p < porcentagensEspeciais.length; p++) {
+                coresQuadrados.push(cor);
+                porcentagensQuadrados.push(porcentagensEspeciais[p]);
             }
         }
+        // SE NÃO FOR ESPECIAL → apenas 1 entrada com 100%
+        else {
+            coresQuadrados.push(cor);
+            porcentagensQuadrados.push(100);
+        }
     }
+
+    // --------------------
+    // Bloco substituto: gerar entries, duplicar template e aplicar tints corretamente
+    // --------------------
+
+    // utilitário: resolve um Spot a partir de nome / Spot / Swatch
+    function resolveSpot(objOrName) {
+        // se já for um Spot
+        try {
+            if (objOrName && objOrName.typename && objOrName.typename.toLowerCase().indexOf("spot") >= 0) {
+                return objOrName;
+            }
+        } catch (e) {}
+
+        // se for um Swatch com SpotColor
+        try {
+            if (objOrName && objOrName.color && objOrName.color.typename === "SpotColor") {
+                return objOrName.color.spot;
+            }
+        } catch (e) {}
+
+        // se for nome: tenta doc.spots depois doc.swatches
+        try {
+            var s = doc.spots.getByName(objOrName);
+            return s;
+        } catch (e1) {}
+        try {
+            var sw = doc.swatches.getByName(objOrName);
+            if (sw && sw.color && sw.color.typename === "SpotColor") {
+                return sw.color.spot;
+            }
+        } catch (e2) {}
+        return null;
+    }
+
+    // porcentagens para especiais
+    var porcentagensEspeciais = [100, 75, 50, 25, 2];
+
+    // Saídas: vamos criar entradas completas {name, tint, spotObj}
+    var entries = []; // cada entrada será uma escala (p.ex. Cyan 75)
+
+    // construir entries (usa coresSemVernizBranco e coresEspeciais0 já definidos)
+    for (var a = 0; a < coresSemVernizBranco.length; a++) {
+        var cor = coresSemVernizBranco[a];
+        var ehEspecial = false;
+        for (var b = 0; b < coresEspeciais0.length; b++) {
+            if (cor.toLowerCase() === coresEspeciais0[b].toLowerCase()) {
+                ehEspecial = true;
+                break;
+            }
+        }
+
+        if (ehEspecial) {
+            for (var p = 0; p < porcentagensEspeciais.length; p++) {
+                var pct = porcentagensEspeciais[p];
+
+                // tentar resolver o Spot direto pelo nome (mais confiável)
+                var spotObj = resolveSpot(cor);
+
+                entries.push({
+                    name: cor,
+                    tint: pct,
+                    spot: spotObj // pode ser null se não houver Spot
+                });
+            }
+        } else {
+            var spot2 = resolveSpot(cor);
+            entries.push({
+                name: cor,
+                tint: 100,
+                spot: spot2
+            });
+        }
+    }
+
+    // --- Duplicar template para cada entry ---
+    // Nomear grupos de forma consistente: groupEscalasCores_idx_nome_tint
+    for (var i = 0; i < entries.length; i++) {
+        var grp = groupEscalasCores.duplicate();
+        // Posicionamento (ajuste se quiser horizontal em vez de vertical)
+        var spacing = (2 / 0.35277777777782);
+        grp.top = groupEscalasCores.top - (i + 1) * (grp.height + spacing);
+        var safeName = entries[i].name.replace(/\s+/g, "_");
+        grp.name = "groupEscalasCores_" + i + "_" + safeName + "_" + entries[i].tint;
+        try {
+            grp.move(groupEscalasCoresFinal, ElementPlacement.PLACEATEND);
+        } catch (mvEx) {}
+    }
+
+    // Remova o template se quiser (comente se não quiser remover)
+    try {
+        groupEscalasCores.remove();
+    } catch (e) {}
+
+    // --- Aplicar cor a cada grupo recém-criado ---
+    // Percorra os grupos (procura por prefixo)
+    for (var ii = 0; ii < doc.groupItems.length; ii++) {
+        var gitem = doc.groupItems[ii];
+        if (gitem.name && gitem.name.indexOf("groupEscalasCores_") === 0) {
+            // extrair índice do nome para localizar entry
+            var parts = gitem.name.split("_");
+            var idx = parseInt(parts[1], 10);
+            if (!isNaN(idx) && entries[idx]) {
+                var entry = entries[idx];
+
+                // resolve spot: usa entry.spot se já veio, senão tenta pelo nome
+                var spotObj = entry.spot;
+                if (!spotObj) {
+                    spotObj = resolveSpot(entry.name);
+                }
+
+                // se encontramos um Spot, criamos SpotColor com tint do entry
+                var finalSpotColor = null;
+                if (spotObj) {
+                    try {
+                        finalSpotColor = new SpotColor();
+                        finalSpotColor.spot = spotObj;
+                        finalSpotColor.tint = entry.tint; // 100/75/50/25/2
+                    } catch (err) {
+                        finalSpotColor = null;
+                    }
+                }
+
+                // aplicar a cada item do grupo
+                for (var jj = 0; jj < gitem.pageItems.length; jj++) {
+                    var sq = gitem.pageItems[jj];
+
+                    if (finalSpotColor) {
+                        // cria instâncias separadas para fill e stroke
+                        try {
+                            var newFill = new SpotColor();
+                            newFill.spot = finalSpotColor.spot;
+                            newFill.tint = finalSpotColor.tint;
+                            sq.fillColor = newFill;
+                        } catch (errF) {
+                            /* silent */ }
+
+                        try {
+                            var newStroke = new SpotColor();
+                            newStroke.spot = finalSpotColor.spot;
+                            newStroke.tint = finalSpotColor.tint;
+                            sq.strokeColor = newStroke;
+                        } catch (errS) {
+                            /* silent */ }
+                    } else {
+                        // sem Spot: preserva o fill/stroke existente (ou aplique fallback CMYK se desejar)
+                    }
+                } // fim pageItems loop
+            } // fim entries[idx] exist
+        } // fim name check
+    } // fim grupo loop
+
+
 
     // Função para subtrair arrays
     function subtractArrays(arr1, arr2) {
@@ -5703,7 +5816,7 @@ function montagemMajicplast() {
                 // Loop para duplicar o grupo de Escalas com base no número de cores Brancas encontradas
                 var espaçoEntreGrupos = (2 / 0.35277777777782);
                 var xOffset = 0; // Inicialize o deslocamento horizontal como 0
-                for (var k = 0; k < coresSemVernizBranco.length; k++) {
+                for (var k = 0; k < coresQuadrados.length; k++) {
                     var groupEspecialBranco = grupoEspeciaisBranco.duplicate();
 
                     // Defina a posição horizontal do grupo duplicado
@@ -5726,7 +5839,7 @@ function montagemMajicplast() {
 
     if (contemBranco) {
 
-        grupoEscalasBrancoFinal.translate(0, (8 / 0.35277777777782))
+        grupoEscalasBrancoFinal.translate(0, -((2 / 0.35277777777782) + grupoEscalasBrancoFinal.height))
 
     } else {
 

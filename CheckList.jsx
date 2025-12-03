@@ -1105,7 +1105,7 @@ conteudo += '<Material File ="' + nomeArquivo + '" Folder = "" Milestone = "AI C
 conteudo += '</Alpha>'
 
 
-if (coresOK && linkOk && labelOK && distorcaoOK && facaOK && montagemOK && nomeClienteOK && precisaDeCheck && osOK && fezMontagemDist && fezMedicaoLayers && todasDistanciasCorretas && conjugacaoOK && scriptPistasOK) {
+if (coresOK && linkOk && labelOK && distorcaoOK && facaOK && montagemOK && nomeClienteOK && osOK && fezMontagemDist && fezMedicaoLayers && todasDistanciasCorretas && conjugacaoOK && scriptPistasOK) {
     // Cria o objeto File para o arquivo de texto
     var arquivoTxt = new File(pastaDestino + "/" + nomeArquivoTxt + ".xml");
 
