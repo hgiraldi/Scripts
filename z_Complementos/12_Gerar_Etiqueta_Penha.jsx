@@ -368,7 +368,7 @@ var larguraMaxMaquinaPt = 76.5354;
 for (var i = 0; i < cores.length; i++) {
     var corAtual = cores[i],
         qtdc = (i + 1) + "/" + cores.length,
-        codcorAtual = referenciaCor[i];
+        codcorAtual = referenciaCor[i].slipt("/")[1];
     //alert("🎨 Processando cor: " + corAtual);
 
     var dados = {

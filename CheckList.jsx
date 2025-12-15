@@ -248,13 +248,6 @@ if (folder == "conver" ||
 
 }
 
-var eAproveitamento = false;
-if (clickArray.length != cores.length) {
-    eAproveitamento = true;
-} else {
-
-}
-
 var eTesteForm = false;
 if ((nomeArte.indexOf("Teste Form") >= 0) ||
     (nomeArte.indexOf("Single Color") >= 0) ||

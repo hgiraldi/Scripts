@@ -211,6 +211,7 @@ var cac = jsonObject.Order[0].@attributes.CAC;
 var np = jsonObject.Order[0].@attributes.NP;
 var categoria = jsonObject.Order[0].@attributes.Category;
 var supplied = jsonObject.Job[0].Supplied[0].@attributes.Material;
+var requested = jsonObject.Job[0].Requested[0].@attributes.Material;
 var type = jsonObject.Job[0].Cameron[0].@attributes.Type;
 var espessura = jsonObject.CtP[0].@attributes.Tickness;
 var folder = jsonObject.Customer[0].@attributes.Folder;
@@ -230,10 +231,61 @@ if (operador) {
     resultadoOperador = "Sem Entrada";
 }
 
+//Ondulado
+var cp = produtoComUnderline.split("_")[0];
+var rev = produtoComUnderline.split("_")[1];
+var v = produtoComUnderline.split("_")[2];
+var clienteOnd = nomeArte.split("-")[0];
+var ref = nomeArte.split("-")[1];
+var medInt = nomeArte.split("-")[2];
+//Original
+var tipoOriginal = "proprio";
+
+if (supplied && supplied.toLowerCase().indexOf("via e-mail") !== -1) {
+    tipoOriginal = "email";
+} else if (supplied && supplied.toLowerCase().indexOf("amostra") !== -1) {
+    tipoOriginal = "amostra";
+}
+
+var tipoCliche = "";
+var temRepremont = false;
+
+// verifica RS ou RC
+if (
+    requested &&
+    (requested.indexOf("RS") !== -1 || requested.indexOf("RC") !== -1)
+) {
+    temRepremont = true;
+}
+
+// define tipo base
+if (eAproveitamento === true) {
+    tipoCliche = "parcial";
+} else {
+    tipoCliche = "total";
+}
+
+// ajusta para repremont
+if (temRepremont) {
+    if (tipoCliche === "parcial") {
+        tipoCliche = "parcial,repremont";
+    } else {
+        tipoCliche = "repremont";
+    }
+}
+
+//FIM ONDULADO
+
+
+
 var ncores = jsonObject.Inks[0].Ink.length;
 var pos = jsonObject.Job[0].Cameron[0].@attributes.Pos;
 var lpi = jsonObject.Inks[0].Ink[0].@attributes.LPI;
 var lpc = Math.round(lpi / 2.54);
+var dataEntrega = (function () {
+    var d = jsonObject.Order[0].@attributes.DueDate.split("T")[0].split("-");
+    return d[2] + " " + d[1] + " " + d[0].substring(2, 4);
+})();
 
 var uScreen = [];
 var cores = [];
@@ -387,4 +439,11 @@ for (var prop in clickObj) {
         // Adicionando o valor ao array após converter para inteiro
         clickArray.push(parseInt(clickObj[prop]));
     }
+}
+
+var eAproveitamento = false;
+if (clickArray.length != cores.length) {
+    eAproveitamento = true;
+} else {
+
 }
