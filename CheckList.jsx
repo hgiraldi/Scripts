@@ -241,12 +241,13 @@ if (((status.indexOf("egravação") > 0) || (status.indexOf("epetição") > 0)) 
 }
 
 var precisaDePistas = false;
-if (folder == "conver" ||
-    folder == "brl_embalagens" ||
-    folder == "pp_print") {
-    precisaDePistas = true;
 
-} else {
+if ((status.indexOf("egravação") > 0) || (status.indexOf("epetição") > 0)) {
+    precisaDePistas = false;
+} else if ((folder == "conver" ||
+        folder == "brl_embalagens" ||
+        folder == "pp_print")) {
+    precisaDePistas = true;
 
 }
 
