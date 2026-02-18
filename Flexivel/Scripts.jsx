@@ -5,7 +5,7 @@ app.documents = app.documents || [];
 if (app.documents.length === 0) {
     alert("Não há nenhum documento aberto. Abra um documento antes de executar este script.");
 } else {
-    var dlg = new Window("dialog", "Scripts");
+    var dlg = new Window("dialog", "Scripts Flexivel");
 
     function getScriptDirectory() {
         var scriptFile = new File($.fileName);
@@ -41,9 +41,9 @@ if (app.documents.length === 0) {
     var checkbox6 = dlg.add("checkbox", undefined, "Úteis");
     var checkbox7 = dlg.add("checkbox", undefined, "Micropontos");
     var checkbox9 = dlg.add("checkbox", undefined, "Box Valfilm Mg");
-    var checkbox10 = dlg.add("checkbox", undefined, "Medição Ondulado");
-    var checkbox11 = dlg.add("checkbox", undefined, "Layers Ondulado");
-    var checkbox12 = dlg.add("checkbox", undefined, "Etiquetas Cores Ondulado");
+    //var checkbox10 = dlg.add("checkbox", undefined, "Medição Ondulado");
+    //var checkbox11 = dlg.add("checkbox", undefined, "Layers Ondulado");
+    //var checkbox12 = dlg.add("checkbox", undefined, "Etiquetas Cores Ondulado");
 
 
     // Adiciona um painel vazio para espaçamento
@@ -55,7 +55,7 @@ if (app.documents.length === 0) {
     var btnCancelar = dlg.add("button", undefined, "Cancelar");
 
     // Adiciona manipulador de eventos para checkboxes
-    var checkboxes = [checkbox1, checkbox8, checkbox2, checkbox3, checkbox4, checkbox5, checkbox6, checkbox7, checkbox9, checkbox10, checkbox11, checkbox12];
+    var checkboxes = [checkbox1, checkbox8, checkbox2, checkbox3, checkbox4, checkbox5, checkbox6, checkbox7, checkbox9];
     for (var i = 0; i < checkboxes.length; i++) {
         checkboxes[i].alignment = "left";
         checkboxes[i].onClick = function() {
@@ -136,20 +136,7 @@ if (app.documents.length === 0) {
 
             }
 
-        } else if (checkbox10.value) {
-            
-            #include "z_Complementos/10_Medicao_Ondulado.jsx";
-
-        } else if (checkbox11.value) {
-
-            #include "z_Complementos/11_Criar_Layers_Ondulado.jsx";
-
-        } else if (checkbox12.value) {
-
-            #include "z_Complementos/12_Gerar_Etiqueta_Penha.jsx";
-
-        }
-    
+        } 
 
         dlg.close();
     };

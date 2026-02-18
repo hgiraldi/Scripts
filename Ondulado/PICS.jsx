@@ -23,23 +23,23 @@ var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígit
     }
 
     // ===== Configurações =====
-    var distancia_mm      = 1.5; // folga da PONTA da cruz até a seleção
-    var cruz_total_mm     = 2.5; // cruz com 1 mm total (0,5 mm pra cada lado)
-    var traco_mm          = 0.3; // espessura do traço
-    var margem_extra_mm   = 6.0; // EXTRA (mantido do seu código)
+    var distancia_mm = 1.5; // folga da PONTA da cruz até a seleção
+    var cruz_total_mm = 2.5; // cruz com 1 mm total (0,5 mm pra cada lado)
+    var traco_mm = 0.3; // espessura do traço
+    var margem_extra_mm = 6.0; // EXTRA (mantido do seu código)
 
-    var cruz_meio_mm      = cruz_total_mm / 2;        // 0,5 mm
+    var cruz_meio_mm = cruz_total_mm / 2; // 0,5 mm
     // centro da cruz agora: 2,5 (folga) + 0,5 (meia cruz) - extra
-    var distCentro_mm     = distancia_mm + cruz_meio_mm - margem_extra_mm;
+    var distCentro_mm = distancia_mm + cruz_meio_mm - margem_extra_mm;
 
-    var cruz_meio_pt      = mmToPt(cruz_meio_mm);
-    var distCentro_pt     = mmToPt(distCentro_mm);
-    var stroke_pt         = mmToPt(traco_mm);
+    var cruz_meio_pt = mmToPt(cruz_meio_mm);
+    var distCentro_pt = mmToPt(distCentro_mm);
+    var stroke_pt = mmToPt(traco_mm);
 
-    var fonte_mm          = 1.77;     // tamanho da fonte
-    var fonte_pt          = mmToPt(fonte_mm);
-    var textoOffset_mm    = 4.5;      // 4,5 mm para a direita da cruz de baixo
-    var textoOffset_pt    = mmToPt(textoOffset_mm);
+    var fonte_mm = 1.77; // tamanho da fonte
+    var fonte_pt = mmToPt(fonte_mm);
+    var textoOffset_mm = 4.5; // 4,5 mm para a direita da cruz de baixo
+    var textoOffset_pt = mmToPt(textoOffset_mm);
 
     // ===== Layer "pics" para receber cruzes + texto =====
     var picsLayer;
@@ -74,7 +74,10 @@ var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígit
 
     function criaLinha(targetLayer, x1, y1, x2, y2) {
         var l = targetLayer.pathItems.add();
-        l.setEntirePath([[x1, y1], [x2, y2]]);
+        l.setEntirePath([
+            [x1, y1],
+            [x2, y2]
+        ]);
         l.stroked = true;
         l.strokeWidth = stroke_pt;
         l.strokeColor = reg;
@@ -98,12 +101,12 @@ var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígit
 
         // 1) Bounds do grupo (não vamos re-agrupar, só usar o próprio grupo)
         var b = grupoMae.geometricBounds; // [top, left, bottom, right]
-        var top    = b[0];
-        var left   = b[1];
+        var top = b[0];
+        var left = b[1];
         var bottom = b[2];
-        var right  = b[3];
+        var right = b[3];
 
-        var width  = right - left;
+        var width = right - left;
         var height = top - bottom;
 
         // Centro do grupo
@@ -111,22 +114,22 @@ var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígit
         var centroY = (top + bottom) / 2;
 
         // 2) Criar quadrado temporário do MESMO tamanho, centralizado
-        var rectTop  = centroY + (height / 2);
-        var rectLeft = centroX - (width  / 2);
+        var rectTop = centroY + (height / 2);
+        var rectLeft = centroX - (width / 2);
 
         var tempRect = picsLayer.pathItems.rectangle(rectTop, rectLeft, width, height);
         tempRect.stroked = false;
-        tempRect.filled  = false;
+        tempRect.filled = false;
 
         // Bounds do quadrado (base pra cruz)
         var rb = tempRect.geometricBounds; // [top, left, bottom, right]
-        var rTop    = rb[0];
-        var rLeft   = rb[1];
+        var rTop = rb[0];
+        var rLeft = rb[1];
         var rBottom = rb[2];
-        var rRight  = rb[3];
+        var rRight = rb[3];
 
         var rCentroX = (rLeft + rRight) / 2;
-        var rCentroY = (rTop  + rBottom) / 2;
+        var rCentroY = (rTop + rBottom) / 2;
 
         // 3) Criar as 4 cruzes PARA FORA usando o quadrado como base
 
@@ -168,29 +171,38 @@ var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígit
     // ===== Percorrer TODOS os grupos “mãe” do documento =====
     // Consideramos "grupo mãe" como GroupItem diretamente dentro das layers (parent == layer),
     // e ignoramos a própria layer "pics" para não recursar em cima das marcas.
+    // ===== Processar APENAS grupos "mãe" selecionados =====
     var gruposProcessados = 0;
 
-    for (var li = 0; li < doc.layers.length; li++) {
-        var lyr = doc.layers[li];
+    if (doc.selection.length === 0) {
+        alert("Selecione ao menos um grupo 'mãe'.");
+        return;
+    }
 
-        // pula a layer "pics"
-        if (lyr.name === "pics") {
+    for (var i = 0; i < doc.selection.length; i++) {
+        var item = doc.selection[i];
+
+        // precisa ser GroupItem
+        if (item.typename !== "GroupItem") {
             continue;
         }
 
-        var gItems = lyr.groupItems;
-        for (var gi = 0; gi < gItems.length; gi++) {
-            var gMae = gItems[gi];
-            // apenas grupos de topo (parent é a própria layer)
-            if (gMae.parent === lyr) {
-                processaGrupoMae(gMae);
-                gruposProcessados++;
-            }
+        // precisa ser grupo mãe (parent direto da layer)
+        if (item.parent.typename !== "Layer") {
+            continue;
         }
+
+        // evita aplicar nas marcas
+        if (item.parent.name === "pics") {
+            continue;
+        }
+
+        processaGrupoMae(item);
+        gruposProcessados++;
     }
 
     if (gruposProcessados === 0) {
-        alert("Nenhum grupo 'mãe' encontrado para aplicar as cruzes.");
+        alert("Nenhum grupo 'mãe' válido selecionado.");
     }
 
 })();

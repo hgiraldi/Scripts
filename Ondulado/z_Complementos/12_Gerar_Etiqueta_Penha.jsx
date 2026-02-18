@@ -1,3 +1,5 @@
+//var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+
 #include "Xml_upload.jsx"
 
 /* ========= Helpers ========= */
@@ -365,10 +367,57 @@ var espacamento = mmToPt(10),
 var caminhoBasePath = scriptDirectory + '/z_pdfs/Etiqueta_Penha.pdf';
 var larguraMaxMaquinaPt = 76.5354;
 
+function extrairDepoisDaBarraSeguro(texto) {
+    if (!texto) return texto;
+    if (texto.indexOf("/") === -1) return texto;
+    return texto.split("/")[1];
+}
+
+// ================== DIALOGO LOCALIZAÇÃO ==================
+var localizacao = "";
+
+var dlgS = new Window("dialog", "Localização");
+dlgS.orientation = "column";
+dlgS.alignChildren = "left";
+
+dlgS.add("statictext", undefined, "Digite a localização:");
+
+var inputLoc = dlgS.add("edittext", undefined, "");
+inputLoc.characters = 30;
+inputLoc.active = true;
+
+var grpButtons = dlgS.add("group");
+grpButtons.alignment = "right";
+
+var btnOk = grpButtons.add("button", undefined, "OK");
+var btnCancel = grpButtons.add("button", undefined, "Cancelar");
+
+// OK → exige algo digitado
+btnOk.onClick = function() {
+    if (inputLoc.text === "") {
+        alert("⚠️ A localização deve ser preenchida ou clique em Cancelar.");
+        return;
+    }
+    localizacao = inputLoc.text;
+    dlgS.close(1);
+};
+
+// Cancelar → localização vazia
+btnCancel.onClick = function() {
+    localizacao = "";
+    dlgS.close(0);
+};
+
+dlgS.show();
+// =========================================================
+
+
+
 for (var i = 0; i < cores.length; i++) {
     var corAtual = cores[i],
         qtdc = (i + 1) + "/" + cores.length,
-        codcorAtual = referenciaCor[i].slipt("/")[1];
+        codcorAtual = extrairDepoisDaBarraSeguro(referenciaCor[i]);
+
     //alert("🎨 Processando cor: " + corAtual);
 
     var dados = {
@@ -379,8 +428,10 @@ for (var i = 0; i < cores.length; i++) {
         qtdc: qtdc,
         data: getDataAtualFormatada(),
         maquina: extrairDepoisDeMM(cpc),
-        codcor: codcorAtual
+        codcor: codcorAtual,
+        loc: localizacao
     };
+
     var mapa = {
         "{{fi}}": dados.fi,
         "{{cor}}": dados.cor,
@@ -389,7 +440,8 @@ for (var i = 0; i < cores.length; i++) {
         "{{qtdc}}": dados.qtdc,
         "{{data}}": dados.data,
         "{{maquina}}": dados.maquina,
-        "{{codcor}}": dados.codcor
+        "{{codcor}}": dados.codcor,
+        "{{loc}}": dados.loc
     };
 
     var caminhoBase = new File(caminhoBasePath);

@@ -1,6 +1,6 @@
 var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
 
-#include "z_Complementos/Xml_upload.jsx"
+#include "Flexivel/z_Complementos/Xml_upload.jsx"
 
 // Exibindo o array resultante com alert
 var clickString = "click = " + clickArray.join(", ");
@@ -199,6 +199,8 @@ if (supplied.indexOf("ontado e distorcido") > 0) {
 
 //=============================Variaveis de Comparação===============================//
 //var scriptLabelOK = false;
+var codCoresOK = true;
+var preenchimentoOK = true;
 var scriptPistasOK = true;
 var conjugacaoOK = true;
 var todasDistanciasCorretas = true;
@@ -232,7 +234,7 @@ if (scriptAlpha == "true") {
 }
 
 var precisaDeCheck = true;
-if ((status.indexOf("egravação") > 0) || (status.indexOf("epetição") > 0)) {
+if (((status.indexOf("egravação") > 0) || (status.indexOf("epetição") > 0)) && (folder != "pp_print" && folder != "brl_embalagens")) {
     precisaDeCheck = false;
 } else {
 
@@ -241,7 +243,7 @@ if ((status.indexOf("egravação") > 0) || (status.indexOf("epetição") > 0)) {
 var precisaDePistas = false;
 if (folder == "conver" ||
     folder == "brl_embalagens" ||
-    folder == "pp_print"){
+    folder == "pp_print") {
     precisaDePistas = true;
 
 } else {
@@ -746,9 +748,10 @@ function occurrences(string, subString, allowOverlapping) {
 
 
 //Checar se possui o label
-if ((folder != "ingaflex") || (folder != "grafica_goncalves") || (folder != "penha_sa")) {
+if ((folder != "ingaflex") && (folder != "grafica_goncalves") && (folder != "penha_sa") && (folder != "pp_print") && (folder != "brl_embalagens")) {
 
     main();
+    //alert("entrou1")
 
     var numerosString = numerosArray.join("");
     //alert(numerosString);
@@ -764,6 +767,58 @@ if ((folder != "ingaflex") || (folder != "grafica_goncalves") || (folder != "pen
     } else {
         labelOK = true;
     }
+
+} else if ((folder == "pp_print") || (folder == "brl_embalagens")) {
+
+    main();
+
+    //alert("entrou2")
+
+    var numerosString = numerosArray.join("");
+    //alert(numerosString);
+    var numerosProduto = produto.replace(/\D/g, '');
+
+    var count = occurrences(numerosString, numerosProduto, false);
+    //alert("Count = " + count);
+    //alert("PatternCount = " + patternCount)
+
+    if (patternCount != count) {
+        alert("O LABEL DE CORES ESTÁ INCORRETO, FAVOR VERIFICAR");
+        labelOK = false;
+    } else {
+        labelOK = true;
+    }
+
+    var referenciaCorLimpa = [];
+
+    for (var i = 0; i < referenciaCor.length; i++) {
+        referenciaCorLimpa.push(
+            referenciaCor[i].replace(/\D/g, "")
+        );
+    }
+
+
+    for (var i = 0; i < referenciaCorLimpa.length; i++) {
+
+        var codCor = referenciaCorLimpa[i];
+
+        //alert(
+        //  "referenciaCorLimpa:\n" + referenciaCorLimpa.join(", ") +
+        //  "\n\nnumerosProduto:\n" + numerosString
+        //);
+
+
+        // verifica se o código NÃO existe na string
+        if (numerosString.indexOf(codCor) === -1) {
+            codCoresOK = false;
+            alert("O CÓDIGO DE CORES ESTÁ INCORRETO, FAVOR VERIFICAR");
+            break; // já pode parar, pois encontrou erro
+        } else {
+            alert("Codigo encontrado");
+        }
+    }
+
+
 } else {
     alert("CLIENTE PRONTO - NÃO CHECADO LABEL POR CONTA DE SER ARQUIVO PRONTO (MUITOS OBJETOS)");
     labelOK = true;
@@ -905,6 +960,19 @@ function checkIfFileExistsLayerOnd() {
 }
 
 //Checar se foi feito montagem e distorção
+function checkIfFileExistsPreenchimento() {
+    var folderPathCopySR = getFolderPathCopyLog();
+    var fileNameSR = serviceOrderNumber + "_I_Illustrator_Preenchimento.xml";
+    var filePathSR = new File(folderPathCopySR + "/" + fileNameSR);
+
+    if (filePathSR.exists) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+//Checar se foi feito montagem e distorção
 function checkIfFileExistsPistas() {
     var folderPathCopyPista = getFolderPathCopyLog();
     var fileNamePista = serviceOrderNumber + "_I_Illustrator_NumeroPistas.xml";
@@ -937,6 +1005,7 @@ if (eScriptObrigatorio) {
 //===============CHECAGEM DE ONDULADO==========================//
 var scriptLayerondulado = checkIfFileExistsLayerOnd();
 var scriptMedicaoOndulado = checkIfFileExistsMedicao();
+var scriptPreenchimentoOk = checkIfFileExistsPreenchimento();
 
 if (medicaoScript && categoria == "Produção") {
     if (scriptLayerondulado && scriptMedicaoOndulado) {
@@ -947,6 +1016,16 @@ if (medicaoScript && categoria == "Produção") {
     }
 } else {
     fezMedicaoLayers = true;
+}
+
+if (status == "novo" && folder == "penha_sa") {
+    if (scriptPreenchimentoOk) {
+        preenchimentoOK = true;
+    } else {
+        preenchimentoOK = false;
+    }
+} else {
+    preenchimentoOK = true;
 }
 //===============CHECAGEM DE NUMERO DE PISTAS==========================//
 
@@ -960,7 +1039,7 @@ if (precisaDePistas && precisaDeCheck) {
         scriptPistasOK = false;
     }
 } else {
-     scriptPistasOK = true;
+    scriptPistasOK = true;
 }
 
 
@@ -997,7 +1076,7 @@ if ((linksArte.length > 0) && (lanes > 1) && (displacementBetweenLanes == 0) && 
 //===============CHECAGEM CONJUGACAO=======================//
 
 if ((nomeArte.indexOf("CONJUGADO") !== -1) || (nomeArte.indexOf("CONJG") !== -1)) {
-    var primeirosNomes = []; 
+    var primeirosNomes = [];
     //alert("Entrou na checagem")
     // Verificar se os nomes dentro dos grupos são iguais
     for (var x in gruposPorX) {
@@ -1059,7 +1138,7 @@ if ((nomeArte.indexOf("CONJUGADO") !== -1) || (nomeArte.indexOf("CONJG") !== -1)
             alert("VERIFICAR CONJUGAÇÃO");
         }
 
-    
+
     }
 }
 
@@ -1098,7 +1177,12 @@ conteudo += '<Material File ="' + nomeArquivo + '" Folder = "" Milestone = "AI C
 conteudo += '</Alpha>'
 
 
-if (coresOK && linkOk && labelOK && distorcaoOK && facaOK && montagemOK && nomeClienteOK && osOK && fezMontagemDist && fezMedicaoLayers && todasDistanciasCorretas && conjugacaoOK && scriptPistasOK) {
+if (
+    coresOK && linkOk && labelOK && distorcaoOK && facaOK &&
+    montagemOK && nomeClienteOK && osOK && fezMontagemDist &&
+    fezMedicaoLayers && todasDistanciasCorretas && conjugacaoOK &&
+    scriptPistasOK && preenchimentoOK && codCoresOK
+) {
     // Cria o objeto File para o arquivo de texto
     var arquivoTxt = new File(pastaDestino + "/" + nomeArquivoTxt + ".xml");
 
@@ -1109,26 +1193,45 @@ if (coresOK && linkOk && labelOK && distorcaoOK && facaOK && montagemOK && nomeC
 
     // Obtém o caminho para a pasta de destino
     var folderPathCopy = getFolderPathCopyLog();
-
     var nomeArquivoTxtCopy = serviceOrderNumber + "_I_Illustrator_CheckList";
 
     // Cria o objeto File para o destino de cópia
     var destinoDaCopia = new File(folderPathCopy + "/" + nomeArquivoTxtCopy + ".xml");
 
-    // Copia o arquivo para o destino
-    if (arquivoTxt.copy(destinoDaCopia)) {
+    // Primeira tentativa de cópia
+    var copiou = arquivoTxt.copy(destinoDaCopia);
+
+    // Se falhar, tenta validar acesso manualmente (Sonoma / permissão)
+    if (!copiou) {
+
+        alert(
+            "Não foi possível copiar o CheckList automaticamente.\n" +
+            "Selecione manualmente a pasta _log para validar o acesso."
+        );
+
+        var pastaLogManual = Folder.selectDialog("Selecione a pasta _log");
+
+        if (pastaLogManual) {
+            destinoDaCopia = new File(pastaLogManual.fsName + "/" + nomeArquivoTxtCopy + ".xml");
+            copiou = arquivoTxt.copy(destinoDaCopia);
+        }
+    }
+
+    // Resultado final
+    if (copiou) {
         alert("Arquivo Correto e CheckList copiado com sucesso");
     } else {
-        alert("Erro ao copiar o arquivo CheckList, contatar suporte");
+        alert("Erro ao copiar o arquivo CheckList.\nContatar suporte.");
     }
 
 } else if (!precisaDeCheck) {
 
-    alert("ARQUIVO CHECADO, PÓREM REGRAVAÇÃO OU REPETIÇÃO NÃO PRECISA DE CHECKLIST")
+    alert("ARQUIVO CHECADO, PORÉM REGRAVAÇÃO OU REPETIÇÃO NÃO PRECISA DE CHECKLIST");
 
 } else {
-
+    // outros fluxos
 }
+
 
 
 // Função para exibir os arrays em um alerta

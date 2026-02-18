@@ -1,6 +1,7 @@
 function mmToPt(mm) {
-    return mm * 2.83465;
+    return mm * (72 / 25.4);
 }
+
 
 function getSpotColorZ(doc) {
     var spotName = "z";

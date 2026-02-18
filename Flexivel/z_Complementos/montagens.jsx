@@ -3097,6 +3097,10 @@ function montagemInterpack() {
     // Largura dos retângulos (0,12mm em pontos)
     var rectangleDiameter = sizeCameron;
     var rectangleWidth = 0.12 / 0.35277777777782;
+    var circuloBrancoCores = 1.435 / 0.35277777777782;
+    var circuloPretoCores = 1.148 / 0.35277777777782;
+    var distanciaBranco = 0.57 / 0.35277777777782;
+    var distanciaPreto = 0.857 / 0.35277777777782;
 
     // Cria o primeiro retângulo na vertical (0,12mm x sizeCameron)
     var verticalRectangle = createBlackRectangle(0, 0, rectangleWidth, rectangleDiameter);
@@ -3145,6 +3149,64 @@ function montagemInterpack() {
     horizontalRectangle.move(finalGroup, ElementPlacement.PLACEATEND);
     whiteCircle.move(finalGroup, ElementPlacement.PLACEATEND);
     blackCircle.move(finalGroup, ElementPlacement.PLACEATEND);
+
+    // Criando bolas de densidade
+    var yCoordBranco = -(cylinderSize / 2 - 30);
+    var yCoordPreto = -((cylinderSize / 2 - 30) + ((circuloBrancoCores - circuloPretoCores) / 2));
+
+    // Criar um grupo para círculos brancos
+    var grupoCirculosBrancos = app.activeDocument.groupItems.add();
+
+    // Criar um grupo para círculos pretos
+    var grupoCirculosColoridos = app.activeDocument.groupItems.add();
+
+    // Loop para criar grupos de círculos brancos e adicionar círculos
+    for (var i = 0; i < cores.length; i++) {
+        var novoGrupoBranco = app.activeDocument.groupItems.add();
+        novoGrupoBranco.name = "grupoBranco_" + (i + 1);
+
+        // Adicionar círculo branco ao grupo
+        var circleBranco = createWhiteCircle(((sizeCameron - circuloBrancoCores) / 2), yCoordBranco, circuloBrancoCores);
+        circleBranco.move(novoGrupoBranco, ElementPlacement.PLACEATEND);
+        yCoordBranco += distanciaBranco + circuloBrancoCores;
+        novoGrupoBranco.move(grupoCirculosBrancos, ElementPlacement.PLACEATEND);
+    }
+
+
+    // Loop para criar grupos de círculos coloridos e adicionar círculos
+    for (var j = 0; j < cores.length; j++) {
+        // Criar um grupo para círculos coloridos
+        var novoGrupoCor = app.activeDocument.groupItems.add();
+        novoGrupoCor.name = "grupoCor_" + (j + 1);
+
+        // Adicionar círculo colorido ao grupo usando a função createColoredCircleFromPalette
+        var circleCor = createColoredCircleFromPalette(((sizeCameron - circuloPretoCores) / 2), yCoordPreto, circuloPretoCores, cores[j]);
+        circleCor.move(novoGrupoCor, ElementPlacement.PLACEATEND);
+        yCoordPreto += distanciaPreto + circuloPretoCores;
+        novoGrupoCor.move(grupoCirculosColoridos, ElementPlacement.PLACEATEND);
+    }
+
+    //Grupo dos Circulos das Cores
+    var circulosCores = app.activeDocument.groupItems.add();
+    grupoCirculosColoridos.move(circulosCores, ElementPlacement.PLACEATEND);
+    grupoCirculosBrancos.move(circulosCores, ElementPlacement.PLACEATEND);
+
+    // Definir as coordenadas para mover o grupo para a posição desejada
+    var novaPosicaoX = ((sizeCameron - circuloBrancoCores) / 2);
+    var novaPosicaoY = circulosCores.height / 2;
+
+    // Mover o grupo para a nova posição
+    circulosCores.translate(novaPosicaoX - circulosCores.position[0], novaPosicaoY - circulosCores.position[1]);
+
+    var grupoDuplicadoDireitaCores = circulosCores.duplicate();
+
+    // Calcula os valores de deslocamento
+    var moveDownValue = (cylinderSize / 2) - ((circulosCores.height / 2) + (8.14 + 11.33 + sizeCameron));
+    var moveUpValue = (cylinderSize / 2) - ((circulosCores.height / 2) + (8.14 + 11.33 + sizeCameron));
+
+    // Move o grupo circulosCores para baixo
+    circulosCores.translate(0, -moveDownValue);
+
 
     // Duplica o grupo para cima
     var groupDuplicateUp = finalGroup.duplicate();
@@ -3322,6 +3384,8 @@ function montagemInterpack() {
     var grupoLabelFinal = app.activeDocument.groupItems.add();
     grupoLabel.move(grupoLabelFinal, ElementPlacement.PLACEATEND);
     retangulo.move(grupoLabelFinal, ElementPlacement.PLACEATEND);
+
+    circulosCores.zOrder(ZOrderMethod.BRINGTOFRONT);
 
 
 
