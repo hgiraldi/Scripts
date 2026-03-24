@@ -244,7 +244,7 @@ function boundsToDims(bounds) {
 
 function hasForbiddenLayers(doc) {
 
-    var forbidden = ["arte", "cota", "cotas", "faca"];
+    var forbidden = ["arte", "cota", "cotas", "faca", "label"];
 
     for (var i = 0; i < doc.layers.length; i++) {
 
