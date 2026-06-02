@@ -146,23 +146,6 @@ var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígit
         // RIGHT – para fora, à direita
         criaCruzH(picsLayer, rRight + distCentro_pt, rCentroY);
 
-        // 4) Criar texto com serviceOrderNumber ao lado da cruz de baixo
-        if (serviceOrderNumber && serviceOrderNumber !== "") {
-            var textoX = rCentroX + textoOffset_pt;
-            var textoY = bottomCrossY + 8.277165; // ajuste fino que você já usou
-
-            var tf = picsLayer.textFrames.add();
-            tf.kind = TextType.POINTTEXT;
-            tf.position = [textoX, textoY]; // [x, y] baseline
-
-            tf.contents = produto;
-            tf.textRange.size = fonte_pt;
-            tf.textRange.fillColor = reg;
-
-            try {
-                tf.textRange.paragraphAttributes.justification = Justification.LEFT;
-            } catch (e) {}
-        }
 
         // 5) Apagar o quadrado temporário
         tempRect.remove();

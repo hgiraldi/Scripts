@@ -815,7 +815,7 @@ if ((folder != "ingaflex") && (folder != "grafica_goncalves") && (folder != "pen
             alert("O CÓDIGO DE CORES ESTÁ INCORRETO, FAVOR VERIFICAR");
             break; // já pode parar, pois encontrou erro
         } else {
-            alert("Codigo encontrado");
+            //alert("Codigo encontrado");
         }
     }
 
