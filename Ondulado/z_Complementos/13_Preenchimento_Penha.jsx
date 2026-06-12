@@ -341,6 +341,7 @@ var mapping = {
     "parcial": marcaSeContem(tipoCliche, "parcial"),
     "repremont": marcaSeContem(tipoCliche, "repremont"),
     "data": dataEntrega,
+    "dataAtual" : getDataAtualFormatada(),
     "rep": repetitions,
     "pist": lanes,
     "onda": onda,
@@ -359,6 +360,15 @@ var mapping = {
 
 var doc = app.activeDocument;
 remapSpotsPorArray(doc, cores);
+
+/* ========= Helpers ========= */
+function getDataAtualFormatada() {
+    var hoje = new Date();
+    var dia = ("0" + hoje.getDate()).slice(-2);
+    var mes = ("0" + (hoje.getMonth() + 1)).slice(-2);
+    var ano = hoje.getFullYear();
+    return dia + "/" + mes + "/" + ano;
+}
  
 // --------------------------------------
 // UTIL: escapa string para uso em RegExp

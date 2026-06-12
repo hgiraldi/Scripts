@@ -45,6 +45,7 @@ if (app.documents.length === 0) {
     var checkbox11 = dlg.add("checkbox", undefined, "Layers Ondulado");
     var checkbox12 = dlg.add("checkbox", undefined, "Etiquetas Cores Ondulado");
     var checkbox13 = dlg.add("checkbox", undefined, "Preenchimento Cabeçalho");
+    var checkbox14 = dlg.add("checkbox", undefined, "Risco Poliester");
 
 
     // Adiciona um painel vazio para espaçamento
@@ -56,7 +57,7 @@ if (app.documents.length === 0) {
     var btnCancelar = dlg.add("button", undefined, "Cancelar");
 
     // Adiciona manipulador de eventos para checkboxes
-    var checkboxes = [checkbox2, checkbox10, checkbox11, checkbox12, checkbox13];
+    var checkboxes = [checkbox2, checkbox10, checkbox11, checkbox12, checkbox13, checkbox14];
     for (var i = 0; i < checkboxes.length; i++) {
         checkboxes[i].alignment = "left";
         checkboxes[i].onClick = function() {
@@ -97,6 +98,10 @@ if (app.documents.length === 0) {
         } else if (checkbox2.value) {
 
             #include "z_Complementos/2_Label_Alpha.jsx";
+
+        } else if (checkbox14.value) {
+
+            #include "z_Complementos/14_Risco_Faca.jsx";
 
         }
 

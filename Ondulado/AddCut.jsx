@@ -33,8 +33,8 @@ function main() {
         cutSpot.colorType = ColorModel.SPOT;
 
         var cutCMYK = new CMYKColor();
-        cutCMYK.cyan = 0;
-        cutCMYK.magenta = 100;
+        cutCMYK.cyan = 100;
+        cutCMYK.magenta = 0;
         cutCMYK.yellow = 0;
         cutCMYK.black = 0;
 
@@ -86,6 +86,7 @@ function main() {
         rect.stroked = true;
         rect.strokeWidth = 1;
         rect.strokeColor = cutColor;
+        rect.strokeOverprint = true;
     }
 }
 
@@ -291,7 +292,7 @@ function getVisibleBounds(object) {
                 clippedItem = object.pageItems[0];
             }
 
-            bounds = clippedItem.geometricBounds;
+            bounds = clippedItem.visibleBounds;
 
             if (sandboxLayer) {
                 sandboxLayer.remove();
@@ -330,7 +331,7 @@ function getVisibleBounds(object) {
 
     } else {
 
-        bounds = object.geometricBounds;
+        bounds = object.visibleBounds;
     }
 
     return bounds;
