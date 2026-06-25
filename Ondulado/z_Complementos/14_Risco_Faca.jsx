@@ -908,11 +908,12 @@ mainMap();
 // facilitar copiar so os da cor certa em cada risco depois.
 // ============================================================
 
-// --- nome de cor que deve ser ignorado (branco/none/registro) ---
+// --- nome de cor TECNICA que deve ser ignorada (none/registro). Branco/white
+// NAO entram aqui: so sao ignorados se o VALOR for 0,0,0,0 (ver spotEhBranco). ---
 function corEhBrancoNome(nome) {
     var n = String(nome).toLowerCase();
-    return (n === "white" || n === "branco" || n === "none" ||
-            n === "[none]" || n === "[registration]" || n === "[registro]");
+    return (n === "none" || n === "[none]" ||
+            n === "[registration]" || n === "[registro]");
 }
 
 // --- spot cuja cor e branca (CMYK 0/0/0/0 ou Gray 0) deve ser ignorada ---
@@ -1932,6 +1933,14 @@ function criarRiscosArte(doc) {
     var pares = [];
     for (var a = 0; a < grupos.length; a++) {
         for (var b = a + 1; b < grupos.length; b++) {
+            // PRE-FILTRO BARATO (performance): se as CAIXAS (vb) ja estao a mais de
+            // 15mm, a arte detalhada dentro delas tambem esta -> impossivel encaixar.
+            // Pula sem rodar o distanciaArte O(M^2) nem o regex de cor. Resultado
+            // IDENTICO: os pares realmente proximos continuam fazendo o calculo
+            // detalhado; so evita o custo caro nos pares obviamente distantes (a
+            // grande maioria). Esse era o gargalo do "as vezes 10min".
+            if (distanciaBounds(grupos[a].vb, grupos[b].vb) > gap15) continue;
+
             if (normalizarNomeCor(grupos[a].nomeCor) === normalizarNomeCor(grupos[b].nomeCor)) continue;
             // encaixe pela ARTE real (nao pelo bounding box) -> evita encaixe falso
             // (bounding boxes grandes se tocam, mas o desenho esta longe -> cut gigante)

@@ -19,11 +19,12 @@
  * Funcoes COPIA VERBATIM do 14_Risco_Faca.jsx / PICS.jsx (cor predominante)
  * =================================================================== */
 
-// --- nome de cor que deve ser ignorado (branco/none/registro) ---
+// --- nome de cor TECNICA que deve ser ignorada (none/registro). Branco/white
+// NAO entram aqui: so sao ignorados se o VALOR for 0,0,0,0 (ver spotEhBranco). ---
 function corEhBrancoNome(nome) {
     var n = String(nome).toLowerCase();
-    return (n === "white" || n === "branco" || n === "none" ||
-            n === "[none]" || n === "[registration]" || n === "[registro]");
+    return (n === "none" || n === "[none]" ||
+            n === "[registration]" || n === "[registro]");
 }
 
 // --- spot cuja cor e branca (CMYK 0/0/0/0 ou Gray 0) deve ser ignorada ---
