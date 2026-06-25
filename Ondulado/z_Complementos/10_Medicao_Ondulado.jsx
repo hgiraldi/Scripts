@@ -250,9 +250,40 @@ function spotEhBranco(spot) {
     return false;
 }
 
-// cor predominante (spot) de um grupo: a mais frequente em fill+stroke
+// cromia PURA: exatamente um canal = 100 e o resto = 0 (com tolerancia de 1%).
+// Mapeia para o nome canonico da separacao. Qualquer mistura -> null (ignorada).
+// E o caso do quadrado que o operador pinta (ex.: preto = 0,0,0,100 -> "black").
+function aproxCromia(v, alvo) {
+    return Math.abs(v - alvo) < 1;
+}
+
+function corCromiaPura(cor) {
+    if (!cor || cor.typename !== "CMYKColor") return null;
+    var c = cor.cyan, m = cor.magenta, y = cor.yellow, k = cor.black;
+    if (aproxCromia(c, 100) && aproxCromia(m, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "cyan";
+    if (aproxCromia(m, 100) && aproxCromia(c, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "magenta";
+    if (aproxCromia(y, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(k, 0)) return "yellow";
+    if (aproxCromia(k, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(y, 0)) return "black";
+    return null;
+}
+
+function melhorDaContagem(contagem) {
+    var melhor = null, maxC = 0;
+    for (var nome in contagem) {
+        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
+            maxC = contagem[nome];
+            melhor = nome;
+        }
+    }
+    return melhor;
+}
+
+// cor predominante de um grupo: a spot mais frequente em fill+stroke. Se o grupo
+// NAO tiver nenhuma spot, cai para a cromia pura mais frequente (black/cyan/...).
+// Spot SEMPRE tem prioridade para nao mudar o que ja funcionava.
 function corPredominanteDoGrupo(grupo) {
-    var contagem = {};
+    var contagemSpot = {};
+    var contagemCromia = {};
 
     function conta(cor) {
         if (!cor) return;
@@ -260,8 +291,11 @@ function corPredominanteDoGrupo(grupo) {
             var nm = cor.spot.name;
             if (corEhBrancoNome(nm)) return;
             if (spotEhBranco(cor.spot)) return;
-            contagem[nm] = (contagem[nm] || 0) + 1;
+            contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
+            return;
         }
+        var crom = corCromiaPura(cor);
+        if (crom) contagemCromia[crom] = (contagemCromia[crom] || 0) + 1;
     }
 
     function visita(item) {
@@ -282,14 +316,9 @@ function corPredominanteDoGrupo(grupo) {
 
     visita(grupo);
 
-    var melhor = null, maxC = 0;
-    for (var nome in contagem) {
-        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
-            maxC = contagem[nome];
-            melhor = nome;
-        }
-    }
-    return melhor;
+    var melhorSpot = melhorDaContagem(contagemSpot);
+    if (melhorSpot) return melhorSpot;
+    return melhorDaContagem(contagemCromia);
 }
 
 /* =============================
@@ -449,8 +478,31 @@ function groupsAndGenerateXML(repetitions) {
 }
 
 /* =============================
+   BLOQUEIO POR IMAGEM
+   - se houver qualquer imagem (incorporada ou colocada) o fluxo nao mede.
+     A cor da imagem nao gera placa de forma confiavel; o operador deve
+     tratar a imagem e representar cada cor por um quadrado de cromia pura.
+============================= */
+
+function docTemImagem(doc) {
+    try { if (doc.rasterItems && doc.rasterItems.length > 0) return true; } catch (e) {}
+    try { if (doc.placedItems && doc.placedItems.length > 0) return true; } catch (e2) {}
+    return false;
+}
+
+/* =============================
    EXECUCAO
 ============================= */
+
+if (app.documents.length === 0) {
+
+    alert("Nenhum documento aberto.");
+
+} else if (docTemImagem(app.activeDocument)) {
+
+    alert("MEDICAO BLOQUEADA\n\nO arquivo contem imagem (incorporada ou colocada).\n\nA cor de uma imagem nao gera placa de forma confiavel.\nTrate a imagem e represente cada cor por um QUADRADO de cromia pura\n(ex.: preto = 0,0,0,100), depois rode a medicao novamente.");
+
+} else {
 
 var repetitions = askRepetitions();
 
@@ -461,5 +513,7 @@ if (repetitions === null) {
 } else {
 
     groupsAndGenerateXML(repetitions);
+
+}
 
 }

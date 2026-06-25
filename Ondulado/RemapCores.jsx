@@ -38,9 +38,43 @@ function spotEhBranco(spot) {
     return false;
 }
 
-// --- cor predominante (spot) de um grupo: a mais frequente em fill+stroke ---
+// --- cromia PURA: exatamente um canal = 100 e o resto = 0 (tolerancia 1%).
+// Mapeia para o nome canonico da separacao (black/cyan/magenta/yellow). E o
+// quadrado que o operador pinta (ex.: preto = 0,0,0,100 -> "black"). ---
+function aproxCromia(v, alvo) {
+    return Math.abs(v - alvo) < 1;
+}
+
+function corCromiaPura(cor) {
+    if (!cor || cor.typename !== "CMYKColor") return null;
+    var c = cor.cyan, m = cor.magenta, y = cor.yellow, k = cor.black;
+    if (aproxCromia(c, 100) && aproxCromia(m, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "cyan";
+    if (aproxCromia(m, 100) && aproxCromia(c, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "magenta";
+    if (aproxCromia(y, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(k, 0)) return "yellow";
+    if (aproxCromia(k, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(y, 0)) return "black";
+    return null;
+}
+
+function ehNomeCromia(nome) {
+    return (nome === "black" || nome === "cyan" || nome === "magenta" || nome === "yellow");
+}
+
+function melhorDaContagem(contagem) {
+    var melhor = null, maxC = 0;
+    for (var nome in contagem) {
+        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
+            maxC = contagem[nome];
+            melhor = nome;
+        }
+    }
+    return melhor;
+}
+
+// --- cor predominante de um grupo: a spot mais frequente em fill+stroke. Se NAO
+// houver spot, cai para a cromia pura mais frequente. Spot sempre tem prioridade. ---
 function corPredominanteDoGrupo(grupo) {
-    var contagem = {};
+    var contagemSpot = {};
+    var contagemCromia = {};
 
     function conta(cor) {
         if (!cor) return;
@@ -48,8 +82,11 @@ function corPredominanteDoGrupo(grupo) {
             var nm = cor.spot.name;
             if (corEhBrancoNome(nm)) return;
             if (spotEhBranco(cor.spot)) return;
-            contagem[nm] = (contagem[nm] || 0) + 1;
+            contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
+            return;
         }
+        var crom = corCromiaPura(cor);
+        if (crom) contagemCromia[crom] = (contagemCromia[crom] || 0) + 1;
     }
 
     function visita(item) {
@@ -70,14 +107,9 @@ function corPredominanteDoGrupo(grupo) {
 
     visita(grupo);
 
-    var melhor = null, maxC = 0;
-    for (var nome in contagem) {
-        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
-            maxC = contagem[nome];
-            melhor = nome;
-        }
-    }
-    return melhor;
+    var melhorSpot = melhorDaContagem(contagemSpot);
+    if (melhorSpot) return melhorSpot;
+    return melhorDaContagem(contagemCromia);
 }
 
 /* ===================================================================
@@ -130,14 +162,32 @@ function criarSpotClonando(doc, nome, spotOriginal) {
     return novo;
 }
 
-// Remapeia, dentro do item (recursivo), SOMENTE os fills/strokes que usam a
-// spot predominante -> nova spot, preservando o tint (porcentagem) original.
-function remapItem(item, nomePredom, novoSpot) {
+// CMYKColor da separacao de cromia (black -> 0,0,0,100, etc.).
+function cmykDaCromia(cromiaNome) {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 0;
+    if (cromiaNome === "cyan") c.cyan = 100;
+    else if (cromiaNome === "magenta") c.magenta = 100;
+    else if (cromiaNome === "yellow") c.yellow = 100;
+    else if (cromiaNome === "black") c.black = 100;
+    return c;
+}
 
-    function ehPredom(cor) {
-        return (cor && cor.typename === "SpotColor" && cor.spot &&
-                cor.spot.name === nomePredom);
-    }
+// Cria uma spot nova com a cor da cromia pura (sem spot original p/ clonar).
+function criarSpotCromia(doc, nome, cromiaNome) {
+    var existente = getSpotByName(doc, nome);
+    if (existente) return existente;
+
+    var novo = doc.spots.add();
+    novo.name = nome;
+    try { novo.colorType = ColorModel.SPOT; } catch (e) {}
+    try { novo.color = cmykDaCromia(cromiaNome); } catch (e3) {}
+    return novo;
+}
+
+// Remapeia, dentro do item (recursivo), SOMENTE os fills/strokes aceitos pelo
+// predicado ehPredom -> nova spot, preservando o tint (porcentagem) original.
+function remapItem(item, ehPredom, novoSpot) {
 
     function novaCor(antiga) {
         var c = new SpotColor();
@@ -151,9 +201,9 @@ function remapItem(item, nomePredom, novoSpot) {
     try { if (item.stroked && ehPredom(item.strokeColor)) item.strokeColor = novaCor(item.strokeColor); } catch (e2) {}
 
     if (item.typename === "GroupItem") {
-        for (var i = 0; i < item.pageItems.length; i++) remapItem(item.pageItems[i], nomePredom, novoSpot);
+        for (var i = 0; i < item.pageItems.length; i++) remapItem(item.pageItems[i], ehPredom, novoSpot);
     } else if (item.typename === "CompoundPathItem") {
-        for (var j = 0; j < item.pathItems.length; j++) remapItem(item.pathItems[j], nomePredom, novoSpot);
+        for (var j = 0; j < item.pathItems.length; j++) remapItem(item.pathItems[j], ehPredom, novoSpot);
     } else if (item.typename === "TextFrame") {
         try {
             var ca = item.textRange.characterAttributes;
@@ -167,6 +217,12 @@ function remapItem(item, nomePredom, novoSpot) {
  * Execucao
  * =================================================================== */
 
+function docTemImagem(doc) {
+    try { if (doc.rasterItems && doc.rasterItems.length > 0) return true; } catch (e) {}
+    try { if (doc.placedItems && doc.placedItems.length > 0) return true; } catch (e2) {}
+    return false;
+}
+
 function main() {
 
     if (app.documents.length === 0) {
@@ -175,6 +231,12 @@ function main() {
     }
 
     var doc = app.activeDocument;
+
+    if (docTemImagem(doc)) {
+        alert("REMAP BLOQUEADO\n\nO arquivo contem imagem (incorporada ou colocada).\n\nO remap troca a cor de vetores, nao dos pixels de uma imagem.\nTrate a imagem e represente cada cor por um QUADRADO de cromia pura\n(ex.: preto = 0,0,0,100), depois rode o remap novamente.");
+        return;
+    }
+
     var sel = doc.selection;
 
     if (!sel || sel.length === 0) {
@@ -203,7 +265,9 @@ function main() {
         }
 
         var spotOrig = getSpotByName(doc, nomePredom);
-        if (!spotOrig) {
+        var ehCromia = (!spotOrig) && ehNomeCromia(nomePredom);
+
+        if (!spotOrig && !ehCromia) {
             ignoradosSemCor++;
             continue;
         }
@@ -211,8 +275,26 @@ function main() {
         var n = proximoNumero(doc, nomePredom);
         var novoNome = nomePredom + n;
 
-        var novoSpot = criarSpotClonando(doc, novoNome, spotOrig);
-        remapItem(it, nomePredom, novoSpot);
+        var novoSpot, ehPredom;
+
+        if (spotOrig) {
+            novoSpot = criarSpotClonando(doc, novoNome, spotOrig);
+            ehPredom = (function (alvo) {
+                return function (cor) {
+                    return (cor && cor.typename === "SpotColor" && cor.spot &&
+                            cor.spot.name === alvo);
+                };
+            })(nomePredom);
+        } else {
+            novoSpot = criarSpotCromia(doc, novoNome, nomePredom);
+            ehPredom = (function (alvo) {
+                return function (cor) {
+                    return corCromiaPura(cor) === alvo;
+                };
+            })(nomePredom);
+        }
+
+        remapItem(it, ehPredom, novoSpot);
 
         processados++;
         resumo.push(novoNome);
