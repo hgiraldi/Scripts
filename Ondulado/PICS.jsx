@@ -40,9 +40,55 @@ function spotEhBranco(spot) {
     return false;
 }
 
-// --- cor predominante (spot) de um grupo: a mais frequente em fill+stroke ---
+// --- cromia PURA: exatamente um canal = 100 e o resto = 0 (tolerancia 1%).
+// Mapeia para o nome canonico da separacao (black/cyan/magenta/yellow). E o
+// quadrado que o operador pinta (ex.: preto = 0,0,0,100 -> "black"). ---
+function aproxCromia(v, alvo) {
+    return Math.abs(v - alvo) < 1;
+}
+
+function corCromiaPura(cor) {
+    if (!cor || cor.typename !== "CMYKColor") return null;
+    var c = cor.cyan, m = cor.magenta, y = cor.yellow, k = cor.black;
+    if (aproxCromia(c, 100) && aproxCromia(m, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "cyan";
+    if (aproxCromia(m, 100) && aproxCromia(c, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "magenta";
+    if (aproxCromia(y, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(k, 0)) return "yellow";
+    if (aproxCromia(k, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(y, 0)) return "black";
+    return null;
+}
+
+function ehNomeCromia(nome) {
+    return (nome === "black" || nome === "cyan" || nome === "magenta" || nome === "yellow");
+}
+
+// CMYKColor da separacao de cromia (black -> 0,0,0,100, etc.).
+function cmykDaCromia(cromiaNome) {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 0;
+    if (cromiaNome === "cyan") c.cyan = 100;
+    else if (cromiaNome === "magenta") c.magenta = 100;
+    else if (cromiaNome === "yellow") c.yellow = 100;
+    else if (cromiaNome === "black") c.black = 100;
+    return c;
+}
+
+function melhorDaContagem(contagem) {
+    var melhor = null, maxC = 0;
+    for (var nome in contagem) {
+        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
+            maxC = contagem[nome];
+            melhor = nome;
+        }
+    }
+    return melhor;
+}
+
+// --- cor predominante de um grupo: a spot mais frequente em fill+stroke. Se NAO
+// houver spot, cai para a cromia pura mais frequente (black/cyan/...). Spot SEMPRE
+// tem prioridade para nao mudar o que ja funcionava. ---
 function corPredominanteDoGrupo(grupo) {
-    var contagem = {};
+    var contagemSpot = {};
+    var contagemCromia = {};
 
     function conta(cor) {
         if (!cor) return;
@@ -50,8 +96,11 @@ function corPredominanteDoGrupo(grupo) {
             var nm = cor.spot.name;
             if (corEhBrancoNome(nm)) return;
             if (spotEhBranco(cor.spot)) return;
-            contagem[nm] = (contagem[nm] || 0) + 1;
+            contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
+            return;
         }
+        var crom = corCromiaPura(cor);
+        if (crom) contagemCromia[crom] = (contagemCromia[crom] || 0) + 1;
     }
 
     function visita(item) {
@@ -72,14 +121,43 @@ function corPredominanteDoGrupo(grupo) {
 
     visita(grupo);
 
-    var melhor = null, maxC = 0;
-    for (var nome in contagem) {
-        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
-            maxC = contagem[nome];
-            melhor = nome;
-        }
-    }
-    return melhor;
+    var melhorSpot = melhorDaContagem(contagemSpot);
+    if (melhorSpot) return melhorSpot;
+    return melhorDaContagem(contagemCromia);
+}
+
+// cor p/ pintar o registro a partir do nome predominante:
+//  - spot existente -> SpotColor (tint 100). Cobre pantones e as spots de cromia
+//    que o RemapCores cria (black1, cyan1...).
+//  - cromia pura sem spot (black/cyan/magenta/yellow) -> CMYKColor puro, p/ a
+//    cromia seguir como cor normal. null -> pula o grupo.
+function corDoGrupo(doc, nomeCor) {
+    try {
+        var sc = new SpotColor();
+        sc.spot = doc.spots.getByName(nomeCor);
+        sc.tint = 100;
+        return sc;
+    } catch (e) {}
+    if (ehNomeCromia(nomeCor)) return cmykDaCromia(nomeCor);
+    return null;
+}
+
+// --- doc tem imagem (incorporada/colocada)? so para AVISAR (nao bloqueia) ---
+function docTemImagem(doc) {
+    try { if (doc.rasterItems && doc.rasterItems.length > 0) return true; } catch (e) {}
+    try { if (doc.placedItems && doc.placedItems.length > 0) return true; } catch (e2) {}
+    return false;
+}
+
+// --- layers que alimentam o risco: a arte principal + a "medidas" (quadrados
+// que representam as cores da imagem). "medidas" e opcional. ---
+function getLayersFonteRisco(doc, arte) {
+    var fontes = [arte];
+    try {
+        var med = doc.layers.getByName("medidas");
+        if (med && med.name !== arte.name) fontes.push(med);
+    } catch (e) {}
+    return fontes;
 }
 
 // --- bounds visiveis de um objeto/grupo (trata grupo, clip e compound) ---
@@ -937,12 +1015,21 @@ function normalizarNomeCor(nome) {
  * IGUAL ao criarRiscosArte (PASSO 1-4); SEM o cut (PASSO 5) e SEM separacoes.
  * =================================================================== */
 function criarRegistrosLabel(doc) {
+    // Imagem nao gera registro: avisa (sem bloquear) que cada cor da imagem deve
+    // virar um quadrado de cromia na "arte"/"medidas". A layer de imagens fica fora.
+    if (docTemImagem(doc)) {
+        alert("ATENCAO: IMAGEM NO ARQUIVO\n\nO PICS nao processa imagens (raster/colocadas) - elas serao IGNORADAS.\n\nRepresente cada cor da imagem por um QUADRADO de cromia pura\n(ex.: preto = 0,0,0,100) agrupado na layer 'arte' ou 'medidas'.");
+    }
+
     var arte = null;
     try { arte = doc.layers.getByName("arte"); } catch (e) { arte = null; }
     if (!arte) {
         arte = escolherLayerArteDialog(doc);
         if (!arte) return -1; // operador cancelou
     }
+
+    // arte + medidas alimentam os registros (medidas = quadrados das cores da imagem)
+    var fontesRisco = getLayersFonteRisco(doc, arte);
 
     // margem PADRAO de 6mm (sem dialogo): faixa ao redor da arte onde o label PODE
     // ficar (refB = arte ∪ marcas + 6mm). A logica tenta SEMPRE por o label dentro
@@ -963,39 +1050,39 @@ function criarRegistrosLabel(doc) {
     var strokeReg = mmToPt(0.3);
     var gap15 = mmToPt(15);
 
-    // ===== PASSO 1: coleta os grupos da arte (cor, bounds, area) =====
+    // ===== PASSO 1: coleta os grupos da arte + medidas (cor, bounds, area) =====
     var grupos = [];
-    for (var i = 0; i < arte.pageItems.length; i++) {
-        var grupo = arte.pageItems[i];
-        if (grupo.typename !== "GroupItem") continue;
+    for (var _lf = 0; _lf < fontesRisco.length; _lf++) {
+        var _layerFonte = fontesRisco[_lf];
+        for (var i = 0; i < _layerFonte.pageItems.length; i++) {
+            var grupo = _layerFonte.pageItems[i];
+            if (grupo.typename !== "GroupItem") continue;
 
-        var nomeCor = corPredominanteDoGrupo(grupo);
-        if (!nomeCor) continue;
+            var nomeCor = corPredominanteDoGrupo(grupo);
+            if (!nomeCor) continue;
 
-        var spotColor;
-        try {
-            spotColor = new SpotColor();
-            spotColor.spot = doc.spots.getByName(nomeCor);
-            spotColor.tint = 100;
-        } catch (e) { continue; }
+            // spot existente OU cromia pura (CMYK puro) -> cor do registro
+            var corObj = corDoGrupo(doc, nomeCor);
+            if (!corObj) continue;
 
-        var vb = getVisibleBoundsDeep(grupo); // bounds VISIVEL (clipa o que passa da mascara)
-        if (!vb) continue;
+            var vb = getVisibleBoundsDeep(grupo); // bounds VISIVEL (clipa o que passa da mascara)
+            if (!vb) continue;
 
-        var ba = [];
-        coletarBoundsArte(grupo, ba);
+            var ba = [];
+            coletarBoundsArte(grupo, ba);
 
-        grupos.push({
-            nomeCor: nomeCor,
-            cor: spotColor,
-            vb: vb,
-            boundsArte: ba,
-            area: (vb[2] - vb[0]) * (vb[1] - vb[3]),
-            par: null,
-            marcasB: null,
-            maioresIdx: null,
-            pulaPar: false
-        });
+            grupos.push({
+                nomeCor: nomeCor,
+                cor: corObj,
+                vb: vb,
+                boundsArte: ba,
+                area: (vb[2] - vb[0]) * (vb[1] - vb[3]),
+                par: null,
+                marcasB: null,
+                maioresIdx: null,
+                pulaPar: false
+            });
+        }
     }
 
     // ===== PASSO 2: encaixes (cores DIFERENTES com folga <= 15mm) =====
@@ -1084,7 +1171,7 @@ function criarRegistrosLabel(doc) {
 
     if (n === -1) return; // cancelou um dos dialogos
     if (n === 0) {
-        alert("Nenhum grupo-mãe com cor spot encontrado na layer da arte.");
+        alert("Nenhum grupo-mãe com cor (spot ou cromia pura) encontrado nas layers 'arte'/'medidas'.");
     } else {
         alert(n + " grupo(s) processado(s).\nRegistros (+/×) + label criados na layer 'registros'.");
     }

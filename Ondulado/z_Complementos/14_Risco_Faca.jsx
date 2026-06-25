@@ -927,9 +927,55 @@ function spotEhBranco(spot) {
     return false;
 }
 
-// --- cor predominante (spot) de um grupo: a mais frequente em fill+stroke ---
+// --- cromia PURA: exatamente um canal = 100 e o resto = 0 (tolerancia 1%).
+// Mapeia para o nome canonico da separacao (black/cyan/magenta/yellow). E o
+// quadrado que o operador pinta (ex.: preto = 0,0,0,100 -> "black"). ---
+function aproxCromia(v, alvo) {
+    return Math.abs(v - alvo) < 1;
+}
+
+function corCromiaPura(cor) {
+    if (!cor || cor.typename !== "CMYKColor") return null;
+    var c = cor.cyan, m = cor.magenta, y = cor.yellow, k = cor.black;
+    if (aproxCromia(c, 100) && aproxCromia(m, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "cyan";
+    if (aproxCromia(m, 100) && aproxCromia(c, 0) && aproxCromia(y, 0) && aproxCromia(k, 0)) return "magenta";
+    if (aproxCromia(y, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(k, 0)) return "yellow";
+    if (aproxCromia(k, 100) && aproxCromia(c, 0) && aproxCromia(m, 0) && aproxCromia(y, 0)) return "black";
+    return null;
+}
+
+function ehNomeCromia(nome) {
+    return (nome === "black" || nome === "cyan" || nome === "magenta" || nome === "yellow");
+}
+
+// CMYKColor da separacao de cromia (black -> 0,0,0,100, etc.).
+function cmykDaCromia(cromiaNome) {
+    var c = new CMYKColor();
+    c.cyan = 0; c.magenta = 0; c.yellow = 0; c.black = 0;
+    if (cromiaNome === "cyan") c.cyan = 100;
+    else if (cromiaNome === "magenta") c.magenta = 100;
+    else if (cromiaNome === "yellow") c.yellow = 100;
+    else if (cromiaNome === "black") c.black = 100;
+    return c;
+}
+
+function melhorDaContagem(contagem) {
+    var melhor = null, maxC = 0;
+    for (var nome in contagem) {
+        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
+            maxC = contagem[nome];
+            melhor = nome;
+        }
+    }
+    return melhor;
+}
+
+// --- cor predominante de um grupo: a spot mais frequente em fill+stroke. Se NAO
+// houver spot, cai para a cromia pura mais frequente (black/cyan/...). Spot SEMPRE
+// tem prioridade para nao mudar o que ja funcionava. ---
 function corPredominanteDoGrupo(grupo) {
-    var contagem = {};
+    var contagemSpot = {};
+    var contagemCromia = {};
 
     function conta(cor) {
         if (!cor) return;
@@ -937,8 +983,11 @@ function corPredominanteDoGrupo(grupo) {
             var nm = cor.spot.name;
             if (corEhBrancoNome(nm)) return;
             if (spotEhBranco(cor.spot)) return;
-            contagem[nm] = (contagem[nm] || 0) + 1;
+            contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
+            return;
         }
+        var crom = corCromiaPura(cor);
+        if (crom) contagemCromia[crom] = (contagemCromia[crom] || 0) + 1;
     }
 
     function visita(item) {
@@ -959,14 +1008,25 @@ function corPredominanteDoGrupo(grupo) {
 
     visita(grupo);
 
-    var melhor = null, maxC = 0;
-    for (var nome in contagem) {
-        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
-            maxC = contagem[nome];
-            melhor = nome;
-        }
-    }
-    return melhor;
+    var melhorSpot = melhorDaContagem(contagemSpot);
+    if (melhorSpot) return melhorSpot;
+    return melhorDaContagem(contagemCromia);
+}
+
+// cor p/ pintar registro+cut a partir do nome predominante:
+//  - spot existente -> SpotColor (tint 100). Cobre pantones e as spots de cromia
+//    que o RemapCores cria (black1, cyan1...).
+//  - cromia pura sem spot (black/cyan/magenta/yellow) -> CMYKColor puro, p/ a
+//    cromia seguir como cor normal (registro + cut). null -> pula o grupo.
+function corDoGrupo(doc, nomeCor) {
+    try {
+        var sc = new SpotColor();
+        sc.spot = doc.spots.getByName(nomeCor);
+        sc.tint = 100;
+        return sc;
+    } catch (e) {}
+    if (ehNomeCromia(nomeCor)) return cmykDaCromia(nomeCor);
+    return null;
 }
 
 // --- bounds visiveis de um objeto/grupo (trata grupo, clip e compound) ---
@@ -1854,15 +1914,44 @@ function clearanceLado(vb, vizinhos, lado) {
     return menor;
 }
 
-// --- cria os quadrados (cut) e registros (+/x) - 1 por grupo da arte ---
+// --- doc tem imagem (incorporada/colocada)? so para AVISAR (nao bloqueia) ---
+function docTemImagem(doc) {
+    try { if (doc.rasterItems && doc.rasterItems.length > 0) return true; } catch (e) {}
+    try { if (doc.placedItems && doc.placedItems.length > 0) return true; } catch (e2) {}
+    return false;
+}
+
+// --- layers que alimentam o risco: a arte principal + a "medidas" (quadrados
+// que representam as cores da imagem). "medidas" e opcional. ---
+function getLayersFonteRisco(doc, arte) {
+    var fontes = [arte];
+    try {
+        var med = doc.layers.getByName("medidas");
+        if (med && med.name !== arte.name) fontes.push(med);
+    } catch (e) {}
+    return fontes;
+}
+
+// --- cria os quadrados (cut) e registros (+/x) - 1 por grupo da arte/medidas ---
 function criarRiscosArte(doc) {
+    // Imagem nao gera risco: avisa (sem bloquear) que cada cor da imagem deve
+    // virar um quadrado de cromia na "arte"/"medidas". A layer de imagens fica fora.
+    if (docTemImagem(doc)) {
+        alert("ATENCAO: IMAGEM NO ARQUIVO\n\nO risco nao processa imagens (raster/colocadas) - elas serao IGNORADAS.\n\nRepresente cada cor da imagem por um QUADRADO de cromia pura\n(ex.: preto = 0,0,0,100) agrupado na layer 'arte' ou 'medidas'.");
+    }
+
     var arte = null;
     try { arte = doc.layers.getByName("arte"); } catch (e) { arte = null; }
     if (!arte) {
         arte = escolherLayerArteDialog(doc);
         if (!arte) return; // operador cancelou
     }
-    nomeLayerArte = arte.name; // guarda para remover a arte das separacoes
+
+    // arte + medidas alimentam o risco; guarda os nomes para remove-las das separacoes.
+    var fontesRisco = getLayersFonteRisco(doc, arte);
+    nomeLayerArte = arte.name;
+    nomesLayersRisco = [];
+    for (var _nf = 0; _nf < fontesRisco.length; _nf++) nomesLayersRisco.push(fontesRisco[_nf].name);
 
     var margens = showMarginDialogRiscos(); // [left, top, right, bottom] em pt
     if (!margens) return;
@@ -1894,39 +1983,39 @@ function criarRiscosArte(doc) {
     var strokeReg = mmToPt(0.3);
     var gap15 = mmToPt(15);
 
-    // ===== PASSO 1: coleta os grupos da arte (cor, bounds, area) =====
+    // ===== PASSO 1: coleta os grupos da arte + medidas (cor, bounds, area) =====
     var grupos = [];
-    for (var i = 0; i < arte.pageItems.length; i++) {
-        var grupo = arte.pageItems[i];
-        if (grupo.typename !== "GroupItem") continue;
+    for (var _lf = 0; _lf < fontesRisco.length; _lf++) {
+        var _layerFonte = fontesRisco[_lf];
+        for (var i = 0; i < _layerFonte.pageItems.length; i++) {
+            var grupo = _layerFonte.pageItems[i];
+            if (grupo.typename !== "GroupItem") continue;
 
-        var nomeCor = corPredominanteDoGrupo(grupo);
-        if (!nomeCor) continue;
+            var nomeCor = corPredominanteDoGrupo(grupo);
+            if (!nomeCor) continue;
 
-        var spotColor;
-        try {
-            spotColor = new SpotColor();
-            spotColor.spot = doc.spots.getByName(nomeCor);
-            spotColor.tint = 100;
-        } catch (e) { continue; }
+            // spot existente OU cromia pura (CMYK puro) -> cor do registro/cut
+            var corObj = corDoGrupo(doc, nomeCor);
+            if (!corObj) continue;
 
-        var vb = getVisibleBoundsDeep(grupo); // bounds VISIVEL (clipa o que passa da mascara)
-        if (!vb) continue;
+            var vb = getVisibleBoundsDeep(grupo); // bounds VISIVEL (clipa o que passa da mascara)
+            if (!vb) continue;
 
-        var ba = [];
-        coletarBoundsArte(grupo, ba);
+            var ba = [];
+            coletarBoundsArte(grupo, ba);
 
-        grupos.push({
-            nomeCor: nomeCor,
-            cor: spotColor,
-            vb: vb,
-            boundsArte: ba,
-            area: (vb[2] - vb[0]) * (vb[1] - vb[3]),
-            par: null,
-            marcasB: null,
-            maioresIdx: null,
-            pulaPar: false
-        });
+            grupos.push({
+                nomeCor: nomeCor,
+                cor: corObj,
+                vb: vb,
+                boundsArte: ba,
+                area: (vb[2] - vb[0]) * (vb[1] - vb[3]),
+                par: null,
+                marcasB: null,
+                maioresIdx: null,
+                pulaPar: false
+            });
+        }
     }
 
     // ===== PASSO 2: encaixes (cores DIFERENTES com folga <= 15mm) =====
@@ -2062,6 +2151,8 @@ function criarRiscosArte(doc) {
 
 // nome da layer usada como arte (para remove-la das separacoes)
 var nomeLayerArte = null;
+// nomes de TODAS as layers-fonte do risco (arte + medidas) p/ remover das separacoes
+var nomesLayersRisco = [];
 // margens do cut (p/ o label ocupar a area do cut, incluindo a margem, sem crescer o cut)
 var margensCut = null;
 
@@ -2095,9 +2186,9 @@ function ensureCutSpot(docSep) {
 // "cut" mantem APENAS os RISCO_ da cor atual, recolorindo-os para a spot "cut"
 // (100% cyan) - mais visivel no arquivo do poliester.
 function prepararSeparacao(docSep, corAtual) {
-    if (nomeLayerArte) {
+    for (var _nl = 0; _nl < nomesLayersRisco.length; _nl++) {
         try {
-            var la = docSep.layers.getByName(nomeLayerArte);
+            var la = docSep.layers.getByName(nomesLayersRisco[_nl]);
             la.locked = false;
             la.visible = true;
             la.remove();
@@ -2916,8 +3007,8 @@ var docPrimeiraCor = null;
 // Esconde a arte no docOriginal para o clone NAO puxar a layer pesada da arte
 // (economiza processamento - ela seria removida da separacao de qualquer jeito).
 // Restaurada no fim do loop.
-if (nomeLayerArte) {
-    try { docOriginal.layers.getByName(nomeLayerArte).visible = false; } catch (e) {}
+for (var _hl = 0; _hl < nomesLayersRisco.length; _hl++) {
+    try { docOriginal.layers.getByName(nomesLayersRisco[_hl]).visible = false; } catch (e) {}
 }
 
 // Marca o inicio da geracao (para o log de tempo no fim).
@@ -3087,9 +3178,9 @@ try {
     _arqTempo.close();
 } catch (e) {}
 
-// Restaura a visibilidade da arte no arquivo principal.
-if (nomeLayerArte) {
-    try { docOriginal.layers.getByName(nomeLayerArte).visible = true; } catch (e) {}
+// Restaura a visibilidade das layers-fonte (arte + medidas) no arquivo principal.
+for (var _rl = 0; _rl < nomesLayersRisco.length; _rl++) {
+    try { docOriginal.layers.getByName(nomesLayersRisco[_rl]).visible = true; } catch (e) {}
 }
 
 } // fim do if (prosseguirCriacao) - cancelado pelo usuario nao cria arquivos
@@ -3100,4 +3191,10 @@ if (nomeLayerArte) {
 try {
     var cutLayerPrincipal = docOriginal.layers.getByName("cut");
     cutLayerPrincipal.visible = false;
+} catch (e) {}
+
+// "medidas" tambem nao vai pra impressao (so quadrados de apoio): esconde no fim
+// no arquivo principal, igual a "cut". O conteudo permanece, so fica oculto.
+try {
+    docOriginal.layers.getByName("medidas").visible = false;
 } catch (e) {}
