@@ -958,7 +958,7 @@ function criarRegistrosLabel(doc) {
         try { registrosLayer.pageItems[_liLimpa].remove(); } catch (e) {}
     }
 
-    var markHalf = mmToPt(4) / 2;
+    var markHalf = mmToPt(5) / 2;
     var strokeReg = mmToPt(0.3);
     var gap15 = mmToPt(15);
 

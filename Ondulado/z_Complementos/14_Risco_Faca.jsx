@@ -1889,7 +1889,7 @@ function criarRiscosArte(doc) {
     }
 
     var strokeCut = mmToPt(0.5);
-    var markHalf = mmToPt(4) / 2;
+    var markHalf = mmToPt(5) / 2;
     var strokeReg = mmToPt(0.3);
     var gap15 = mmToPt(15);
 
