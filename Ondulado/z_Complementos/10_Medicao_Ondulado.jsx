@@ -2,13 +2,15 @@
 
 /**
  * 10_Medicao_Ondulado.jsx
+ *
+ * Mede por GRUPO (e nao mais por layer). Para cada GroupItem das layers,
+ * descobre a COR PREDOMINANTE (mesma logica do 14_Risco_Faca) e nomeia cada
+ * placa com o nome da spot + um indice. Ex.: 5 grupos cuja cor predominante
+ * e a spot "preto" viram preto1, preto2, preto3, preto4 e preto5.
+ *
+ * Layers tecnicas (geradas por script) e layers ocultas/travadas sao puladas,
+ * para que cut/registros/cotas/faca/label nao entrem como placas no XML.
  */
-
-function LayerInfo(name, width, height) {
-    this.name = name;
-    this.width = width;
-    this.height = height;
-}
 
 function pointsToMM(points) {
     return (points * 0.35278).toFixed(1);
@@ -41,6 +43,10 @@ var xmlFileName = serviceOrderNumber + "_AI_STAGGERED.xml";
 
 var margemMM = 0;
 var margemCM = (margemMM / 10).toFixed(1);
+
+/* =============================
+   BOUNDS VISIVEIS (clipados a mascara)
+============================= */
 
 function unionBounds(acc, b) {
     if (!b) return acc;
@@ -205,24 +211,6 @@ function getVisibleBoundsDeep(it) {
     }
 }
 
-function getLayerVisibleBounds(layer) {
-
-    var bounds = null;
-
-    for (var i = 0; i < layer.pageItems.length; i++) {
-
-        var topItem = layer.pageItems[i];
-
-        if (topItem.hidden || topItem.locked) continue;
-        if (shouldIgnoreItemByStyle(topItem) && topItem.typename !== "GroupItem") continue;
-
-        var b = getVisibleBoundsDeep(topItem);
-        bounds = unionBounds(bounds, b);
-    }
-
-    return bounds;
-}
-
 function boundsToDims(bounds) {
 
     var widthPt = bounds[2] - bounds[0];
@@ -239,31 +227,87 @@ function boundsToDims(bounds) {
 }
 
 /* =============================
-   VERIFICAÇÃO DE LAYERS PROIBIDAS
+   COR PREDOMINANTE DO GRUPO
+   - mesma logica do 14_Risco_Faca.jsx
 ============================= */
 
-function hasForbiddenLayers(doc) {
+// nome de cor que deve ser ignorado (branco/none/registro)
+function corEhBrancoNome(nome) {
+    var n = String(nome).toLowerCase();
+    return (n === "white" || n === "branco" || n === "none" ||
+            n === "[none]" || n === "[registration]" || n === "[registro]");
+}
 
-    var forbidden = ["arte", "cota", "cotas", "faca", "label"];
+// spot cuja cor e branca (CMYK 0/0/0/0 ou Gray 0) deve ser ignorada
+function spotEhBranco(spot) {
+    try {
+        var c = spot.color;
+        if (c && c.typename === "CMYKColor" &&
+            c.cyan === 0 && c.magenta === 0 && c.yellow === 0 && c.black === 0) return true;
+        if (c && c.typename === "GrayColor" && c.gray === 0) return true;
+    } catch (e) {}
+    return false;
+}
 
-    for (var i = 0; i < doc.layers.length; i++) {
+// cor predominante (spot) de um grupo: a mais frequente em fill+stroke
+function corPredominanteDoGrupo(grupo) {
+    var contagem = {};
 
-        var name = doc.layers[i].name.toLowerCase();
-
-        for (var j = 0; j < forbidden.length; j++) {
-
-            if (name === forbidden[j]) {
-                return true;
-            }
-
+    function conta(cor) {
+        if (!cor) return;
+        if (cor.typename === "SpotColor" && cor.spot) {
+            var nm = cor.spot.name;
+            if (corEhBrancoNome(nm)) return;
+            if (spotEhBranco(cor.spot)) return;
+            contagem[nm] = (contagem[nm] || 0) + 1;
         }
     }
 
+    function visita(item) {
+        try { if (item.filled) conta(item.fillColor); } catch (e) {}
+        try { if (item.stroked) conta(item.strokeColor); } catch (e) {}
+        if (item.typename === "GroupItem") {
+            for (var i = 0; i < item.pageItems.length; i++) visita(item.pageItems[i]);
+        } else if (item.typename === "CompoundPathItem") {
+            for (var i = 0; i < item.pathItems.length; i++) visita(item.pathItems[i]);
+        } else if (item.typename === "TextFrame") {
+            try {
+                var ca = item.textRange.characterAttributes;
+                conta(ca.fillColor);
+                conta(ca.strokeColor);
+            } catch (e) {}
+        }
+    }
+
+    visita(grupo);
+
+    var melhor = null, maxC = 0;
+    for (var nome in contagem) {
+        if (contagem.hasOwnProperty(nome) && contagem[nome] > maxC) {
+            maxC = contagem[nome];
+            melhor = nome;
+        }
+    }
+    return melhor;
+}
+
+/* =============================
+   LAYERS TECNICAS A IGNORAR
+   - layers geradas por script que NUNCA sao arte; seus grupos
+     (cut, registros, cotas, faca, label) nao podem virar placa.
+============================= */
+
+function isLayerTecnica(layer) {
+    var tecnicas = ["faca", "cut", "cota", "cotas", "registros", "label"];
+    var n = String(layer.name).toLowerCase();
+    for (var i = 0; i < tecnicas.length; i++) {
+        if (n === tecnicas[i]) return true;
+    }
     return false;
 }
 
 /* =============================
-   PERGUNTA REPETIÇÕES
+   PERGUNTA REPETICOES
 ============================= */
 
 function askRepetitions() {
@@ -301,74 +345,91 @@ function minValue(val, min) {
 }
 
 /* =============================
-   FUNÇÃO PRINCIPAL
+   FUNCAO PRINCIPAL
 ============================= */
 
-function groupLayersAndGenerateXML(repetitions) {
+function groupsAndGenerateXML(repetitions) {
 
     var doc = app.activeDocument;
 
-    if (hasForbiddenLayers(doc)) {
-        alert("ERRO: Existe uma layer chamada ARTE, COTA, COTAS ou FACA.\nRemova ou renomeie antes de gerar a medição.");
-        return;
-    }
-
-    var layerInfoArray = [];
-    var jobColorsCount = {};
+    var plateInfoArray = [];
+    var colorCounters = {};   // nome da spot -> quantas placas dessa cor ja saíram
+    var distinctColors = {};  // nome da spot -> true (para contar JobColors)
     var uniqueColorCount = 0;
 
     for (var i = 0; i < doc.layers.length; i++) {
 
         var layer = doc.layers[i];
 
+        // pula layers ocultas/travadas e as tecnicas (cut, faca, registros, etc.)
+        if (!layer.visible || layer.locked) continue;
+        if (isLayerTecnica(layer)) continue;
         if (layer.pageItems.length === 0) continue;
 
-        var lb = getLayerVisibleBounds(layer);
-        if (!lb) continue;
+        // percorre os grupos do TOPO desta layer (1 grupo = 1 placa)
+        for (var g = 0; g < layer.pageItems.length; g++) {
 
-        var dims = boundsToDims(lb);
+            var grupo = layer.pageItems[g];
+            if (grupo.typename !== "GroupItem") continue;
 
-        var wMMraw = dims.wMM + parseFloat(margemMM);
-        var hMMraw = dims.hMM + parseFloat(margemMM);
-        var wCMraw = dims.wCM + parseFloat(margemCM);
-        var hCMraw = dims.hCM + parseFloat(margemCM);
+            var nomeCor = corPredominanteDoGrupo(grupo);
+            if (!nomeCor) continue;
 
-        wMMraw = minValue(wMMraw, 1);
-        hMMraw = minValue(hMMraw, 1);
-        wCMraw = minValue(wCMraw, 1);
-        hCMraw = minValue(hCMraw, 1);
+            var vb = getVisibleBoundsDeep(grupo);
+            if (!vb) continue;
 
-        var widthInMM = wMMraw.toFixed(1);
-        var heightInMM = hMMraw.toFixed(1);
-        var widthInCM = wCMraw.toFixed(0);
-        var heightInCM = hCMraw.toFixed(0);
+            var dims = boundsToDims(vb);
 
-        var colorPrefix = layer.name.replace(/\d+$/, '');
+            var wMMraw = dims.wMM + parseFloat(margemMM);
+            var hMMraw = dims.hMM + parseFloat(margemMM);
+            var wCMraw = dims.wCM + parseFloat(margemCM);
+            var hCMraw = dims.hCM + parseFloat(margemCM);
 
-        if (!jobColorsCount[colorPrefix]) {
-            jobColorsCount[colorPrefix] = true;
-            uniqueColorCount++;
+            wMMraw = minValue(wMMraw, 1);
+            hMMraw = minValue(hMMraw, 1);
+            wCMraw = minValue(wCMraw, 1);
+            hCMraw = minValue(hCMraw, 1);
+
+            var widthInMM = wMMraw.toFixed(1);
+            var heightInMM = hMMraw.toFixed(1);
+            var widthInCM = wCMraw.toFixed(0);
+            var heightInCM = hCMraw.toFixed(0);
+
+            // conta cores distintas (JobColors)
+            if (!distinctColors[nomeCor]) {
+                distinctColors[nomeCor] = true;
+                uniqueColorCount++;
+            }
+
+            // nome da placa = nome da spot + indice (preto1, preto2, ...)
+            colorCounters[nomeCor] = (colorCounters[nomeCor] || 0) + 1;
+            var plateName = nomeCor + colorCounters[nomeCor];
+
+            plateInfoArray.push({
+                name: plateName,
+                widthInMM: widthInMM,
+                heightInMM: heightInMM,
+                widthInCM: widthInCM,
+                heightInCM: heightInCM
+            });
         }
-
-        layerInfoArray.push({
-            name: layer.name,
-            widthInMM: widthInMM,
-            heightInMM: heightInMM,
-            widthInCM: widthInCM,
-            heightInCM: heightInCM
-        });
     }
 
-    var platesCount = layerInfoArray.length;
+    if (plateInfoArray.length === 0) {
+        alert("Nenhum grupo com cor predominante foi encontrado.\nVerifique se a arte esta agrupada e com spots (nao branco).");
+        return;
+    }
+
+    var platesCount = plateInfoArray.length;
 
     var xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<Billing>\n';
 
     xml += '    <Customer Billed="0" Operador="' + resultadoOperadorNome + '" Folder="' + folder + '" JobColors="' + uniqueColorCount + '" Name="' + cliente + '" Order="' + serviceOrderNumber + '" Plates="' + platesCount + '" crop="" mb="" ml="" mr="" mt="" operator="' + resultadoOperador + '" spetialcrop=""/>\n';
 
-    for (var j = 0; j < layerInfoArray.length; j++) {
+    for (var j = 0; j < plateInfoArray.length; j++) {
 
-        var info = layerInfoArray[j];
+        var info = plateInfoArray[j];
 
         xml += '    <PARTIALPLATE Name="' + info.name +
             '" data="' + (j + 1) + '_' + info.name + '_' + info.heightInMM + 'x' + info.widthInMM +
@@ -383,11 +444,11 @@ function groupLayersAndGenerateXML(repetitions) {
 
     saveXMLToFile(xml, folderPathCopy + xmlFileName);
 
-    alert("MEDIDAS GERADAS");
+    alert("MEDIDAS GERADAS\n\nPlacas: " + platesCount + "\nCores distintas: " + uniqueColorCount);
 }
 
 /* =============================
-   EXECUÇÃO
+   EXECUCAO
 ============================= */
 
 var repetitions = askRepetitions();
@@ -398,6 +459,6 @@ if (repetitions === null) {
 
 } else {
 
-    groupLayersAndGenerateXML(repetitions);
+    groupsAndGenerateXML(repetitions);
 
 }

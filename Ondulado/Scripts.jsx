@@ -175,8 +175,7 @@ if (app.documents.length === 0) {
     // Cada operacao: tipo do icone, label e descricao mostrada ao selecionar.
     var operacoes = [
         { tipo: "label",  texto: "Label Alpha",             desc: "Aplica a etiqueta/label padrão Alpha no documento." },
-        { tipo: "regua",  texto: "Medição Ondulado",        desc: "Gera as medidas das placas do ondulado." },
-        { tipo: "regua",  texto: "Medição Ondulado (Teste)", desc: "TESTE: gera as medidas por GRUPO, usando a cor predominante de cada grupo (preto1, preto2...). Não substitui a medição original." },
+        { tipo: "regua",  texto: "Medição Ondulado",        desc: "Gera as medidas das placas do ondulado (por grupo/cor predominante)." },
         { tipo: "layers", texto: "Layers Ondulado",         desc: "Cria a estrutura de layers (placas por cor) do fluxo." },
         { tipo: "header", texto: "Preenchimento Cabeçalho", desc: "Preenche os campos do cabeçalho automaticamente." },
         { tipo: "faca",   texto: "Risco Poliester",         desc: "Gera o risco/faca em poliéster com data." },
@@ -225,13 +224,12 @@ if (app.documents.length === 0) {
     aplicarFonte(lblDesc, "Segoe UI", ScriptUI.FontStyle.REGULAR, 9, null);
 
     // referencias por nome (mantem compatibilidade com o restante do script)
-    var rbLabel        = radios[0];
-    var rbMedicao      = radios[1];
-    var rbMedicaoTeste = radios[2];
-    var rbLayers       = radios[3];
-    var rbPreench      = radios[4];
-    var rbRisco        = radios[5];
-    var rbEtiqueta     = radios[6];
+    var rbLabel   = radios[0];
+    var rbMedicao = radios[1];
+    var rbLayers  = radios[2];
+    var rbPreench = radios[3];
+    var rbRisco   = radios[4];
+    var rbEtiqueta = radios[5];
 
     // ---------------------- BOTOES ------------------------
     var grpBtns = dlg.add("group");
@@ -282,7 +280,7 @@ if (app.documents.length === 0) {
             return;
         }
 
-        if (!rbLabel.value && !rbMedicao.value && !rbMedicaoTeste.value && !rbLayers.value &&
+        if (!rbLabel.value && !rbMedicao.value && !rbLayers.value &&
             !rbPreench.value && !rbRisco.value && !rbEtiqueta.value) {
             alert("Selecione uma operação.");
             return;
@@ -298,10 +296,6 @@ if (app.documents.length === 0) {
         if (rbMedicao.value) {
 
             #include "z_Complementos/10_Medicao_Ondulado.jsx";
-
-        } else if (rbMedicaoTeste.value) {
-
-            #include "z_Complementos/10_Medicao_Ondulado_Teste.jsx";
 
         } else if (rbLayers.value) {
 
