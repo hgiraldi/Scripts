@@ -192,7 +192,15 @@ function remapItem(item, ehPredom, novoSpot) {
     function novaCor(antiga) {
         var c = new SpotColor();
         c.spot = novoSpot;
-        try { c.tint = antiga.tint; } catch (e) { c.tint = 100; }
+        // tint SEMPRE numerico valido. Cromia (CMYKColor) nao tem .tint -> vem
+        // undefined; setar undefined deixa a spot invalida e o fillColor estoura
+        // depois (silenciado pelo try de fora) -> objeto NAO era repintado. Por
+        // isso so reaproveita o tint quando ele e mesmo um numero; senao 100.
+        var t = 100;
+        try {
+            if (antiga && typeof antiga.tint === "number" && !isNaN(antiga.tint)) t = antiga.tint;
+        } catch (e) {}
+        c.tint = t;
         return c;
     }
 
