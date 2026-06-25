@@ -176,7 +176,6 @@ if (app.documents.length === 0) {
     var operacoes = [
         { tipo: "label",  texto: "Label Alpha",             desc: "Aplica a etiqueta/label padrão Alpha no documento." },
         { tipo: "regua",  texto: "Medição Ondulado",        desc: "Gera as medidas das placas do ondulado (por grupo/cor predominante)." },
-        { tipo: "layers", texto: "Layers Ondulado",         desc: "Cria a estrutura de layers (placas por cor) do fluxo." },
         { tipo: "header", texto: "Preenchimento Cabeçalho", desc: "Preenche os campos do cabeçalho automaticamente." },
         { tipo: "faca",   texto: "Risco Poliester",         desc: "Gera o risco/faca em poliéster com data." },
         { tipo: "etiqueta", texto: "Gerar Etiquetas",        desc: "Gera as etiquetas (Penha ou cor, conforme o cliente) empilhadas numa página, pro operador usar." }
@@ -226,10 +225,9 @@ if (app.documents.length === 0) {
     // referencias por nome (mantem compatibilidade com o restante do script)
     var rbLabel   = radios[0];
     var rbMedicao = radios[1];
-    var rbLayers  = radios[2];
-    var rbPreench = radios[3];
-    var rbRisco   = radios[4];
-    var rbEtiqueta = radios[5];
+    var rbPreench = radios[2];
+    var rbRisco   = radios[3];
+    var rbEtiqueta = radios[4];
 
     // ---------------------- BOTOES ------------------------
     var grpBtns = dlg.add("group");
@@ -280,7 +278,7 @@ if (app.documents.length === 0) {
             return;
         }
 
-        if (!rbLabel.value && !rbMedicao.value && !rbLayers.value &&
+        if (!rbLabel.value && !rbMedicao.value &&
             !rbPreench.value && !rbRisco.value && !rbEtiqueta.value) {
             alert("Selecione uma operação.");
             return;
@@ -296,10 +294,6 @@ if (app.documents.length === 0) {
         if (rbMedicao.value) {
 
             #include "z_Complementos/10_Medicao_Ondulado.jsx";
-
-        } else if (rbLayers.value) {
-
-            #include "z_Complementos/11_Criar_Layers_Ondulado.jsx";
 
         } else if (rbPreench.value) {
 

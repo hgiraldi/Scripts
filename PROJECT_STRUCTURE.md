@@ -56,8 +56,7 @@ Scripts/  (raiz)
     └── z_Complementos/
         ├── Xml_upload.jsx    # CORE — versão Ondulado (~1.3 KB maior)
         ├── 2_Label_Alpha.jsx         # IDÊNTICO ao do Flexivel  [DUP]
-        ├── 10_Medicao_Ondulado.jsx   # mede camadas, exporta XML de medições
-        ├── 11_Criar_Layers_Ondulado.jsx  # cria layers por cor (qtd placas)
+        ├── 10_Medicao_Ondulado.jsx   # mede por grupo/cor predominante, exporta XML de medições
         ├── 12_Gerar_Etiqueta_Penha.jsx   # etiqueta Penha (tokens [[...]]) — DESATIVADO: fundido em 14_Risco_Faca; fora do menu Scripts.jsx; será deletado
         ├── 13_Preenchimento_Penha.jsx    # preenchimento cabeçalho Penha
         └── 14_Risco_Faca.jsx         # risco/traço de faca (cores de corte)
@@ -82,15 +81,14 @@ Scripts/  (raiz)
 
 > Montagem/Distorção/Box exigem `selection.length > 0`.
 
-### Ondulado/Scripts.jsx — 6 opções (seleção exclusiva, O.S. 7 dígitos)
+### Ondulado/Scripts.jsx — 5 opções (seleção exclusiva, O.S. 7 dígitos)
 | Opção | Inclui |
 |---|---|
 | Label Alpha | `2_Label_Alpha.jsx` |
 | Medição Ondulado | `10_Medicao_Ondulado.jsx` |
-| Layers Ondulado | `11_Criar_Layers_Ondulado.jsx` |
-| Etiquetas Cores | `12_Gerar_Etiqueta_Penha.jsx` |
-| Preenchimento | `13_Preenchimento_Penha.jsx` |
+| Preenchimento Cabeçalho | `13_Preenchimento_Penha.jsx` |
 | Risco Poliester | `14_Risco_Faca.jsx` |
+| Gerar Etiquetas | `12_Gerar_Etiquetas.jsx` |
 
 ---
 

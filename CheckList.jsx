@@ -206,7 +206,6 @@ var conjugacaoOK = true;
 var todasDistanciasCorretas = true;
 var fezMedicaoLayers = false;
 var scriptMedicaoOndulado = false;
-var scriptLayerondulado = false;
 var scriptDistorcaoOK = false;
 var scriptMontagemOK = false;
 var osOK = false;
@@ -948,19 +947,6 @@ function checkIfFileExistsMedicao() {
     }
 }
 //Checar se foi feito montagem e distorção
-function checkIfFileExistsLayerOnd() {
-    var folderPathCopySR = getFolderPathCopyLog();
-    var fileNameSR = serviceOrderNumber + "_I_Illustrator_LayersOndulado.xml";
-    var filePathSR = new File(folderPathCopySR + "/" + fileNameSR);
-
-    if (filePathSR.exists) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-//Checar se foi feito montagem e distorção
 function checkIfFileExistsPreenchimento() {
     var folderPathCopySR = getFolderPathCopyLog();
     var fileNameSR = serviceOrderNumber + "_I_Illustrator_Preenchimento.xml";
@@ -1004,15 +990,16 @@ if (eScriptObrigatorio) {
 }
 
 //===============CHECAGEM DE ONDULADO==========================//
-var scriptLayerondulado = checkIfFileExistsLayerOnd();
+// A geracao de layers nao e mais necessaria (a medicao agora mede por
+// grupo/cor predominante), entao o ondulado exige SOMENTE a medicao.
 var scriptMedicaoOndulado = checkIfFileExistsMedicao();
 var scriptPreenchimentoOk = checkIfFileExistsPreenchimento();
 
 if (medicaoScript && categoria == "Produção") {
-    if (scriptLayerondulado && scriptMedicaoOndulado) {
+    if (scriptMedicaoOndulado) {
         fezMedicaoLayers = true;
     } else {
-        alert('ONDULADO PRECISA DA MEDICAO E A GERAÇÃO DE LAYERS')
+        alert('ONDULADO PRECISA DA MEDICAO')
         fezMedicaoLayers = false;
     }
 } else {
