@@ -950,6 +950,51 @@ function label(cust) {
 
 
 
+    } else if ((cust.indexOf("olimplastic") >= 0)) {
+
+        var texto = doc.textFrames.add();
+        texto.contents = cliente + " - " + produto + " - " + cac + " - " + formatarData(new Date()) + " - ";
+        texto.textRange.characterAttributes.textFont = app.textFonts.getByName("MyriadPro-Regular");
+        texto.textRange.paragraphAttributes.justification = Justification.RIGHT;
+        texto.textRange.characterAttributes.size = 5; // Tamanho de 1,7 mm
+        texto.textRange.fillColor = registrationColor;
+        // Posicione o texto conforme necessário
+        texto.position = [5, -5];
+
+        var grupoLabel = app.activeDocument.groupItems.add();
+
+
+        // Crie um objeto de texto para cada parte de cores
+        var coresTexto = [];
+
+        for (var i = 0; i < cores.length; i++) {
+            var corTexto = doc.textFrames.add();
+            corTexto.contents = cores[i];
+            coresTexto.push(corTexto);
+        }
+
+        // Aplique a cor a cada parte do texto com base na sequência de coresComuns
+        for (var i = 0; i < coresComuns.length; i++) {
+            aplicarCorTexto(coresTexto[i], coresComuns[i]);
+        }
+
+        // Combine todas as partes do texto em um único objeto de texto
+        var textoCores = doc.textFrames.add();
+        var xPosition = texto.width + 5;
+
+        for (var i = 0; i < coresTexto.length; i++) {
+            var corTexto = coresTexto[i];
+            corTexto.textRange.size = 5;
+            corTexto.textRange.characterAttributes.textFont = app.textFonts.getByName("MyriadPro-Regular");
+            corTexto.position = [xPosition, -5];
+            xPosition += corTexto.width + 1; // Ajuste a posição horizontal para a próxima parte
+            corTexto.move(grupoLabel, ElementPlacement.PLACEATEND);
+
+        }
+
+        texto.move(grupoLabel, ElementPlacement.PLACEATEND);
+
+
     } else {
         //padrão ALpha
         var texto = doc.textFrames.add();
