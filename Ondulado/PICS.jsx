@@ -463,8 +463,68 @@ function embaralhar(arr) {
 }
 
 // a caixa [cx +- raio, cy +- raio] colide com algum bounds de arte?
+// ===== INDICE ESPACIAL p/ colisao com a arte (performance) =====
+// boundsArte de uma arte detalhada tem MILHARES de retangulos; cada checagem de
+// posicao varria a lista INTEIRA (era o gargalo do PASSO 3). O indice agrupa os
+// bounds em CELULAS de grade -> a checagem so olha as celulas PERTO da marca.
+// Resultado IDENTICO ao scan linear (lossless), ordens de magnitude mais rapido.
+// O indice e cacheado no proprio array (arr._idx) e reusado nas checagens do grupo.
+function criarIndiceBounds(arr, cell) {
+    var mapa = {}, grandes = [];
+    for (var i = 0; i < arr.length; i++) {
+        var b = arr[i]; // [left, top, right, bottom]  (top > bottom)
+        var c0 = Math.floor(b[0] / cell), c1 = Math.floor(b[2] / cell);
+        var r0 = Math.floor(b[3] / cell), r1 = Math.floor(b[1] / cell);
+        // bound GRANDE (cobre muitas celulas) vai pra lista fixa (sempre checada),
+        // p/ nao inchar o mapa. Sao poucos (fundos, formas cheias).
+        if ((c1 - c0) > 4 || (r1 - r0) > 4) { grandes.push(b); continue; }
+        for (var cx = c0; cx <= c1; cx++) {
+            for (var ry = r0; ry <= r1; ry++) {
+                var k = cx + "_" + ry;
+                if (!mapa[k]) mapa[k] = [];
+                mapa[k].push(b);
+            }
+        }
+    }
+    return { cell: cell, mapa: mapa, grandes: grandes };
+}
+
+// indice cacheado no array; so vale a pena indexar listas grandes.
+function idxDe(arr) {
+    if (!arr || arr.length < 64) return null; // pequeno: scan linear ja e rapido
+    if (!arr._idx) arr._idx = criarIndiceBounds(arr, mmToPt(5));
+    return arr._idx;
+}
+
+// algum bound do indice sobrepoe a caixa-query [qL,qT,qR,qB] (top > bottom)?
+// Lossless: se b sobrepoe a query, eles compartilham >=1 celula -> b e testado.
+function indiceColide(idx, qL, qT, qR, qB) {
+    var i, b;
+    for (i = 0; i < idx.grandes.length; i++) {
+        b = idx.grandes[i];
+        if (qL < b[2] && qR > b[0] && qB < b[1] && qT > b[3]) return true;
+    }
+    var cell = idx.cell, mapa = idx.mapa;
+    var c0 = Math.floor(qL / cell), c1 = Math.floor(qR / cell);
+    var r0 = Math.floor(qB / cell), r1 = Math.floor(qT / cell);
+    for (var cx = c0; cx <= c1; cx++) {
+        for (var ry = r0; ry <= r1; ry++) {
+            var arr = mapa[cx + "_" + ry];
+            if (!arr) continue;
+            for (var j = 0; j < arr.length; j++) {
+                b = arr[j];
+                if (qL < b[2] && qR > b[0] && qB < b[1] && qT > b[3]) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// a caixa [cx +- raio, cy +- raio] colide com algum bounds de arte?
 function caixaColideArte(cx, cy, raio, boundsArte) {
     var mL = cx - raio, mR = cx + raio, mT = cy + raio, mB = cy - raio;
+    var idx = idxDe(boundsArte);
+    if (idx) return indiceColide(idx, mL, mT, mR, mB);
     for (var i = 0; i < boundsArte.length; i++) {
         var b = boundsArte[i]; // [left, top, right, bottom]
         if (mL < b[2] && mR > b[0] && mB < b[1] && mT > b[3]) return true;
@@ -543,6 +603,8 @@ function acharPosMarca(vb, boundsArte, raio, markHalf, lado) {
 // a caixa [L,T,R,B] (L<R, B<T) NAO sobrepoe nenhum bounds de arte (com folga)?
 function caixaLivreArte(L, T, R, B, arte, folga) {
     if (!arte) return true;
+    var idx = idxDe(arte);
+    if (idx) return !indiceColide(idx, L - folga, T + folga, R + folga, B - folga);
     for (var i = 0; i < arte.length; i++) {
         var b = arte[i]; // [left, top, right, bottom]
         if (L - folga < b[2] && R + folga > b[0] && B - folga < b[1] && T + folga > b[3]) return false;
@@ -741,9 +803,14 @@ function desenharPar(registrosLayer, pMais, pX, cor, nomeCor, markHalf, stroke, 
 function marcaColide(cx, cy, markHalf, arteOwn, vizinhos) {
     var rA = markHalf + mmToPt(3);
     var i, b;
-    for (i = 0; i < arteOwn.length; i++) {
-        b = arteOwn[i];
-        if (cx - rA < b[2] && cx + rA > b[0] && cy - rA < b[1] && cy + rA > b[3]) return true;
+    var idx = idxDe(arteOwn);
+    if (idx) {
+        if (indiceColide(idx, cx - rA, cy + rA, cx + rA, cy - rA)) return true;
+    } else {
+        for (i = 0; i < arteOwn.length; i++) {
+            b = arteOwn[i];
+            if (cx - rA < b[2] && cx + rA > b[0] && cy - rA < b[1] && cy + rA > b[3]) return true;
+        }
     }
     var rV = markHalf + mmToPt(1);
     if (vizinhos) {

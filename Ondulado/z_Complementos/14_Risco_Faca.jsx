@@ -1147,6 +1147,42 @@ function showMarginDialogRiscos() {
     ];
 }
 
+// --- margens do risco POR CLIENTE (tira a margem do operador) ---
+// Le z_Complementos/margens_clientes.json: chave = folder do cliente,
+// valor = [cima, esquerda, direita, baixo] em mm. Cliente fora do JSON (ou JSON
+// ausente/invalido) usa 6,6,6,6. Retorna no formato interno do cut [left, top,
+// right, bottom] em PONTOS. showMarginDialogRiscos fica disponivel como fallback
+// manual, mas nao e mais chamado no fluxo normal.
+function getMargensCliente() {
+    var cima = 6, esq = 6, dir = 6, baixo = 6; // padrao p/ cliente sem entrada
+
+    function numOu(v, def) {
+        var n = parseFloat(v);
+        return isNaN(n) ? def : n;
+    }
+
+    try {
+        var f = new File(scriptDirectory + "/z_Complementos/margens_clientes.json");
+        if (f.exists) {
+            f.encoding = "UTF-8";
+            f.open("r");
+            var txt = f.read();
+            f.close();
+            var mapa = eval("(" + txt + ")");
+            var v = mapa[String(folder).toLowerCase()];
+            if (v && v.length >= 4) {
+                cima  = numOu(v[0], 6);
+                esq   = numOu(v[1], 6);
+                dir   = numOu(v[2], 6);
+                baixo = numOu(v[3], 6);
+            }
+        }
+    } catch (e) {}
+
+    // formato interno do cut: [left, top, right, bottom] em pt
+    return [mmToPt(esq), mmToPt(cima), mmToPt(dir), mmToPt(baixo)];
+}
+
 // --- linha de registro (contorno na cor, overprint); cria na layer e move pro grupo ---
 function criaLinhaReg(layer, grupo, x1, y1, x2, y2, cor, stroke) {
     var l = layer.pathItems.add();
@@ -1374,8 +1410,68 @@ function embaralhar(arr) {
 }
 
 // a caixa [cx +- raio, cy +- raio] colide com algum bounds de arte?
+// ===== INDICE ESPACIAL p/ colisao com a arte (performance) =====
+// boundsArte de uma arte detalhada tem MILHARES de retangulos; cada checagem de
+// posicao varria a lista INTEIRA (era o gargalo do PASSO 3). O indice agrupa os
+// bounds em CELULAS de grade -> a checagem so olha as celulas PERTO da marca.
+// Resultado IDENTICO ao scan linear (lossless), ordens de magnitude mais rapido.
+// O indice e cacheado no proprio array (arr._idx) e reusado nas checagens do grupo.
+function criarIndiceBounds(arr, cell) {
+    var mapa = {}, grandes = [];
+    for (var i = 0; i < arr.length; i++) {
+        var b = arr[i]; // [left, top, right, bottom]  (top > bottom)
+        var c0 = Math.floor(b[0] / cell), c1 = Math.floor(b[2] / cell);
+        var r0 = Math.floor(b[3] / cell), r1 = Math.floor(b[1] / cell);
+        // bound GRANDE (cobre muitas celulas) vai pra lista fixa (sempre checada),
+        // p/ nao inchar o mapa. Sao poucos (fundos, formas cheias).
+        if ((c1 - c0) > 4 || (r1 - r0) > 4) { grandes.push(b); continue; }
+        for (var cx = c0; cx <= c1; cx++) {
+            for (var ry = r0; ry <= r1; ry++) {
+                var k = cx + "_" + ry;
+                if (!mapa[k]) mapa[k] = [];
+                mapa[k].push(b);
+            }
+        }
+    }
+    return { cell: cell, mapa: mapa, grandes: grandes };
+}
+
+// indice cacheado no array; so vale a pena indexar listas grandes.
+function idxDe(arr) {
+    if (!arr || arr.length < 64) return null; // pequeno: scan linear ja e rapido
+    if (!arr._idx) arr._idx = criarIndiceBounds(arr, mmToPt(5));
+    return arr._idx;
+}
+
+// algum bound do indice sobrepoe a caixa-query [qL,qT,qR,qB] (top > bottom)?
+// Lossless: se b sobrepoe a query, eles compartilham >=1 celula -> b e testado.
+function indiceColide(idx, qL, qT, qR, qB) {
+    var i, b;
+    for (i = 0; i < idx.grandes.length; i++) {
+        b = idx.grandes[i];
+        if (qL < b[2] && qR > b[0] && qB < b[1] && qT > b[3]) return true;
+    }
+    var cell = idx.cell, mapa = idx.mapa;
+    var c0 = Math.floor(qL / cell), c1 = Math.floor(qR / cell);
+    var r0 = Math.floor(qB / cell), r1 = Math.floor(qT / cell);
+    for (var cx = c0; cx <= c1; cx++) {
+        for (var ry = r0; ry <= r1; ry++) {
+            var arr = mapa[cx + "_" + ry];
+            if (!arr) continue;
+            for (var j = 0; j < arr.length; j++) {
+                b = arr[j];
+                if (qL < b[2] && qR > b[0] && qB < b[1] && qT > b[3]) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// a caixa [cx +- raio, cy +- raio] colide com algum bounds de arte?
 function caixaColideArte(cx, cy, raio, boundsArte) {
     var mL = cx - raio, mR = cx + raio, mT = cy + raio, mB = cy - raio;
+    var idx = idxDe(boundsArte);
+    if (idx) return indiceColide(idx, mL, mT, mR, mB);
     for (var i = 0; i < boundsArte.length; i++) {
         var b = boundsArte[i]; // [left, top, right, bottom]
         if (mL < b[2] && mR > b[0] && mB < b[1] && mT > b[3]) return true;
@@ -1454,6 +1550,8 @@ function acharPosMarca(vb, boundsArte, raio, markHalf, lado) {
 // a caixa [L,T,R,B] (L<R, B<T) NAO sobrepoe nenhum bounds de arte (com folga)?
 function caixaLivreArte(L, T, R, B, arte, folga) {
     if (!arte) return true;
+    var idx = idxDe(arte);
+    if (idx) return !indiceColide(idx, L - folga, T + folga, R + folga, B - folga);
     for (var i = 0; i < arte.length; i++) {
         var b = arte[i]; // [left, top, right, bottom]
         if (L - folga < b[2] && R + folga > b[0] && B - folga < b[1] && T + folga > b[3]) return false;
@@ -1652,9 +1750,14 @@ function desenharPar(registrosLayer, pMais, pX, cor, nomeCor, markHalf, stroke, 
 function marcaColide(cx, cy, markHalf, arteOwn, vizinhos) {
     var rA = markHalf + mmToPt(3);
     var i, b;
-    for (i = 0; i < arteOwn.length; i++) {
-        b = arteOwn[i];
-        if (cx - rA < b[2] && cx + rA > b[0] && cy - rA < b[1] && cy + rA > b[3]) return true;
+    var idx = idxDe(arteOwn);
+    if (idx) {
+        if (indiceColide(idx, cx - rA, cy + rA, cx + rA, cy - rA)) return true;
+    } else {
+        for (i = 0; i < arteOwn.length; i++) {
+            b = arteOwn[i];
+            if (cx - rA < b[2] && cx + rA > b[0] && cy - rA < b[1] && cy + rA > b[3]) return true;
+        }
     }
     var rV = markHalf + mmToPt(1);
     if (vizinhos) {
@@ -1953,8 +2056,7 @@ function criarRiscosArte(doc) {
     nomesLayersRisco = [];
     for (var _nf = 0; _nf < fontesRisco.length; _nf++) nomesLayersRisco.push(fontesRisco[_nf].name);
 
-    var margens = showMarginDialogRiscos(); // [left, top, right, bottom] em pt
-    if (!margens) return;
+    var margens = getMargensCliente(); // [left, top, right, bottom] em pt (por cliente, via JSON)
     margensCut = margens; // o label pode ocupar a area do cut (com a margem), sem crescer o cut
 
     var cutLayer;
@@ -2241,14 +2343,13 @@ function prepararSeparacao(docSep, corAtual) {
     }
 
     // Fase 2: na layer "registros" mantem so os REG_ da cor atual, RECOLORINDO as
-    // marcas (+/x) para BLACK 100% da cromia (mais visivel no poliester) e REMOVENDO
+    // marcas (+/x) para a spot "cut" (100% cyan) - mesma cor do cut, e REMOVENDO
     // o label (a fonte nao vai pro poliester).
     var regLayer = null;
     try { regLayer = docSep.layers.getByName("registros"); } catch (e) {}
     if (regLayer) {
         var alvoR = normalizarNomeCor(corAtual);
-        var preto = new CMYKColor();
-        preto.cyan = 0; preto.magenta = 0; preto.yellow = 0; preto.black = 100;
+        var corReg = ensureCutSpot(docSep); // registros na spot "cut" (cyan)
         for (var ri = regLayer.pageItems.length - 1; ri >= 0; ri--) {
             var itr = regLayer.pageItems[ri];
             var nmr = String(itr.name);
@@ -2256,15 +2357,14 @@ function prepararSeparacao(docSep, corAtual) {
                 if (!pertenceASeparacao(nmr.substring(4), alvoR)) {
                     try { itr.remove(); } catch (e) {}
                 } else {
-                    recolorirRegistro(itr, preto);
+                    recolorirRegistro(itr, corReg);
                 }
             }
         }
     }
 
-    // Pontilhado (dashed) em volta do artboard, PRETO K=100 (mesmo preto dos registros
-    // na separacao): traco 5mm / gap 3mm, 0,5mm de espessura, overprint.
-    // Layer "borda" (criada se nao existir).
+    // Pontilhado (dashed) em volta do artboard, PRETO K=100: traco 5mm / gap 3mm,
+    // 0,5mm de espessura, overprint. Layer "borda" (criada se nao existir).
     try {
         var pretoB = new CMYKColor();
         pretoB.cyan = 0; pretoB.magenta = 0; pretoB.yellow = 0; pretoB.black = 100;
