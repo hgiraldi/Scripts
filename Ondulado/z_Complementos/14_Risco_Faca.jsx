@@ -2030,7 +2030,7 @@ function criarRiscosArte(doc) {
             // grande maioria). Esse era o gargalo do "as vezes 10min".
             if (distanciaBounds(grupos[a].vb, grupos[b].vb) > gap15) continue;
 
-            if (normalizarNomeCor(grupos[a].nomeCor) === normalizarNomeCor(grupos[b].nomeCor)) continue;
+            if (baseCor(grupos[a].nomeCor) === baseCor(grupos[b].nomeCor)) continue;
             // encaixe pela ARTE real (nao pelo bounding box) -> evita encaixe falso
             // (bounding boxes grandes se tocam, mas o desenho esta longe -> cut gigante)
             if (distanciaArte(grupos[a].boundsArte, grupos[b].boundsArte) <= gap15) {
@@ -2163,6 +2163,28 @@ function normalizarNomeCor(nome) {
         .replace(/ c/g, '');
 }
 
+// Um RISCO_/REG_ "nomeCor" pertence a separacao "alvo" (cor da O.S.) se for a
+// MESMA base: nomeCor == alvo OU nomeCor == alvo + numero. Assim as variacoes que
+// o RemapCores cria (preto1, preto2, preto3...) caem TODAS no risco do "preto".
+// So agrupa o sufixo NUMERICO -> nao funde cores realmente diferentes.
+function pertenceASeparacao(nomeCor, alvo) {
+    var n = normalizarNomeCor(nomeCor);
+    if (n === alvo) return true;
+    if (n.length > alvo.length && n.substring(0, alvo.length) === alvo) {
+        return /^[0-9]+$/.test(n.substring(alvo.length));
+    }
+    return false;
+}
+
+// Base da cor para COMPARAR duas cores (encaixe): tira o sufixo numerico
+// (preto1/preto2/preto3 -> "preto"), mas se sobrar vazio mantem o nome inteiro,
+// para nao fundir cores cujo nome ja e so numero (ex.: Pantone 485 vs 486).
+function baseCor(nome) {
+    var n = normalizarNomeCor(nome);
+    var semNum = n.replace(/[0-9]+$/, '');
+    return semNum.length > 0 ? semNum : n;
+}
+
 // Garante a spot "cut" (100% cyan) no doc e retorna um SpotColor pronto.
 function ensureCutSpot(docSep) {
     var spot;
@@ -2204,7 +2226,7 @@ function prepararSeparacao(docSep, corAtual) {
             var it = cutLayer.pageItems[ci];
             var nm = String(it.name);
             if (nm.indexOf("RISCO_") === 0) {
-                if (normalizarNomeCor(nm.substring(6)) !== alvo) {
+                if (!pertenceASeparacao(nm.substring(6), alvo)) {
                     try { it.remove(); } catch (e) {}
                 } else {
                     // risco desta cor -> recolore para a spot "cut" (cyan), overprint
@@ -2231,7 +2253,7 @@ function prepararSeparacao(docSep, corAtual) {
             var itr = regLayer.pageItems[ri];
             var nmr = String(itr.name);
             if (nmr.indexOf("REG_") === 0) {
-                if (normalizarNomeCor(nmr.substring(4)) !== alvoR) {
+                if (!pertenceASeparacao(nmr.substring(4), alvoR)) {
                     try { itr.remove(); } catch (e) {}
                 } else {
                     recolorirRegistro(itr, preto);

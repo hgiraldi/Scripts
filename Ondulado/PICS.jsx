@@ -1010,6 +1010,15 @@ function normalizarNomeCor(nome) {
         .replace(/ c/g, '');
 }
 
+// Base da cor para COMPARAR duas cores (encaixe): tira o sufixo numerico
+// (preto1/preto2/preto3 -> "preto"), mas se sobrar vazio mantem o nome inteiro,
+// para nao fundir cores cujo nome ja e so numero (ex.: Pantone 485 vs 486).
+function baseCor(nome) {
+    var n = normalizarNomeCor(nome);
+    var semNum = n.replace(/[0-9]+$/, '');
+    return semNum.length > 0 ? semNum : n;
+}
+
 /* ===================================================================
  * Orquestracao: registros + label na layer "arte" do doc ativo.
  * IGUAL ao criarRiscosArte (PASSO 1-4); SEM o cut (PASSO 5) e SEM separacoes.
@@ -1089,7 +1098,7 @@ function criarRegistrosLabel(doc) {
     var pares = [];
     for (var a = 0; a < grupos.length; a++) {
         for (var b = a + 1; b < grupos.length; b++) {
-            if (normalizarNomeCor(grupos[a].nomeCor) === normalizarNomeCor(grupos[b].nomeCor)) continue;
+            if (baseCor(grupos[a].nomeCor) === baseCor(grupos[b].nomeCor)) continue;
             if (distanciaArte(grupos[a].boundsArte, grupos[b].boundsArte) <= gap15) {
                 pares.push([a, b]);
                 var menIdx = (grupos[a].area <= grupos[b].area) ? a : b;
