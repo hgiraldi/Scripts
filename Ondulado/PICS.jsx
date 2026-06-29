@@ -963,8 +963,45 @@ function escolherPar(pool, vb, markHalf, preferir) {
 
 // --- Fase 3a: PREFERE 2 marcas DENTRO do bounds (cut nao cresce); senao FORA,
 //     preferindo lados opostos e o mais afastadas. Desenha e retorna. ---
-function criarParRegistro(doc, vb, vbEnv, arteOwn, vizinhos, preferir, arteEncaixe, cor, nomeCor, registrosLayer, markHalf, stroke, comTexto) {
+// acha posicao livre p/ a marca perto de um CANTO (ladoX: "esq"/"dir";
+// ladoY: "topo"/"base"). Usado na DIFERENCIACAO de pecas de mesmo tamanho.
+// Procura do canto PRA DENTRO (livre da arte/vizinhos); se nada couber dentro,
+// empurra pra FORA do canto. Sempre devolve um ponto.
+function acharPosCanto(vb, arteResp, vizinhos, markHalf, ladoX, ladoY) {
+    var left = vb[0], top = vb[1], right = vb[2], bottom = vb[3];
+    var inset = markHalf + mmToPt(1);
+    var ax = (ladoX === "esq") ? (left + inset) : (right - inset);
+    var ay = (ladoY === "topo") ? (top - inset) : (bottom + inset);
+    var sx = (ladoX === "esq") ? 1 : -1; // direcao PRA DENTRO
+    var sy = (ladoY === "topo") ? -1 : 1;
+    var passo = mmToPt(4);
+    var d, cands, c, p;
+    for (d = 0; d < 16; d++) {
+        cands = [
+            [ax + sx * passo * d, ay + sy * passo * d], // diagonal pra dentro
+            [ax + sx * passo * d, ay],                  // ao longo do lado X
+            [ax, ay + sy * passo * d]                   // ao longo do lado Y
+        ];
+        for (c = 0; c < cands.length; c++) {
+            p = cands[c];
+            if (p[0] - markHalf >= left && p[0] + markHalf <= right &&
+                p[1] - markHalf >= bottom && p[1] + markHalf <= top) {
+                if (!marcaColide(p[0], p[1], markHalf, arteResp, vizinhos)) return p;
+            }
+        }
+    }
+    // nada livre DENTRO -> empurra pra FORA do canto ate ficar livre
+    for (d = 1; d < 12; d++) {
+        var off = markHalf + mmToPt(3) + passo * d;
+        p = [ax - sx * off, ay - sy * off];
+        if (!marcaColide(p[0], p[1], markHalf, arteResp, vizinhos)) return p;
+    }
+    return [ax, ay]; // ultimo recurso (pode sobrepor)
+}
+
+function criarParRegistro(doc, vb, vbEnv, arteOwn, vizinhos, preferir, arteEncaixe, cor, nomeCor, registrosLayer, markHalf, stroke, comTexto, variacao) {
     var pMais = null, pX = null, i;
+    if (variacao === undefined) variacao = -1; // -1 = colocacao otimizada normal
 
     // arte a respeitar 4mm: a propria + (no encaixe) a arte detalhada da cor MAIOR
     var arteResp = arteOwn;
@@ -983,15 +1020,30 @@ function criarParRegistro(doc, vb, vbEnv, arteOwn, vizinhos, preferir, arteEncai
 
     // junta candidatos DENTRO (nao crescem o cut) + FORA (empurrados ate livre) e
     // escolhe o par que deixa o cut com a MENOR area possivel.
-    var pool = candidatosDentro(areaBusca, arteResp, vizinhos, markHalf);
-    var fora = gerarCandidatosMarca(vb, arteResp, vizinhos, markHalf);
-    for (i = 0; i < fora.length; i++) pool.push(fora[i].p);
+    if (variacao >= 0) {
+        // DIFERENCIACAO (pecas de mesmo tamanho/cor, sem encaixe): par em cantos
+        // DIAGONAIS (fora do centro), + e x ALTERNADOS por indice -> distintas
+        // entre si e com a inversao 180 (ponta-cabeca) visivel.
+        // 0:+TL/xBR   1:+TR/xBL   2:+BR/xTL   3:+BL/xTR
+        var _cfgs = [
+            [["esq", "topo"], ["dir", "base"]],
+            [["dir", "topo"], ["esq", "base"]],
+            [["dir", "base"], ["esq", "topo"]],
+            [["esq", "base"], ["dir", "topo"]]
+        ];
+        var _cfg = _cfgs[variacao % 4];
+        pMais = acharPosCanto(vb, arteResp, vizinhos, markHalf, _cfg[0][0], _cfg[0][1]);
+        pX    = acharPosCanto(vb, arteResp, vizinhos, markHalf, _cfg[1][0], _cfg[1][1]);
+    } else {
+        var pool = candidatosDentro(areaBusca, arteResp, vizinhos, markHalf);
+        var fora = gerarCandidatosMarca(vb, arteResp, vizinhos, markHalf);
+        for (i = 0; i < fora.length; i++) pool.push(fora[i].p);
 
-    // escolhe o par que menos aumenta a area DOS DOIS (proprio cut + cor maior do
-    // encaixe). Prefere ficar DENTRO do maior, mas pode sair um pouco se for o
-    // minimo (ex.: 4mm na lateral cresce menos que jogar pra cima).
-    var par = escolherPar(pool, vb, markHalf, preferir);
-    if (par) { pMais = par[0]; pX = par[1]; }
+        // escolhe o par que menos aumenta a area DOS DOIS (proprio cut + cor maior
+        // do encaixe). Prefere ficar DENTRO do maior, mas pode sair um pouco.
+        var par = escolherPar(pool, vb, markHalf, preferir);
+        if (par) { pMais = par[0]; pX = par[1]; }
+    }
 
     // recurso (nada escolhido): marcas no EIXO CURTO do grupo (cresce menos)
     if (!pMais) {
@@ -1179,6 +1231,38 @@ function criarRegistrosLabel(doc) {
         }
     }
 
+    // ===== PASSO 2.5: DIFERENCIACAO de pecas de MESMO TAMANHO + MESMA COR (base),
+    // SEM encaixe -> registros em arranjos distintos (cantos diagonais, +/x
+    // alternados) p/ o operador nao montar peca de uma no lugar da outra nem de
+    // ponta-cabeca. Ate 4 pecas; tolerancia 3mm em largura E altura. =====
+    var temEncaixe = [], _zz;
+    for (_zz = 0; _zz < grupos.length; _zz++) { grupos[_zz].variacao = -1; temEncaixe[_zz] = false; }
+    for (_zz = 0; _zz < pares.length; _zz++) { temEncaixe[pares[_zz][0]] = true; temEncaixe[pares[_zz][1]] = true; }
+
+    var _tol = mmToPt(3), _atrib = [];
+    for (_zz = 0; _zz < grupos.length; _zz++) _atrib[_zz] = false;
+    for (var _ca = 0; _ca < grupos.length; _ca++) {
+        if (temEncaixe[_ca] || _atrib[_ca]) continue;
+        var _wa = grupos[_ca].vb[2] - grupos[_ca].vb[0];
+        var _ha = grupos[_ca].vb[1] - grupos[_ca].vb[3];
+        var _cluster = [_ca];
+        for (var _cb = _ca + 1; _cb < grupos.length; _cb++) {
+            if (temEncaixe[_cb] || _atrib[_cb]) continue;
+            if (baseCor(grupos[_ca].nomeCor) !== baseCor(grupos[_cb].nomeCor)) continue;
+            var _wb = grupos[_cb].vb[2] - grupos[_cb].vb[0];
+            var _hb = grupos[_cb].vb[1] - grupos[_cb].vb[3];
+            if (Math.abs(_wa - _wb) <= _tol && Math.abs(_ha - _hb) <= _tol) _cluster.push(_cb);
+        }
+        if (_cluster.length >= 2) {
+            for (var _ci = 0; _ci < _cluster.length; _ci++) {
+                _atrib[_cluster[_ci]] = true;
+                grupos[_cluster[_ci]].variacao = (_ci < 4) ? _ci : -1; // ate 4 arranjos
+            }
+        } else {
+            _atrib[_ca] = true; // peca sozinha -> colocacao normal
+        }
+    }
+
     // ===== PASSO 3: par PROPRIO de cada grupo, evitando vizinhos =====
     for (var k = 0; k < grupos.length; k++) {
         var gr = grupos[k];
@@ -1199,7 +1283,7 @@ function criarRegistrosLabel(doc) {
             }
         }
 
-        gr.par = criarParRegistro(doc, gr.vb, gr.vb, gr.boundsArte, vizinhos, preferir, arteEncaixe, gr.cor, gr.nomeCor, registrosLayer, markHalf, strokeReg, true);
+        gr.par = criarParRegistro(doc, gr.vb, gr.vb, gr.boundsArte, vizinhos, preferir, arteEncaixe, gr.cor, gr.nomeCor, registrosLayer, markHalf, strokeReg, true, gr.variacao);
         gr.marcasB = gr.par ? gr.par.bounds : null;
     }
 
