@@ -267,49 +267,73 @@ function remapItem(item, ehPredom, novoSpot, cromiaAlvo, spotAlvo) {
         return c;
     }
 
-    // GRADIENTE para a spot nova, PRESERVANDO a rampa -> cada stop vira a spot com
-    // tint = % do canal (cromia) ou tint do stop (spot). Trata 2 casos:
-    //  - cromia pura (canal == cromiaAlvo): tint = % do canal CMYK do stop.
-    //  - spot unica (spot == spotAlvo): tint = tint do stop (branco -> 0).
-    // Retorna true se TRATOU o gradiente (ai nao pinta solido).
-    function tentaGradiente(cor) {
-        if (!cor || cor.typename !== "GradientColor") return false;
+    // tint de um stop p/ a spot nova, conforme o modo ("cromia" = % do canal CMYK
+    // do stop; "spot" = tint do stop). Branco/0,0,0,0 -> 0.
+    function tintDoStop(sc, modo) {
+        var val = 0;
+        if (modo === "cromia") {
+            if (sc && sc.typename === "CMYKColor") {
+                if (cromiaAlvo === "cyan") val = sc.cyan;
+                else if (cromiaAlvo === "magenta") val = sc.magenta;
+                else if (cromiaAlvo === "yellow") val = sc.yellow;
+                else if (cromiaAlvo === "black") val = sc.black;
+            }
+        } else {
+            if (sc && sc.typename === "SpotColor") {
+                try { val = (typeof sc.tint === "number" && !isNaN(sc.tint)) ? sc.tint : 100; } catch (e) { val = 100; }
+            }
+        }
+        return val;
+    }
+
+    // GRADIENTE -> cria um gradiente PROPRIO (nao compartilhado) com os stops na
+    // spot nova, preservando a rampa E a geometria do objeto. Criar gradiente
+    // proprio e ESSENCIAL: dois grupos com o MESMO degrade (swatch compartilhado)
+    // iam parar na mesma spot porque alterar os stops mexia no swatch dos dois.
+    // Agora cada um vira sua spot (preto1, preto2...). Retorna a GradientColor
+    // nova (pronta p/ atribuir) ou null se nao for caso de remap.
+    function gradienteRemap(cor) {
+        if (!cor || cor.typename !== "GradientColor") return null;
         var modo = null;
         if (cromiaAlvo && cromiaDeGradiente(cor) === cromiaAlvo) modo = "cromia";
         else if (spotAlvo && spotDeGradiente(cor) === spotAlvo) modo = "spot";
-        if (!modo) return false;
+        if (!modo) return null;
 
-        var stops = cor.gradient.gradientStops;
-        for (var s = 0; s < stops.length; s++) {
-            var sc = stops[s].color, val = 0;
-            if (modo === "cromia") {
-                if (sc && sc.typename === "CMYKColor") {
-                    if (cromiaAlvo === "cyan") val = sc.cyan;
-                    else if (cromiaAlvo === "magenta") val = sc.magenta;
-                    else if (cromiaAlvo === "yellow") val = sc.yellow;
-                    else if (cromiaAlvo === "black") val = sc.black;
-                }
-            } else { // spot: reaproveita o tint do stop (branco/0,0,0,0 -> 0)
-                if (sc && sc.typename === "SpotColor") {
-                    try { val = (typeof sc.tint === "number" && !isNaN(sc.tint)) ? sc.tint : 100; } catch (e) { val = 100; }
-                }
-            }
-            var novo = new SpotColor();
-            novo.spot = novoSpot;
-            novo.tint = val;
-            stops[s].color = novo;
+        var velho = cor.gradient;
+        var stopsV = velho.gradientStops;
+        var ng = app.activeDocument.gradients.add();
+        try { ng.type = velho.type; } catch (e) {}
+        // gradiente novo nasce com 2 stops; iguala a quantidade do original
+        while (ng.gradientStops.length < stopsV.length) {
+            try { ng.gradientStops.add(); } catch (eAdd) { break; }
         }
-        return true;
+        var nstops = ng.gradientStops;
+        for (var s = 0; s < stopsV.length && s < nstops.length; s++) {
+            try { nstops[s].rampPoint = stopsV[s].rampPoint; } catch (e1) {}
+            try { nstops[s].midPoint = stopsV[s].midPoint; } catch (e2) {}
+            var nc = new SpotColor();
+            nc.spot = novoSpot;
+            nc.tint = tintDoStop(stopsV[s].color, modo);
+            nstops[s].color = nc;
+        }
+        cor.gradient = ng; // troca SO a definicao; a geometria do objeto e preservada
+        return cor;
     }
 
     // fill/stroke diretos (PathItem, CompoundPathItem)
     try {
-        if (item.filled && !tentaGradiente(item.fillColor) && ehPredom(item.fillColor))
-            item.fillColor = novaCor(item.fillColor);
+        if (item.filled) {
+            var _gf = gradienteRemap(item.fillColor);
+            if (_gf) item.fillColor = _gf;
+            else if (ehPredom(item.fillColor)) item.fillColor = novaCor(item.fillColor);
+        }
     } catch (e1) {}
     try {
-        if (item.stroked && !tentaGradiente(item.strokeColor) && ehPredom(item.strokeColor))
-            item.strokeColor = novaCor(item.strokeColor);
+        if (item.stroked) {
+            var _gs = gradienteRemap(item.strokeColor);
+            if (_gs) item.strokeColor = _gs;
+            else if (ehPredom(item.strokeColor)) item.strokeColor = novaCor(item.strokeColor);
+        }
     } catch (e2) {}
 
     if (item.typename === "GroupItem") {
@@ -319,8 +343,12 @@ function remapItem(item, ehPredom, novoSpot, cromiaAlvo, spotAlvo) {
     } else if (item.typename === "TextFrame") {
         try {
             var ca = item.textRange.characterAttributes;
-            if (!tentaGradiente(ca.fillColor) && ehPredom(ca.fillColor)) ca.fillColor = novaCor(ca.fillColor);
-            if (!tentaGradiente(ca.strokeColor) && ehPredom(ca.strokeColor)) ca.strokeColor = novaCor(ca.strokeColor);
+            var _gtf = gradienteRemap(ca.fillColor);
+            if (_gtf) ca.fillColor = _gtf;
+            else if (ehPredom(ca.fillColor)) ca.fillColor = novaCor(ca.fillColor);
+            var _gts = gradienteRemap(ca.strokeColor);
+            if (_gts) ca.strokeColor = _gts;
+            else if (ehPredom(ca.strokeColor)) ca.strokeColor = novaCor(ca.strokeColor);
         } catch (e3) {}
     }
 }
