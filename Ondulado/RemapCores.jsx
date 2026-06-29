@@ -59,6 +59,63 @@ function ehNomeCromia(nome) {
     return (nome === "black" || nome === "cyan" || nome === "magenta" || nome === "yellow");
 }
 
+// --- canal de cromia de UM CMYKColor: o nome do unico canal != 0 (qualquer %);
+// "" se for tudo 0 (branco, compativel com qualquer canal); null se nao for CMYK
+// ou se misturar 2+ canais. Usado para validar os stops de um gradiente. ---
+function canalCromiaCMYK(cor) {
+    if (!cor || cor.typename !== "CMYKColor") return null;
+    var nome = "", n = 0;
+    if (cor.cyan    > 0.5) { nome = "cyan";    n++; }
+    if (cor.magenta > 0.5) { nome = "magenta"; n++; }
+    if (cor.yellow  > 0.5) { nome = "yellow";  n++; }
+    if (cor.black   > 0.5) { nome = "black";   n++; }
+    if (n === 0) return "";   // branco -> compativel com qualquer canal
+    if (n === 1) return nome; // 1 canal so -> cromia pura desse canal
+    return null;              // mistura
+}
+
+// --- canal de cromia de um GRADIENTE: black/cyan/magenta/yellow se TODOS os stops
+// forem do MESMO canal (qualquer %; stops brancos contam como compativeis).
+// null se misturar canais, tiver stop nao-CMYK, ou nao for gradiente. ---
+function cromiaDeGradiente(cor) {
+    if (!cor || cor.typename !== "GradientColor") return null;
+    var stops;
+    try { stops = cor.gradient.gradientStops; } catch (e) { return null; }
+    if (!stops || stops.length === 0) return null;
+    var nome = "";
+    for (var i = 0; i < stops.length; i++) {
+        var canal = canalCromiaCMYK(stops[i].color);
+        if (canal === null) return null;   // stop misturado/nao-CMYK -> nao remapeia
+        if (canal === "") continue;        // branco -> compativel
+        if (nome === "") nome = canal;
+        else if (nome !== canal) return null; // dois canais -> nao e cromia pura
+    }
+    return (nome === "") ? null : nome;     // gradiente todo branco -> ignora
+}
+
+// --- nome da SPOT de um gradiente de spot UNICA: todos os stops na mesma spot
+// (qualquer tint; stops brancos 0,0,0,0 compativeis). null se misturar cores,
+// nao for spot, ou nao for gradiente. ---
+function spotDeGradiente(cor) {
+    if (!cor || cor.typename !== "GradientColor") return null;
+    var stops;
+    try { stops = cor.gradient.gradientStops; } catch (e) { return null; }
+    if (!stops || stops.length === 0) return null;
+    var nome = null;
+    for (var i = 0; i < stops.length; i++) {
+        var sc = stops[i].color;
+        if (sc && sc.typename === "SpotColor" && sc.spot) {
+            if (nome === null) nome = sc.spot.name;
+            else if (nome !== sc.spot.name) return null; // duas spots -> nao
+        } else if (canalCromiaCMYK(sc) === "") {
+            continue; // stop branco CMYK -> compativel
+        } else {
+            return null; // stop de outra cor -> nao
+        }
+    }
+    return nome;
+}
+
 function melhorDaContagem(contagem) {
     var melhor = null, maxC = 0;
     for (var nome in contagem) {
@@ -85,7 +142,13 @@ function corPredominanteDoGrupo(grupo) {
             contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
             return;
         }
-        var crom = corCromiaPura(cor);
+        // gradiente de SPOT unica -> conta como aquela spot (prioridade de spot)
+        var spg = spotDeGradiente(cor);
+        if (spg) {
+            if (!corEhBrancoNome(spg)) contagemSpot[spg] = (contagemSpot[spg] || 0) + 1;
+            return;
+        }
+        var crom = corCromiaPura(cor) || cromiaDeGradiente(cor);
         if (crom) contagemCromia[crom] = (contagemCromia[crom] || 0) + 1;
     }
 
@@ -187,7 +250,7 @@ function criarSpotCromia(doc, nome, cromiaNome) {
 
 // Remapeia, dentro do item (recursivo), SOMENTE os fills/strokes aceitos pelo
 // predicado ehPredom -> nova spot, preservando o tint (porcentagem) original.
-function remapItem(item, ehPredom, novoSpot) {
+function remapItem(item, ehPredom, novoSpot, cromiaAlvo, spotAlvo) {
 
     function novaCor(antiga) {
         var c = new SpotColor();
@@ -204,19 +267,60 @@ function remapItem(item, ehPredom, novoSpot) {
         return c;
     }
 
+    // GRADIENTE para a spot nova, PRESERVANDO a rampa -> cada stop vira a spot com
+    // tint = % do canal (cromia) ou tint do stop (spot). Trata 2 casos:
+    //  - cromia pura (canal == cromiaAlvo): tint = % do canal CMYK do stop.
+    //  - spot unica (spot == spotAlvo): tint = tint do stop (branco -> 0).
+    // Retorna true se TRATOU o gradiente (ai nao pinta solido).
+    function tentaGradiente(cor) {
+        if (!cor || cor.typename !== "GradientColor") return false;
+        var modo = null;
+        if (cromiaAlvo && cromiaDeGradiente(cor) === cromiaAlvo) modo = "cromia";
+        else if (spotAlvo && spotDeGradiente(cor) === spotAlvo) modo = "spot";
+        if (!modo) return false;
+
+        var stops = cor.gradient.gradientStops;
+        for (var s = 0; s < stops.length; s++) {
+            var sc = stops[s].color, val = 0;
+            if (modo === "cromia") {
+                if (sc && sc.typename === "CMYKColor") {
+                    if (cromiaAlvo === "cyan") val = sc.cyan;
+                    else if (cromiaAlvo === "magenta") val = sc.magenta;
+                    else if (cromiaAlvo === "yellow") val = sc.yellow;
+                    else if (cromiaAlvo === "black") val = sc.black;
+                }
+            } else { // spot: reaproveita o tint do stop (branco/0,0,0,0 -> 0)
+                if (sc && sc.typename === "SpotColor") {
+                    try { val = (typeof sc.tint === "number" && !isNaN(sc.tint)) ? sc.tint : 100; } catch (e) { val = 100; }
+                }
+            }
+            var novo = new SpotColor();
+            novo.spot = novoSpot;
+            novo.tint = val;
+            stops[s].color = novo;
+        }
+        return true;
+    }
+
     // fill/stroke diretos (PathItem, CompoundPathItem)
-    try { if (item.filled && ehPredom(item.fillColor)) item.fillColor = novaCor(item.fillColor); } catch (e1) {}
-    try { if (item.stroked && ehPredom(item.strokeColor)) item.strokeColor = novaCor(item.strokeColor); } catch (e2) {}
+    try {
+        if (item.filled && !tentaGradiente(item.fillColor) && ehPredom(item.fillColor))
+            item.fillColor = novaCor(item.fillColor);
+    } catch (e1) {}
+    try {
+        if (item.stroked && !tentaGradiente(item.strokeColor) && ehPredom(item.strokeColor))
+            item.strokeColor = novaCor(item.strokeColor);
+    } catch (e2) {}
 
     if (item.typename === "GroupItem") {
-        for (var i = 0; i < item.pageItems.length; i++) remapItem(item.pageItems[i], ehPredom, novoSpot);
+        for (var i = 0; i < item.pageItems.length; i++) remapItem(item.pageItems[i], ehPredom, novoSpot, cromiaAlvo, spotAlvo);
     } else if (item.typename === "CompoundPathItem") {
-        for (var j = 0; j < item.pathItems.length; j++) remapItem(item.pathItems[j], ehPredom, novoSpot);
+        for (var j = 0; j < item.pathItems.length; j++) remapItem(item.pathItems[j], ehPredom, novoSpot, cromiaAlvo, spotAlvo);
     } else if (item.typename === "TextFrame") {
         try {
             var ca = item.textRange.characterAttributes;
-            if (ehPredom(ca.fillColor)) ca.fillColor = novaCor(ca.fillColor);
-            if (ehPredom(ca.strokeColor)) ca.strokeColor = novaCor(ca.strokeColor);
+            if (!tentaGradiente(ca.fillColor) && ehPredom(ca.fillColor)) ca.fillColor = novaCor(ca.fillColor);
+            if (!tentaGradiente(ca.strokeColor) && ehPredom(ca.strokeColor)) ca.strokeColor = novaCor(ca.strokeColor);
         } catch (e3) {}
     }
 }
@@ -283,7 +387,7 @@ function main() {
         var n = proximoNumero(doc, nomePredom);
         var novoNome = nomePredom + n;
 
-        var novoSpot, ehPredom;
+        var novoSpot, ehPredom, cromiaAlvo = null, spotAlvo = null;
 
         if (spotOrig) {
             novoSpot = criarSpotClonando(doc, novoNome, spotOrig);
@@ -293,6 +397,7 @@ function main() {
                             cor.spot.name === alvo);
                 };
             })(nomePredom);
+            spotAlvo = nomePredom; // habilita o remap de gradiente de spot
         } else {
             novoSpot = criarSpotCromia(doc, novoNome, nomePredom);
             ehPredom = (function (alvo) {
@@ -300,9 +405,10 @@ function main() {
                     return corCromiaPura(cor) === alvo;
                 };
             })(nomePredom);
+            cromiaAlvo = nomePredom; // habilita o remap de gradiente de cromia
         }
 
-        remapItem(it, ehPredom, novoSpot);
+        remapItem(it, ehPredom, novoSpot, cromiaAlvo, spotAlvo);
 
         processados++;
         resumo.push(novoNome);
