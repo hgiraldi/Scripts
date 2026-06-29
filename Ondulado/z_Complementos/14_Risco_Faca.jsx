@@ -3019,7 +3019,7 @@ function criarEtiquetaDeCor(docAlvo, indiceCor) {
     // ESQUERDA: borda esquerda na lateral esquerda da faca
     grupoNoAlvo.top = topo;
     grupoNoAlvo.left = facaLeft;
-    grupoNoAlvo.resize(-100, 100); // espelha
+    grupoNoAlvo.resize(100, -100); // espelha na VERTICAL (somar/artivinco)
 
     // DIREITA: duplica (ja espelhada) e alinha borda direita na lateral direita
     var grupoDir = grupoNoAlvo.duplicate();
