@@ -207,17 +207,27 @@
   // processo do PAINEL (nao na thread do Illustrator) -> NUNCA trava/crasha o
   // Illustrator, mesmo se o IP estiver errado ou o servidor caido.
   function checkHost(ip, cb) {
-    try {
-      var net = require("net");
-      var s = new net.Socket();
-      var feito = false;
-      function fim(ok) { if (feito) return; feito = true; try { s.destroy(); } catch (e) {} cb(ok); }
-      s.setTimeout(1800);
-      s.once("connect", function () { fim(true); });
-      s.once("timeout", function () { fim(false); });
-      s.once("error",   function () { fim(false); });
-      s.connect(445, ip);
-    } catch (e) { cb(false); } // sem Node -> nao quebra, so nao confirma
+    var tentativa = 0;
+    function tentar() {
+      tentativa++;
+      try {
+        var net = require("net");
+        var s = new net.Socket();
+        var feito = false;
+        function fim(ok) {
+          if (feito) return; feito = true;
+          try { s.destroy(); } catch (e) {}
+          if (!ok && tentativa < 2) { tentar(); return; } // 1 retry: evita falso "fora" em rede lenta
+          cb(ok);
+        }
+        s.setTimeout(3000);
+        s.once("connect", function () { fim(true); });
+        s.once("timeout", function () { fim(false); });
+        s.once("error",   function () { fim(false); });
+        s.connect(445, ip);
+      } catch (e) { if (tentativa < 2) { tentar(); } else { cb(false); } } // sem Node -> nao confirma
+    }
+    tentar();
   }
 
   function setDot(on, txt) {

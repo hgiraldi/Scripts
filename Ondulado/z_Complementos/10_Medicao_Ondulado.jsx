@@ -31,7 +31,7 @@ function saveXMLToFile(xmlContent, filePath) {
 function getFolderPathCopyLog() {
     var folderPathCopy = "";
     if ($.os.indexOf("Windows") !== -1) {
-        folderPathCopy = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
+        folderPathCopy = "\\\\192.168.1.96\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
     } else {
         folderPathCopy = "/Engine/_Jobfolder/" + serviceOrderNumber + "/_log/";
     }

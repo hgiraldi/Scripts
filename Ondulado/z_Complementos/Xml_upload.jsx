@@ -49,7 +49,7 @@ function getFolderPath() {
 
     // Check the operating system
     if ($.os.indexOf("Windows") !== -1) {
-        folderPath = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_xml\\";
+        folderPath = "\\\\192.168.1.96\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_xml\\";
     } else {
         folderPath = "/Engine/_JobFolder/" + serviceOrderNumber + "/_xml/";
     }
