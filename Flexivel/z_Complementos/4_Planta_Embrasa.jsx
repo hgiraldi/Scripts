@@ -1341,7 +1341,7 @@ function getFolderPathCopyLog() {
     // Check the operating system
     if ($.os.indexOf("Windows") !== -1) {
         // Windows folder path
-        folderPathCopy = "\\\\192.168.1.96\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
+        folderPathCopy = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
     } else {
         // Mac folder path
         folderPathCopy = "/Engine/_Jobfolder/" + serviceOrderNumber + "/_log/";

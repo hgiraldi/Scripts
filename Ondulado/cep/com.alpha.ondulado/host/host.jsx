@@ -13,7 +13,9 @@ var CANDIDATOS_BASE = [
 ];
 // --- pasta Engine (192.168.1.96) que tambem precisa estar conectada/montada ---
 var CANDIDATOS_ENGINE = [
-    "//192.168.1.96/Engine",   // Windows (UNC)
+    "//aeserver16/Engine",     // Windows (NOME do mount): casa com \\aeserver16\Engine.
+                               // Acessar o mesmo servidor pelo IP gera conflito SMB (1219).
+    "//192.168.1.96/Engine",   // Windows (IP, fallback se montado por IP)
     "/Volumes/Engine",         // Mac (montado em /Volumes)
     "/Engine"                  // Mac (montado na raiz)
 ];
