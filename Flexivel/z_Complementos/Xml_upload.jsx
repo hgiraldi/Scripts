@@ -1,11 +1,14 @@
 // ---- mensagem ao usuario ----
-// Sob o PAINEL CEP: NAO mostra modal. O alert()/Window no motor do CEP NAO
-// bloqueia - o script segue, CONCLUI e grava (CSV/log existem), mas a janela
-// fica ORFA e REAPARECE a cada evalScript (= o "loop"), empilhando ate TRAVAR.
-// Entao, no painel: nada de modal; o painel mostra "concluido" no rodape.
-// Sem painel (menu antigo do Illustrator): alert() nativo normal.
+// Sob o PAINEL CEP: NAO mostra modal (alert no motor do CEP nao bloqueia, fica
+// ORFAO e reaparece a cada evalScript = loop, empilha ate travar). So GUARDA a
+// msg em $.global.__msgPainel; o rodarOperacao (host.jsx) RETORNA ela e o painel
+// mostra no rodape DEPOIS de concluir (sem modal, sem deadlock). Erro aparece;
+// sucesso vira "concluido". Sem painel (menu antigo): alert() nativo normal.
 function msgUsuario(texto, tipo) {
-    if (typeof $.global !== "undefined" && typeof $.global.painelMsg === "function") { return; }
+    if (typeof $.global !== "undefined" && typeof $.global.painelMsg === "function") {
+        $.global.__msgPainel = (tipo || "info") + "|" + String(texto);
+        return;
+    }
     alert(texto);
 }
 

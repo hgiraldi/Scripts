@@ -105,6 +105,8 @@ function rodarOperacao(arq, os, pasta) {
         }
         $.global.scriptDirectory = dirScriptDir;
 
+        $.global.__msgPainel = ""; // limpa: o script grava aqui via msgUsuario
+
         var arquivos = String(arq).split(",");
         for (var i = 0; i < arquivos.length; i++) {
             var nome = arquivos[i].replace(/^\s+|\s+$/g, "");
@@ -113,7 +115,10 @@ function rodarOperacao(arq, os, pasta) {
             if (!script.exists) return "ERRO: script nao encontrado: " + script.fsName;
             $.evalFile(script);
         }
-        return "OK";
+        // devolve a msg que o script guardou (ex.: erro de cores) p/ o painel
+        // mostrar no rodape SEM modal. "OK|tipo|texto" ou so "OK".
+        var __m = $.global.__msgPainel || "";
+        return __m ? ("OK|" + __m) : "OK";
     } catch (e) {
         return "ERRO: " + e.toString() + (e.line ? (" (linha " + e.line + ")") : "");
     }

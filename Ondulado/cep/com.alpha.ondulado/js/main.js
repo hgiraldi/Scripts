@@ -154,6 +154,14 @@
       execBtn.disabled = false;
       if (ret === "__SEM_CEP__") { setStatus("Painel fora do Illustrator (sem CEP).", "err"); return; }
       if (ret && ret.indexOf("ERRO:") === 0) { setStatus(ret, "err"); return; }
+      // o script pode devolver uma msg: "OK|tipo|texto". erro -> rodape vermelho;
+      // sucesso/info -> "concluido". Sem modal (evita o alert orfao que loopa).
+      if (ret && ret.indexOf("OK|") === 0) {
+        var msg = ret.substring(3), bar = msg.indexOf("|");
+        var tipo = bar > -1 ? msg.substring(0, bar) : "info";
+        var texto = bar > -1 ? msg.substring(bar + 1) : msg;
+        if (tipo === "erro") { setStatus(texto, "err"); return; }
+      }
       setStatus(selecionada.nome + " — concluído.", "ok");
     });
   }
