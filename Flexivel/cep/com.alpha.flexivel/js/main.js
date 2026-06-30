@@ -59,6 +59,39 @@
 
   var osInput, statusEl, dotEl, connLblEl, opsEl, execBtn;
   var selecionada = null, selEl = null;
+  var ocupado = false; // true enquanto uma operacao roda -> NAO checa rede (evita
+                       // que o evalScript do poll colida com dialogos do script)
+
+  // ---- banner de mensagem (o script dispara via evento CEP; o painel mostra) ----
+  // Evita janelas ScriptUI do Illustrator (que entram em loop pelo CEP).
+  var bannerEl, bannerTxt, bannerTimer = null;
+  function montarBanner() {
+    if (bannerEl) return;
+    bannerEl = document.createElement("div");
+    bannerEl.className = "banner hidden";
+    bannerTxt = document.createElement("span");
+    bannerTxt.className = "banner-txt";
+    var x = document.createElement("button");
+    x.className = "banner-x"; x.innerHTML = "&times;";
+    x.addEventListener("click", esconderBanner);
+    bannerEl.appendChild(bannerTxt);
+    bannerEl.appendChild(x);
+    document.body.appendChild(bannerEl);
+  }
+  function esconderBanner() {
+    if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
+    if (bannerEl) bannerEl.classList.add("hidden");
+  }
+  // data = "tipo|texto". info some sozinho (5s); erro fica fixo (fecha no x).
+  function mostrarBanner(data) {
+    montarBanner();
+    var s = String(data || ""), tipo = "info", texto = s, bar = s.indexOf("|");
+    if (bar > -1) { tipo = s.substring(0, bar); texto = s.substring(bar + 1); }
+    bannerTxt.textContent = texto;
+    bannerEl.className = "banner " + (tipo === "erro" ? "erro" : "info");
+    if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
+    if (tipo !== "erro") bannerTimer = setTimeout(esconderBanner, 5000);
+  }
 
   function setStatus(msg, cls) {
     statusEl.textContent = msg || "";
@@ -113,7 +146,9 @@
     execBtn.textContent = "Executando…";
     setStatus("Executando " + selecionada.nome + "…");
     var pasta = selecionada.pasta || "";
+    ocupado = true; // pausa o poll de rede enquanto o script roda (dialogos!)
     evalScript("rodarOperacao(" + q(selecionada.arq) + "," + q(osInput.value) + "," + q(pasta) + ")", function (ret) {
+      ocupado = false;
       execBtn.classList.remove("loading");
       execBtn.textContent = "Executar";
       execBtn.disabled = false;
@@ -194,6 +229,7 @@
   // estao acessiveis/montadas? (host -> File.exists no caminho real; rapido pq o
   // servidor ja respondeu). Verde so quando a pasta existe MESMO = o run funciona.
   function checarConexao() {
+    if (ocupado) return; // operacao rodando -> nao dispara evalScript (evita loop de dialogo)
     checkHost(SCRIPTS_IP, function (sOk) {
       checkHost(ENGINE_IP, function (eOk) {
         if (!sOk || !eOk) {
@@ -203,6 +239,7 @@
           setDot(false, "servidor fora: " + f.join(" e "));
           return;
         }
+        if (ocupado) return; // operacao comecou durante o teste TCP -> nao mexe no motor
         evalScript("statusRede()", function (st) {
           if (st === "OK") { setDot(true, "conectado às redes"); return; }
           if (st && st.indexOf("OFF|") === 0) { setDot(false, "pasta não montada: " + st.substring(4)); return; }
@@ -227,6 +264,15 @@
       setStatus("");
     });
     execBtn.addEventListener("click", executar);
+
+    // escuta as mensagens que o script manda (banner). Tipo de evento por-painel
+    // (derivado do ID da extensao) p/ Ondulado e Flexivel nao se cruzarem.
+    montarBanner();
+    try {
+      var EVT = "com.alpha.msg";
+      if (cep && cep.getExtensionId) EVT = cep.getExtensionId().replace(/\.panel$/, "") + ".msg";
+      if (cep && cep.addEventListener) cep.addEventListener(EVT, function (ev) { mostrarBanner(ev && ev.data); });
+    } catch (e) {}
 
     carregarOperacoes();
     checarConexao();

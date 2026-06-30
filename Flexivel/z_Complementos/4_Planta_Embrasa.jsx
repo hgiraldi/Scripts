@@ -210,8 +210,9 @@ function main() {
         };
     }
 
-    // Botão de OK
-    dlg.okButton = dlg.add('button', undefined, 'OK');
+    // Botão de OK — {name:'ok'} fecha NATIVO (onClick->close entra em loop pelo
+    // painel CEP). O onClick abaixo ainda roda e grava as variaveis antes de fechar.
+    dlg.okButton = dlg.add('button', undefined, 'OK', { name: 'ok' });
     dlg.okButton.onClick = function() {
         // Armazenamento das variáveis em escopo global
         if (teraCapaBoca) {

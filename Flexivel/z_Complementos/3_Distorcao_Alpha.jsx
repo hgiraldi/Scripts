@@ -68,27 +68,7 @@ if (nomeArquivo.indexOf(produtoComUnderline) !== -1) {
     redimensionarVerticalmente();
 } else {
     // Caso o produto não esteja no nome do arquivo, exibir um alerta personalizado
-    var alertWindow = new Window("dialog", "OS nao bate com o arquivo");
-    alertWindow.orientation = "column";
-
-    var aviso = alertWindow.add("statictext", undefined, "OS nao bate com o arquivo");
-    aviso.alignment = "center";
-    aviso.characters = 17; // Define a largura do texto
-
-    // Define a cor vermelha para o texto
-    var myBrush = alertWindow.graphics.newPen(alertWindow.graphics.PenType.SOLID_COLOR, [1, 1, 0], 1);
-    aviso.graphics.foregroundColor = myBrush;
-
-    var okButton = alertWindow.add("button", undefined, "OK");
-    okButton.alignment = "center";
-
-    okButton.onClick = function() {
-        alertWindow.close();
-    }
-    // Centralizando a janela de alerta no Illustrator
-    alertWindow.center();
-
-    alertWindow.show();
+    msgUsuario("OS nao bate com o arquivo", "erro");
 }
 
 

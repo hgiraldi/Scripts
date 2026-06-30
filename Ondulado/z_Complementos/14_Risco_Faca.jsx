@@ -3174,21 +3174,16 @@ if (isPenha) {
     inputLoc.active = true;
     var grpLoc = dlgLoc.add("group");
     grpLoc.alignment = "right";
-    var btnLocOk = grpLoc.add("button", undefined, "OK");
-    var btnLocCancel = grpLoc.add("button", undefined, "Cancelar");
-    btnLocOk.onClick = function () {
-        if (inputLoc.text === "") {
-            alert("A localizacao deve ser preenchida ou clique em Cancelar.");
-            return;
-        }
-        localizacaoPenha = inputLoc.text;
-        dlgLoc.close(1);
-    };
-    btnLocCancel.onClick = function () {
-        localizacaoPenha = "";
-        dlgLoc.close(0);
-    };
-    dlgLoc.show();
+    // {name}: fechamento NATIVO (onClick->close entra em loop pelo painel CEP).
+    // Valida no laco apos o show: mantem aberto enquanto vazio.
+    var btnLocOk = grpLoc.add("button", undefined, "OK", { name: "ok" });
+    var btnLocCancel = grpLoc.add("button", undefined, "Cancelar", { name: "cancel" });
+    var rLoc;
+    do {
+        rLoc = dlgLoc.show();
+        if (rLoc === 1 && inputLoc.text === "") { alert("A localizacao deve ser preenchida ou clique em Cancelar."); }
+    } while (rLoc === 1 && inputLoc.text === "");
+    localizacaoPenha = (rLoc === 1) ? inputLoc.text : "";
 }
 
 

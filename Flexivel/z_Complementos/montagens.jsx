@@ -1127,16 +1127,8 @@ function montagemPadrao() {
 
         var alertMessage = "Montagem e Label feitos";
 
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -1321,16 +1313,8 @@ function montagemContisul() {
 
         var alertMessage = "Montagem e Label feitos";
 
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -1719,16 +1703,8 @@ function montagemRalprint() {
 
         var alertMessage = "Montagem e Label feitos";
 
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -2143,16 +2119,8 @@ function montagemNovatack() {
 
         var alertMessage = "Montagem e Label feitos";
 
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -2765,16 +2733,8 @@ function montagemEdiprint() {
 
         var alertMessage = "Montagem e Label feitos";
 
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -3078,16 +3038,8 @@ function montagemGadeGraff() {
         }
 
         var alertMessage = "Montagem e Label feitos";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -3455,16 +3407,8 @@ function montagemInterpack() {
         }
 
         var alertMessage = "Montagem e Label feitos";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
 
     }
@@ -3781,16 +3725,8 @@ function montagemDeAPrint() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Digilabel
@@ -4170,16 +4106,8 @@ function montagemDigilabel() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Digilabel
@@ -4559,16 +4487,8 @@ function montagemCimed() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Marcoprint
@@ -4936,16 +4856,8 @@ function montagemMarcoprint() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //TriColor
@@ -5267,16 +5179,8 @@ function montagemTricoloretiq() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 }
 //Limpack
 function montagemLimpack() {
@@ -5466,16 +5370,8 @@ function montagemLimpack() {
     }
 
     var alertMessage = "Montagem e Label feitos";
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Majicplast
@@ -6013,16 +5909,8 @@ function montagemMajicplast() {
     }
 
     var alertMessage = "Montagem e Label feitos - Verificar Cores do Cameron";
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //AlphaColor
@@ -6452,44 +6340,20 @@ function montagemAlphaColor() {
         if (cac.indexOf("BULA") >= 0 || cac.indexOf("ROTULO") >= 0) {
 
             var alertMessage = "Montagem e Label feitos, nao esquecer das cruzetas centrais e escalas de densidade";
-            var dialog = new Window('dialog', 'Mensagem Importante');
-            var messageText = dialog.add('statictext', undefined, alertMessage);
-            messageText.characters = alertMessage.length;
 
-            var okButton = dialog.add('button', undefined, 'OK');
-            okButton.onClick = function() {
-                dialog.close();
-            };
-
-            dialog.show();
+            msgUsuario(alertMessage, "info");
 
         } else if (cac.indexOf("IN MOLD LABEL") >= 0) {
 
             var alertMessage = "Montagem e Label feitos, nao esquecer de aplicar as fotocelulas";
-            var dialog = new Window('dialog', 'Mensagem Importante');
-            var messageText = dialog.add('statictext', undefined, alertMessage);
-            messageText.characters = alertMessage.length;
 
-            var okButton = dialog.add('button', undefined, 'OK');
-            okButton.onClick = function() {
-                dialog.close();
-            };
-
-            dialog.show();
+            msgUsuario(alertMessage, "info");
 
         } else {
 
             var alertMessage = "Montagem e Label feitos";
-            var dialog = new Window('dialog', 'Mensagem Importante');
-            var messageText = dialog.add('statictext', undefined, alertMessage);
-            messageText.characters = alertMessage.length;
 
-            var okButton = dialog.add('button', undefined, 'OK');
-            okButton.onClick = function() {
-                dialog.close();
-            };
-
-            dialog.show();
+            msgUsuario(alertMessage, "info");
 
 
 
@@ -6814,16 +6678,8 @@ function montagemPinhoPack() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Aplipack
@@ -7138,16 +6994,8 @@ function montagemAplipack() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //WoodFlex
@@ -7471,16 +7319,8 @@ function montagemWoodFlex() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Shclemper
@@ -7783,16 +7623,8 @@ function montagemSchlemper() {
 
     var alertMessage = "Montagem e Label feitos";
 
-    var dialog = new Window('dialog', 'Mensagem Importante');
-    var messageText = dialog.add('statictext', undefined, alertMessage);
-    messageText.characters = alertMessage.length;
 
-    var okButton = dialog.add('button', undefined, 'OK');
-    okButton.onClick = function() {
-        dialog.close();
-    };
-
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 }
 //Rioplastic
@@ -7855,29 +7687,13 @@ function montagemRioplasticLaminados() {
 
     if (pos != "") {
         var alertMessage = "Verificar a cor do Cameron conforme OS";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
-
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
 
     } else {
         var alertMessage = "Montagem e Label feitos";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
-
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
 
     }
 
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 
     //Camerons Position
@@ -7956,29 +7772,13 @@ function montagemGrafigel() {
 
     if (pos != "") {
         var alertMessage = "Verificar a cor do Cameron conforme OS";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
-
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
 
     } else {
         var alertMessage = "Montagem e Label feitos";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
-
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
 
     }
 
-    dialog.show();
+    msgUsuario(alertMessage, "info");
 
 
     //Camerons Position
@@ -8136,16 +7936,8 @@ function montagens(cust) {
         label();
 
         var alertMessage = "Cameron Conforme Arquivo - Somente Imposicao e Label feita";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
 
     } else if (pAlpha) {
         montagemPadrao();
@@ -8155,15 +7947,7 @@ function montagens(cust) {
         label();
 
         var alertMessage = "Sem Cameron Padrao Alpha ou do Cliente automatizado - Somente Imposicao e Label feita";
-        var dialog = new Window('dialog', 'Mensagem Importante');
-        var messageText = dialog.add('statictext', undefined, alertMessage);
-        messageText.characters = alertMessage.length;
 
-        var okButton = dialog.add('button', undefined, 'OK');
-        okButton.onClick = function() {
-            dialog.close();
-        };
-
-        dialog.show();
+        msgUsuario(alertMessage, "info");
     }
 }

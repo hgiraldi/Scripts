@@ -70,29 +70,9 @@ if (arquivosCliente.length > 0) {
     fileList.maximumSize.height = 120;
 
     // Botão "Abrir" para abrir o arquivo selecionado
-    var btnAbrir = dialog.add('button', undefined, 'Abrir', {
-        name: 'btnAbrir'
-    });
-    btnAbrir.onClick = function() {
-        var selectedIndex = fileList.selection.index;
-        if (selectedIndex >= 0) { // Verifique se o índice é válido
-            //alert("filePaths: " + filePaths); // Adicione este alerta para depuração
-            var selectedFilePath = filePaths[selectedIndex]; // Obter o caminho completo
-            if (selectedFilePath) {
-                var selectedFile = new File(selectedFilePath);
-                if (selectedFile.exists) {
-                    selectedFile.execute(); // Abrir o arquivo selecionado
-                    dialog.close(); // Fechar a caixa de diálogo
-                } else {
-                    alert('O arquivo selecionado não existe.');
-                }
-            } else {
-                alert('O caminho do arquivo selecionado não foi encontrado.');
-            }
-        } else {
-            alert('Por favor, selecione um arquivo antes de clicar em "Abrir".');
-        }
-    };
+    // Abrir = {name:"ok"} (fecha NATIVO apos abrir). O fechamento via onClick
+    // entrava em loop quando rodado pelo painel CEP. Validacao no laco abaixo.
+    var btnAbrir = dialog.add('button', undefined, 'Abrir', { name: 'ok' });
 
 
 
@@ -101,15 +81,21 @@ if (arquivosCliente.length > 0) {
 
 
 
-    // Botão "Fechar" para fechar a janela de diálogo
-    var btnFechar = dialog.add('button', undefined, 'Fechar', {
-        name: 'btnFechar'
-    });
-    btnFechar.onClick = function() {
-        dialog.close();
-    };
+    // Botão "Fechar" = {name:"cancel"} (fecha NATIVO)
+    var btnFechar = dialog.add('button', undefined, 'Fechar', { name: 'cancel' });
 
-    dialog.show();
+    do {
+        var rU = dialog.show();
+        if (rU !== 1) break; // Fechar / Esc
+        var selectedIndex = fileList.selection ? fileList.selection.index : -1;
+        if (selectedIndex < 0) { alert('Por favor, selecione um arquivo antes de clicar em "Abrir".'); continue; }
+        var selectedFilePath = filePaths[selectedIndex];
+        if (!selectedFilePath) { alert('O caminho do arquivo selecionado não foi encontrado.'); continue; }
+        var selectedFile = new File(selectedFilePath);
+        if (!selectedFile.exists) { alert('O arquivo selecionado não existe.'); continue; }
+        selectedFile.execute(); // Abrir o arquivo selecionado
+        break; // abriu -> sai
+    } while (true);
 } else {
     alert("Nenhum arquivo encontrado para o cliente especificado.");
 }

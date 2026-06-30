@@ -1,3 +1,12 @@
+// ---- mensagem ao usuario (banner no painel CEP; alert no menu antigo) ----
+// Janelas ScriptUI (new Window) entram em LOOP quando o script roda pelo painel
+// CEP (nao fecham). Use SEMPRE msgUsuario para avisos. tipo: "info" | "erro".
+// $.global.painelMsg e posto pelo host.jsx do painel; sem painel, cai no alert.
+function msgUsuario(texto, tipo) {
+    if (typeof $.global.painelMsg === "function") { $.global.painelMsg(texto, tipo || "info"); }
+    else { alert(texto); }
+}
+
 // Initialize global variables
 var xmlData = {};
 

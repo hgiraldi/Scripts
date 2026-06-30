@@ -112,6 +112,25 @@ body.alpha-dark .op.sel { background: rgba(22,163,74,.12); }
 }
 .ops > .sec-title:first-child { margin-top: 0; }
 
+/* ===== Banner de mensagem (vem do script via evento CEP) ===== */
+.banner {
+  position: fixed; left: 10px; right: 10px; top: 10px; z-index: 50;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 12px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 600; line-height: 1.35; color: #fff;
+  box-shadow: var(--shadow-lg); transition: transform var(--t), opacity var(--t);
+}
+.banner.info { background: linear-gradient(135deg, #178a4a, #16a34a); }
+.banner.erro { background: linear-gradient(135deg, #b81f4e, var(--alpha-accent)); }
+.banner-txt { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; padding-top: 2px; }
+.banner-x {
+  flex: none; background: rgba(255,255,255,.22); border: none; color: #fff;
+  width: 22px; height: 22px; border-radius: 50%; font-size: 16px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.banner-x:hover { background: rgba(255,255,255,.38); }
+.banner.hidden { opacity: 0; transform: translateY(-12px); pointer-events: none; }
+
 /* ===== Botao Executar ===== */
 .btn-exec {
   margin: 11px 14px 0; padding: 12px; border: none; border-radius: var(--radius-sm);

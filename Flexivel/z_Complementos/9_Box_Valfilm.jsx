@@ -21,28 +21,12 @@ tamanhoBoxInput.active = true;
 
 // Adicionar botões OK e Cancelar
 var buttonsGroup = dialog.add("group");
-var okButton = buttonsGroup.add("button", undefined, "OK");
-var cancelButton = buttonsGroup.add("button", undefined, "Cancelar");
+// Botoes com {name:"ok"}/{name:"cancel"}: o ScriptUI FECHA nativamente (o
+// fechamento manual via onClick entra em loop quando roda pelo painel CEP).
+var okButton = buttonsGroup.add("button", undefined, "OK", { name: "ok" });
+var cancelButton = buttonsGroup.add("button", undefined, "Cancelar", { name: "cancel" });
 
-// Adicionar ação ao botão OK
-okButton.onClick = function() {
-    // Obter o valor inserido
-    var tamanhoBoxValue = tamanhoBoxInput.text;
-
-    // Executar a lógica desejada com o valor inserido
-    // (por exemplo, aplicar o tamanho do box após a distorção)
-
-    // Fechar a janela de diálogo
-    dialog.close();
-};
-
-// Adicionar ação ao botão Cancelar
-cancelButton.onClick = function() {
-    // Fechar a janela de diálogo sem fazer nada
-    dialog.close();
-};
-
-// Mostrar a janela de diálogo
+// Mostrar a janela de diálogo (o valor e lido depois de tamanhoBoxInput.text)
 dialog.show();
 
 function boxValfilm() {

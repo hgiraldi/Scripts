@@ -223,11 +223,9 @@ if (app.documents.length > 0) {
     buttonGroup.alignment = "right";
     buttonGroup.margins = [20, 0, 20, 20]; // [left, top, right, bottom]
 
-    // Cancel button
-    cancelButton = buttonGroup.add("button", undefined, "Cancelar");
-    cancelButton.onClick = function() {
-        specifyDialogBox.close();
-    }
+    // Cancel button — {name:"cancel"} fecha NATIVO (onClick->close entra em loop
+    // pelo painel CEP). "Aplicar Cotas" segue rodando startSpec sem fechar.
+    cancelButton = buttonGroup.add("button", undefined, "Cancelar", { name: "cancel" });
 
     // Specify button
     specifyButton = buttonGroup.add("button", undefined, "Aplicar Cotas");

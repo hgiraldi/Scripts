@@ -574,82 +574,19 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
 
 } else if (coresComuns.length != cores.length) {
     // Caso o produto não esteja no nome do arquivo, exibir um alerta personalizado
-    var alertWindow = new Window("dialog", "Cores do arquivo nao batem com a OS");
-    alertWindow.orientation = "column";
-
-    var aviso = alertWindow.add("statictext", undefined, "Cores do arquivo nao batem com a OS");
-    aviso.alignment = "center";
-    aviso.characters = 50; // Define a largura do texto
-
-    // Define a cor vermelha para o texto
-    var myBrush = alertWindow.graphics.newPen(alertWindow.graphics.PenType.SOLID_COLOR, [1, 1, 0], 1);
-    aviso.graphics.foregroundColor = myBrush;
-
-    var okButton = alertWindow.add("button", undefined, "OK");
-    okButton.alignment = "center";
-
-    okButton.onClick = function() {
-        alertWindow.close();
-    }
-
-    // Centralizando a janela de alerta no Illustrator
-    alertWindow.center();
-
-    alertWindow.show();
+    msgUsuario("Cores do arquivo nao batem com a OS", "erro");
     artLayer.visible = true;
     artLayer.remove();
 
 } else if (temProblema) {
     // Caso o produto não esteja no nome do arquivo, exibir um alerta personalizado
-    var alertWindow = new Window("dialog", "Link nao corresponde com a OS");
-    alertWindow.orientation = "column";
-
-    var aviso = alertWindow.add("statictext", undefined, "Link nao corresponde com a OS");
-    aviso.alignment = "center";
-    aviso.characters = 50; // Define a largura do texto
-
-    // Define a cor vermelha para o texto
-    var myBrush = alertWindow.graphics.newPen(alertWindow.graphics.PenType.SOLID_COLOR, [1, 1, 0], 1);
-    aviso.graphics.foregroundColor = myBrush;
-
-    var okButton = alertWindow.add("button", undefined, "OK");
-    okButton.alignment = "center";
-
-    okButton.onClick = function() {
-        alertWindow.close();
-    }
-
-    // Centralizando a janela de alerta no Illustrator
-    alertWindow.center();
-
-    alertWindow.show();
+    msgUsuario("Link nao corresponde com a OS", "erro");
     artLayer.visible = true;
     artLayer.remove();
 
 } else {
     // Caso o produto não esteja no nome do arquivo, exibir um alerta personalizado
-    var alertWindow = new Window("dialog", "Produto nao encontrado");
-    alertWindow.orientation = "column";
-
-    var aviso = alertWindow.add("statictext", undefined, "Produto nao encontrado no nome do arquivo");
-    aviso.alignment = "center";
-    aviso.characters = 50; // Define a largura do texto
-
-    // Define a cor vermelha para o texto
-    var myBrush = alertWindow.graphics.newPen(alertWindow.graphics.PenType.SOLID_COLOR, [1, 1, 0], 1);
-    aviso.graphics.foregroundColor = myBrush;
-
-    var okButton = alertWindow.add("button", undefined, "OK");
-    okButton.alignment = "center";
-
-    okButton.onClick = function() {
-        alertWindow.close();
-    }
-
-    // Centralizando a janela de alerta no Illustrator
-    alertWindow.center();
-
-    alertWindow.show();
+    msgUsuario("Produto nao encontrado no nome do arquivo", "erro");
     artLayer.visible = true;
     artLayer.remove();
 }

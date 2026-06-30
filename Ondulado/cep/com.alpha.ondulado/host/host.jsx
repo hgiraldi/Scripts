@@ -18,6 +18,25 @@ var CANDIDATOS_ENGINE = [
     "/Engine"                  // Mac (montado na raiz)
 ];
 
+// ---- mensagens NO PAINEL (em vez de abrir janela do Illustrator) ----
+// Janelas ScriptUI (new Window) entram em loop quando o script roda pelo CEP.
+// Em vez disso o script chama painelMsg(): dispara um evento que o painel escuta
+// e mostra como banner. NAO bloqueia o script. tipo: "info" | "erro".
+// Disponibilizado em $.global p/ os scripts rodados via $.evalFile enxergarem.
+var EVT_MSG = "com.alpha.ondulado.msg"; // por-painel: nao cruza com o Flexivel
+function painelMsg(texto, tipo) {
+    try {
+        var xLib = new ExternalObject("lib:PlugPlugExternalObject");
+        var ev = new CSXSEvent();
+        ev.type = EVT_MSG;
+        ev.data = (tipo || "info") + "|" + String(texto);
+        ev.dispatch();
+    } catch (e) {
+        try { alert(String(texto)); } catch (e2) {} // sem painel -> alert nativo
+    }
+}
+$.global.painelMsg = painelMsg;
+
 function primeiroQueExiste(lista) {
     for (var i = 0; i < lista.length; i++) {
         try { if (new File(lista[i]).exists) return lista[i]; } catch (e) {}

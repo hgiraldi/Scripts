@@ -12,26 +12,23 @@ numbersLayer.name = "numeros";
 function criarCaixaDialogo() {
     var dialogBox = new Window("dialog", "Escolha a Orientação dos Números");
 
-    var horizontalButton = dialogBox.add("button", undefined, "Horizontal");
-    var verticalDireitaButton = dialogBox.add("button", undefined, "Vertical para a Direita");
-    var verticalEsquerdaButton = dialogBox.add("button", undefined, "Vertical para a Esquerda");
-
-    horizontalButton.onClick = function() {
-        orientacaoEscolhida = "horizontal";
-        dialogBox.close();
-    };
-
-    verticalDireitaButton.onClick = function() {
-        orientacaoEscolhida = "verticalDireita";
-        dialogBox.close();
-    };
-
-    verticalEsquerdaButton.onClick = function() {
-        orientacaoEscolhida = "verticalEsquerda";
-        dialogBox.close();
-    };
+    // Radios + OK {name:"ok"} (fechamento NATIVO). Os 3 botoes-acao antigos
+    // fechavam via onClick e entravam em loop quando rodados pelo painel CEP.
+    dialogBox.orientation = "column";
+    dialogBox.alignChildren = "left";
+    var rbHor = dialogBox.add("radiobutton", undefined, "Horizontal");
+    var rbDir = dialogBox.add("radiobutton", undefined, "Vertical para a Direita");
+    var rbEsq = dialogBox.add("radiobutton", undefined, "Vertical para a Esquerda");
+    rbHor.value = true;
+    var grpNum = dialogBox.add("group");
+    grpNum.alignment = "right";
+    grpNum.add("button", undefined, "OK", { name: "ok" });
 
     dialogBox.show();
+
+    if (rbDir.value) orientacaoEscolhida = "verticalDireita";
+    else if (rbEsq.value) orientacaoEscolhida = "verticalEsquerda";
+    else orientacaoEscolhida = "horizontal";
 }
 
 // Chame a função da caixa de diálogo

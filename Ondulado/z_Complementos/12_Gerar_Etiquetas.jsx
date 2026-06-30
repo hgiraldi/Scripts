@@ -352,14 +352,16 @@ if (isPenha) {
     inputLoc.active = true;
     var grpB = dlgS.add("group");
     grpB.alignment = "right";
-    var btnOk = grpB.add("button", undefined, "OK");
-    var btnCancel = grpB.add("button", undefined, "Cancelar");
-    btnOk.onClick = function () {
-        if (inputLoc.text === "") { alert("Preencha a localização ou clique em Cancelar."); return; }
-        localizacao = inputLoc.text; dlgS.close(1);
-    };
-    btnCancel.onClick = function () { localizacao = ""; dlgS.close(0); };
-    dlgS.show();
+    // {name}: fechamento NATIVO (onClick->close entra em loop pelo painel CEP).
+    // Valida no laco apos o show: mantem aberto enquanto vazio.
+    var btnOk = grpB.add("button", undefined, "OK", { name: "ok" });
+    var btnCancel = grpB.add("button", undefined, "Cancelar", { name: "cancel" });
+    var rLoc;
+    do {
+        rLoc = dlgS.show();
+        if (rLoc === 1 && inputLoc.text === "") { alert("Preencha a localização ou clique em Cancelar."); }
+    } while (rLoc === 1 && inputLoc.text === "");
+    localizacao = (rLoc === 1) ? inputLoc.text : "";
 }
 
 // Abre um template, troca os tokens [[...]], (Penha) gera os 2 barcodes, agrupa e
