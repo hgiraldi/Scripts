@@ -155,6 +155,12 @@
       if (ret === "__SEM_CEP__") { setStatus("Painel fora do Illustrator (sem CEP).", "err"); return; }
       if (ret && ret.indexOf("ERRO:") === 0) { setStatus(ret, "err"); return; }
       setStatus(selecionada.nome + " — concluído.", "ok");
+      // O script NAO abre dialogo (modal dentro do script, via painel, reaparece
+      // em loop). Ele guarda a msg em $.global.__msgPainel; lemos e mostramos como
+      // banner AQUI, FORA da execucao (sem modal, sem deadlock). Le e limpa.
+      evalScript("(function(){var m=$.global.__msgPainel||'';$.global.__msgPainel='';return m;})()", function (msg) {
+        if (msg && msg !== "__SEM_CEP__" && msg.indexOf("ERRO:") !== 0) mostrarBanner(msg);
+      });
     });
   }
 

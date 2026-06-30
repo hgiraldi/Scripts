@@ -1,10 +1,15 @@
 // ---- mensagem ao usuario ----
-// Use SEMPRE msgUsuario para avisos (nunca new Window, que LOOPA pelo painel CEP).
-// Usa alert() nativo: bloqueante, confiavel e nao loopa, igual ao menu antigo.
-// (O banner via evento CSXSEvent foi desativado: disparar o evento no meio do
-//  script, durante o evalScript do painel, podia dar deadlock e TRAVAR o Illustrator.)
+// Pelo PAINEL CEP: NAO abre dialogo. Um modal (alert/Window) aberto de DENTRO do
+// script - ainda mais depois de muitas operacoes no doc, ex. apos label() -
+// reaparece em LOOP no motor do CEP. Entao so GUARDA a msg; o painel le
+// ($.global.__msgPainel) e mostra como banner DEPOIS que o script termina (fora
+// da execucao, sem modal). Sem painel (menu antigo): alert() nativo. tipo: info|erro.
 function msgUsuario(texto, tipo) {
-    alert(texto);
+    if (typeof $.global !== "undefined" && typeof $.global.painelMsg === "function") {
+        $.global.__msgPainel = (tipo || "info") + "|" + String(texto);
+    } else {
+        alert(texto);
+    }
 }
 
 // Initialize global variables
