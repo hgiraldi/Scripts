@@ -117,8 +117,8 @@ if (app.documents.length === 0) {
     var dlg = new Window("dialog", "Scripts Ondulado");
     dlg.orientation = "column";
     dlg.alignChildren = ["fill", "top"];
-    dlg.margins = 18;
-    dlg.spacing = 12;
+    dlg.margins = 22;
+    dlg.spacing = 14;
     // NAO definir backgroundColor em janela/painel que contenha radiobutton:
     // no Windows isso faz o texto dos labels dos radios sumir.
 
@@ -129,16 +129,18 @@ if (app.documents.length === 0) {
     header.spacing = 1;
 
     var titulo = header.add("statictext", undefined, "SCRIPTS  ONDULADO");
-    aplicarFonte(titulo, "Segoe UI", ScriptUI.FontStyle.BOLD, 20, COR_TITULO);
+    aplicarFonte(titulo, "Segoe UI", ScriptUI.FontStyle.BOLD, 22, COR_TITULO);
 
     var subtitulo = header.add("statictext", undefined, "Automação de pré-impressão flexográfica");
     aplicarFonte(subtitulo, "Segoe UI", ScriptUI.FontStyle.REGULAR, 10, null);
 
-    // divisor fino
-    var divisor = dlg.add("panel");
+    // divisor: linha de ACENTO (barra fina colorida). statictext aceita
+    // backgroundColor no Windows (radio nao) -> usado aqui de proposito.
+    var divisor = dlg.add("statictext", undefined, "");
     divisor.alignment = ["fill", "top"];
-    divisor.maximumSize.height = 2;
-    divisor.minimumSize.height = 2;
+    divisor.maximumSize.height = 3;
+    divisor.minimumSize.height = 3;
+    aplicarFundo(divisor, COR_TITULO);
 
     // ------------------- ORDEM DE SERVICO -----------------
     var painelOS = dlg.add("panel", undefined, "Ordem de Serviço");
@@ -151,8 +153,8 @@ if (app.documents.length === 0) {
     aplicarFonte(lblOS, "Segoe UI", ScriptUI.FontStyle.BOLD, 11, null);
 
     var numeroOrdemInput = painelOS.add("edittext", undefined, "");
-    numeroOrdemInput.characters = 16;
-    numeroOrdemInput.preferredSize.height = 26;
+    numeroOrdemInput.characters = 18;
+    numeroOrdemInput.preferredSize.height = 28;
     numeroOrdemInput.active = true;
 
     var lblDigitos = painelOS.add("statictext", undefined, "(7 dígitos)");
@@ -169,8 +171,8 @@ if (app.documents.length === 0) {
     var painelOp = dlg.add("panel", undefined, "Selecione a operação");
     painelOp.orientation = "column";
     painelOp.alignChildren = ["fill", "top"];
-    painelOp.margins = [14, 18, 14, 14];
-    painelOp.spacing = 5;
+    painelOp.margins = [16, 20, 16, 16];
+    painelOp.spacing = 8;
 
     // Cada operacao: tipo do icone, label e descricao mostrada ao selecionar.
     var operacoes = [
@@ -219,7 +221,7 @@ if (app.documents.length === 0) {
     // descricao dinamica da operacao selecionada
     var lblDesc = painelOp.add("statictext", undefined, "Selecione uma operação acima.", { multiline: true });
     lblDesc.alignment = ["fill", "top"];
-    lblDesc.minimumSize.height = 30;
+    lblDesc.minimumSize.height = 34;
     aplicarFonte(lblDesc, "Segoe UI", ScriptUI.FontStyle.REGULAR, 9, null);
 
     // referencias por nome (mantem compatibilidade com o restante do script)
@@ -241,10 +243,10 @@ if (app.documents.length === 0) {
     espaco.alignment = ["fill", "center"];
 
     var btnCancelar = grpBtns.add("button", undefined, "Cancelar", { name: "cancel" });
-    btnCancelar.preferredSize = [110, 32];
+    btnCancelar.preferredSize = [110, 34];
 
     var btnExecutar = grpBtns.add("button", undefined, "Executar", { name: "ok" });
-    btnExecutar.preferredSize = [130, 32];
+    btnExecutar.preferredSize = [150, 34];
     btnExecutar.enabled = false; // habilita ao escolher uma operacao
 
     dlg.defaultElement = btnExecutar;
@@ -320,6 +322,11 @@ if (app.documents.length === 0) {
     btnCancelar.onClick = function () {
         dlg.close();
     };
+
+    // rodape: dica de atalhos (texto suave)
+    var dica = dlg.add("statictext", undefined, "Enter executa   •   Esc cancela");
+    dica.alignment = ["fill", "top"];
+    aplicarFonte(dica, "Segoe UI", ScriptUI.FontStyle.REGULAR, 8, COR_SUB);
 
     dlg.show();
 }
