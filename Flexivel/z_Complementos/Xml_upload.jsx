@@ -1,15 +1,8 @@
 // ---- mensagem ao usuario ----
-// Pelo PAINEL CEP: NAO abre dialogo. Um modal (alert/Window) aberto de DENTRO do
-// script - ainda mais depois de muitas operacoes no doc, ex. apos label() -
-// reaparece em LOOP no motor do CEP. Entao so GUARDA a msg; o painel le
-// ($.global.__msgPainel) e mostra como banner DEPOIS que o script termina (fora
-// da execucao, sem modal). Sem painel (menu antigo): alert() nativo. tipo: info|erro.
+// alert() nativo, igual ao menu antigo (estado estavel: no maximo loopa, NAO
+// crasha). Banner/evento/guardar-msg foram revertidos.
 function msgUsuario(texto, tipo) {
-    if (typeof $.global !== "undefined" && typeof $.global.painelMsg === "function") {
-        $.global.__msgPainel = (tipo || "info") + "|" + String(texto);
-    } else {
-        alert(texto);
-    }
+    alert(texto);
 }
 
 // Initialize global variables
