@@ -86,7 +86,8 @@
     return el;
   }
 
-  // recebe SECOES: [{ titulo?, operacoes:[...] }]. Sem titulo = grupo sem cabecalho.
+  // recebe SECOES: [{ titulo?, operacoes:[...] }]. Cada secao = titulo (largura
+  // cheia) + GRADE propria -> a secao nunca se quebra entre colunas.
   function montarSecoes(secoes) {
     opsEl.innerHTML = "";
     selecionada = null; selEl = null; execBtn.disabled = true;
@@ -97,26 +98,12 @@
         h.textContent = sec.titulo;
         opsEl.appendChild(h);
       }
-      (sec.operacoes || []).forEach(function (op) { opsEl.appendChild(criarOpEl(op)); });
+      var grid = document.createElement("div");
+      grid.className = "sec-grid";
+      (sec.operacoes || []).forEach(function (op) { grid.appendChild(criarOpEl(op)); });
+      opsEl.appendChild(grid);
     });
-    setTimeout(ajustarLargura, 40);
   }
-
-  // largura dinamica: se as operacoes nao couberem na ALTURA disponivel, liga a
-  // 2a coluna (.cols2 -> column-wrap) e o painel DOBRA de largura. Cabendo em 1
-  // coluna, volta ao normal. (resizeContent vale p/ painel FLUTUANTE; acoplado,
-  // o operador arrasta a borda e a 2a coluna aparece.)
-  function ajustarLargura() {
-    try {
-      opsEl.classList.remove("cols2");
-      var precisa2 = opsEl.scrollHeight > opsEl.clientHeight + 4;
-      if (precisa2) opsEl.classList.add("cols2");
-      if (cep && typeof cep.resizeContent === "function") {
-        cep.resizeContent(precisa2 ? 588 : 300, window.innerHeight || 760);
-      }
-    } catch (e) {}
-  }
-  window.addEventListener("resize", function () { setTimeout(ajustarLargura, 60); });
 
   function executar() {
     if (!selecionada) return;
@@ -147,14 +134,17 @@
     return null;
   }
 
-  // Camadas: 1) operacoes.json da REDE (editavel sem reinstalar) ->
-  //          2) operacoes.json BUNDLADO (default que veio no painel) ->
-  //          3) lista embutida (ultimo fallback).
+  // Render IMEDIATO do bundlado (nao trava no boot). Depois, SE o servidor de
+  // scripts responder (TCP), sobrescreve com o operacoes.json da REDE (editavel
+  // sem reinstalar). Assim, rede caida no boot nao congela o painel.
   function carregarOperacoes() {
-    evalScript("lerConfig()", function (ret) {
-      var rede = parseConfig(ret);
-      if (rede) { montarSecoes(rede); return; }    // 1) rede
-      carregarBundlado();                          // 2) e 3)
+    carregarBundlado();
+    checkHost(SCRIPTS_IP, function (ok) {
+      if (!ok) return;
+      evalScript("lerConfig()", function (ret) {
+        var rede = parseConfig(ret);
+        if (rede) montarSecoes(rede);
+      });
     });
   }
 
@@ -195,20 +185,29 @@
     } catch (e) { cb(false); } // sem Node -> nao quebra, so nao confirma
   }
 
-  // verde se as DUAS redes respondem; vermelho avisando QUAL caiu.
+  function setDot(on, txt) {
+    dotEl.className = "dot " + (on ? "on" : "off");
+    connLblEl.textContent = txt;
+  }
+
+  // 2 etapas: (1) servidores respondem? (TCP, nao trava). (2) se sim, as PASTAS
+  // estao acessiveis/montadas? (host -> File.exists no caminho real; rapido pq o
+  // servidor ja respondeu). Verde so quando a pasta existe MESMO = o run funciona.
   function checarConexao() {
-    checkHost(SCRIPTS_IP, function (scriptsOk) {
-      checkHost(ENGINE_IP, function (engineOk) {
-        if (scriptsOk && engineOk) {
-          dotEl.className = "dot on";
-          connLblEl.textContent = "conectado às redes";
+    checkHost(SCRIPTS_IP, function (sOk) {
+      checkHost(ENGINE_IP, function (eOk) {
+        if (!sOk || !eOk) {
+          var f = [];
+          if (!sOk) f.push("Scripts (" + SCRIPTS_IP + ")");
+          if (!eOk) f.push("Engine (" + ENGINE_IP + ")");
+          setDot(false, "servidor fora: " + f.join(" e "));
           return;
         }
-        var faltam = [];
-        if (!scriptsOk) faltam.push("Scripts (" + SCRIPTS_IP + ")");
-        if (!engineOk)  faltam.push("Engine (" + ENGINE_IP + ")");
-        dotEl.className = "dot off";
-        connLblEl.textContent = "sem conexão: " + faltam.join(" e ");
+        evalScript("statusRede()", function (st) {
+          if (st === "OK") { setDot(true, "conectado às redes"); return; }
+          if (st && st.indexOf("OFF|") === 0) { setDot(false, "pasta não montada: " + st.substring(4)); return; }
+          setDot(false, "rede inacessível");
+        });
       });
     });
   }

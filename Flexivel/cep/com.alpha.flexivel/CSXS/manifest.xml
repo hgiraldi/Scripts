@@ -40,9 +40,9 @@
           <Type>Panel</Type>
           <Menu>Flexível</Menu>
           <Geometry>
-            <Size><Height>760</Height><Width>300</Width></Size>
-            <MinSize><Height>360</Height><Width>280</Width></MinSize>
-            <MaxSize><Height>2400</Height><Width>640</Width></MaxSize>
+            <Size><Height>720</Height><Width>570</Width></Size>
+            <MinSize><Height>360</Height><Width>300</Width></MinSize>
+            <MaxSize><Height>2200</Height><Width>720</Width></MaxSize>
           </Geometry>
           <Icons>
             <Icon Type="Normal">./img/icon-n.png</Icon>

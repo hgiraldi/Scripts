@@ -1,8 +1,12 @@
-// Se a O.S. ja veio de fora (ex.: painel CEP define serviceOrderNumber antes de
-// rodar este script), NAO pergunta de novo. Rodando sozinho, pergunta normal.
-var serviceOrderNumber = (typeof serviceOrderNumber !== "undefined" && serviceOrderNumber)
-    ? serviceOrderNumber
-    : prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+// Se a O.S. ja veio de fora (o painel CEP define $.global.serviceOrderNumber
+// antes de rodar este script), NAO pergunta de novo. Rodando sozinho, pergunta.
+// IMPORTANTE: checar via $.global -> o "var serviceOrderNumber" abaixo, por
+// hoisting, sombreia o global e fica undefined; checar pelo nome dava sempre o
+// prompt. Pelo $.global pega o valor real que o painel setou.
+if (typeof $.global.serviceOrderNumber === "undefined" || !$.global.serviceOrderNumber) {
+    $.global.serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+}
+var serviceOrderNumber = $.global.serviceOrderNumber;
 
 #include "Flexivel/z_Complementos/Xml_upload.jsx"
 

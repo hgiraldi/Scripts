@@ -11,10 +11,11 @@ var CANDIDATOS_BASE = [
     "/Volumes/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado",          // Mac
     "/Volumes/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado"                 // Mac (outra montagem)
 ];
-// --- pasta Engine (192.168.1.96) que tambem precisa estar conectada ---
+// --- pasta Engine (192.168.1.96) que tambem precisa estar conectada/montada ---
 var CANDIDATOS_ENGINE = [
     "//192.168.1.96/Engine",   // Windows (UNC)
-    "/Volumes/Engine"          // Mac
+    "/Volumes/Engine",         // Mac (montado em /Volumes)
+    "/Engine"                  // Mac (montado na raiz)
 ];
 
 function primeiroQueExiste(lista) {
@@ -23,12 +24,14 @@ function primeiroQueExiste(lista) {
     }
     return null;
 }
-var BASE = primeiroQueExiste(CANDIDATOS_BASE) || CANDIDATOS_BASE[0];
+// resolve o BASE NA HORA (se o share for montado depois, passa a achar).
+function getBase() { return primeiroQueExiste(CANDIDATOS_BASE) || CANDIDATOS_BASE[0]; }
 
-// status das DUAS redes. "OK" se as duas estao acessiveis; senao "OFF|<quais cairam>".
+// status das DUAS PASTAS (resolvido na hora). "OK" se as duas estao ACESSIVEIS
+// (montadas), senao "OFF|<quais nao acessiveis>". So e chamado pelo painel DEPOIS
+// de confirmar que os servidores respondem (TCP), entao isto e rapido (nao trava).
 function statusRede() {
-    var scriptsOk = false;
-    try { scriptsOk = (new File(BASE)).exists; } catch (e) {}
+    var scriptsOk = (primeiroQueExiste(CANDIDATOS_BASE) !== null);
     var engineOk = (primeiroQueExiste(CANDIDATOS_ENGINE) !== null);
     if (scriptsOk && engineOk) return "OK";
     var faltam = [];
@@ -48,7 +51,7 @@ function pingDoc() {
 // le o operacoes.json da REDE (z_Complementos). Editar = atualiza sem reinstalar.
 function lerConfig() {
     try {
-        var f = new File(BASE + "/z_Complementos/operacoes.json");
+        var f = new File(getBase() + "/z_Complementos/operacoes.json");
         if (!f.exists) return "";
         f.encoding = "UTF-8";
         f.open("r");
@@ -63,8 +66,9 @@ function lerConfig() {
 function rodarOperacao(arq, os, pasta) {
     try {
         if (app.documents.length === 0) return "ERRO: nenhum documento aberto.";
+        var BASE = getBase();
         var pastaBase = new File(BASE);
-        if (!pastaBase.exists) return "ERRO: rede inacessivel: " + BASE;
+        if (!pastaBase.exists) return "ERRO: pasta nao montada/acessivel: " + BASE;
 
         $.global.serviceOrderNumber = String(os);
 

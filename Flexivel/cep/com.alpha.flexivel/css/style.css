@@ -64,12 +64,17 @@ body {
 body.alpha-dark #os { background: #0e1830; }
 .hint { font-size: 10px; color: var(--muted); white-space: nowrap; }
 
-/* ===== Operacoes (selecionaveis, SEM scroll) ===== */
-/* 1 coluna por padrao (largura cheia). Se nao couber na ALTURA, o JS adiciona
-   .cols2 -> quebra em 2 colunas (column-wrap) e o painel dobra de largura. */
-.ops { margin: 10px 12px 0; flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 7px; }
-.ops.cols2 { flex-flow: column wrap; align-content: flex-start; align-items: flex-start; }
-.ops.cols2 .op { width: 256px; }
+/* ===== Operacoes (selecionaveis) — agrupadas por SECAO ===== */
+/* Cada secao = titulo (largura cheia) + GRADE de operacoes (auto-fill): 2 colunas
+   quando o painel e largo, 1 quando estreito. As secoes NUNCA quebram entre
+   colunas -> cada uma fica integra. Rolagem so como seguranca (normalmente cabe). */
+.ops { margin: 10px 14px 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 3px; padding-right: 5px; }
+.sec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-bottom: 6px; }
+.ops::-webkit-scrollbar { width: 9px; }
+.ops::-webkit-scrollbar-track { background: transparent; }
+.ops::-webkit-scrollbar-thumb { background: #c2cbe0; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+.ops::-webkit-scrollbar-thumb:hover { background: var(--alpha-blue-3); background-clip: content-box; }
+body.alpha-dark .ops::-webkit-scrollbar-thumb { background: #2c3d5e; background-clip: content-box; }
 .op {
   display: flex; align-items: center; gap: 11px;
   background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius);
@@ -101,12 +106,11 @@ body.alpha-dark .op.sel { background: rgba(22,163,74,.12); }
 
 /* titulo de secao (ex.: "Geral" com CheckList/Cotas) */
 .sec-title {
-  font-size: 9.5px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase;
-  color: var(--alpha-accent); padding: 5px 2px 3px; margin-top: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase;
+  color: var(--alpha-accent); padding: 7px 2px 6px; margin-top: 5px;
   border-bottom: 1px solid var(--line);
 }
 .ops > .sec-title:first-child { margin-top: 0; }
-.ops.cols2 .sec-title { width: 256px; }
 
 /* ===== Botao Executar ===== */
 .btn-exec {
