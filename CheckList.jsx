@@ -1,4 +1,8 @@
-var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+// Se a O.S. ja veio de fora (ex.: painel CEP define serviceOrderNumber antes de
+// rodar este script), NAO pergunta de novo. Rodando sozinho, pergunta normal.
+var serviceOrderNumber = (typeof serviceOrderNumber !== "undefined" && serviceOrderNumber)
+    ? serviceOrderNumber
+    : prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
 
 #include "Flexivel/z_Complementos/Xml_upload.jsx"
 

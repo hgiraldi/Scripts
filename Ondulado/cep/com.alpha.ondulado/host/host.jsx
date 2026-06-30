@@ -60,20 +60,31 @@ function lerConfig() {
 
 // roda uma operacao. 'arq' pode ter VARIOS scripts separados por virgula (rodam
 // em sequencia, ex.: montagem + distorcao). 'os' = O.S.
-function rodarOperacao(arq, os) {
+function rodarOperacao(arq, os, pasta) {
     try {
         if (app.documents.length === 0) return "ERRO: nenhum documento aberto.";
-        var pasta = new File(BASE);
-        if (!pasta.exists) return "ERRO: rede inacessivel: " + BASE;
+        var pastaBase = new File(BASE);
+        if (!pastaBase.exists) return "ERRO: rede inacessivel: " + BASE;
 
         $.global.serviceOrderNumber = String(os);
-        $.global.scriptDirectory = pasta.fsName;
+
+        // pasta == "raiz" -> scripts na RAIZ do Scripts (um nivel acima do BASE),
+        // ex.: CheckList/Cotas. Senao -> z_Complementos do proprio modulo.
+        var dirScripts, dirScriptDir;
+        if (pasta === "raiz") {
+            dirScripts = pastaBase.parent.fsName;       // .../Scripts
+            dirScriptDir = dirScripts;
+        } else {
+            dirScripts = pastaBase.fsName + "/z_Complementos";
+            dirScriptDir = pastaBase.fsName;            // z_pdfs etc. ficam aqui
+        }
+        $.global.scriptDirectory = dirScriptDir;
 
         var arquivos = String(arq).split(",");
         for (var i = 0; i < arquivos.length; i++) {
             var nome = arquivos[i].replace(/^\s+|\s+$/g, "");
             if (!nome) continue;
-            var script = new File(BASE + "/z_Complementos/" + nome);
+            var script = new File(dirScripts + "/" + nome);
             if (!script.exists) return "ERRO: script nao encontrado: " + script.fsName;
             $.evalFile(script);
         }

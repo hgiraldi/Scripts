@@ -1,13 +1,25 @@
 {
-  "operacoes": [
-    { "tipo": "montagem",  "nome": "Montagem",             "desc": "Monta (step-and-repeat) os itens selecionados.", "arq": "1_SR_Montagens.jsx" },
-    { "tipo": "montdist",  "nome": "Montagem + Distorção", "desc": "Monta e aplica a distorção em sequência.",       "arq": "1_SR_Montagens.jsx,3_Distorcao_Alpha.jsx" },
-    { "tipo": "label",     "nome": "Label Alpha",          "desc": "Aplica a etiqueta/label padrão Alpha.",          "arq": "2_Label_Alpha.jsx" },
-    { "tipo": "distorcao", "nome": "Distorção",            "desc": "Aplica a distorção nos itens selecionados.",     "arq": "3_Distorcao_Alpha.jsx" },
-    { "tipo": "numeros",   "nome": "Números Pistas",       "desc": "Insere a numeração das pistas.",                 "arq": "5_Numeros_PPPrintBRL.jsx" },
-    { "tipo": "planta",    "nome": "Planta Grupo Embrasa", "desc": "Gera a planta do grupo Embrasa.",                "arq": "4_Planta_Embrasa.jsx" },
-    { "tipo": "uteis",     "nome": "Úteis",                "desc": "Ferramentas/utilidades diversas do fluxo.",      "arq": "7_Uteis.jsx" },
-    { "tipo": "micro",     "nome": "Micropontos",          "desc": "Aplica os micropontos.",                         "arq": "8_Micropontos.jsx" },
-    { "tipo": "box",       "nome": "Box Valfilm Mg",       "desc": "Gera o box Valfilm a partir da seleção.",        "arq": "9_Box_Valfilm.jsx" }
+  "secoes": [
+    {
+      "titulo": "Flexível",
+      "operacoes": [
+        { "tipo": "montagem",  "nome": "Montagem",             "desc": "Monta (step-and-repeat) os itens selecionados.", "arq": "1_SR_Montagens.jsx" },
+        { "tipo": "montdist",  "nome": "Montagem + Distorção", "desc": "Monta e aplica a distorção em sequência.",       "arq": "1_SR_Montagens.jsx,3_Distorcao_Alpha.jsx" },
+        { "tipo": "label",     "nome": "Label Alpha",          "desc": "Aplica a etiqueta/label padrão Alpha.",          "arq": "2_Label_Alpha.jsx" },
+        { "tipo": "distorcao", "nome": "Distorção",            "desc": "Aplica a distorção nos itens selecionados.",     "arq": "3_Distorcao_Alpha.jsx" },
+        { "tipo": "numeros",   "nome": "Números Pistas",       "desc": "Insere a numeração das pistas.",                 "arq": "5_Numeros_PPPrintBRL.jsx" },
+        { "tipo": "planta",    "nome": "Planta Grupo Embrasa", "desc": "Gera a planta do grupo Embrasa.",                "arq": "4_Planta_Embrasa.jsx" },
+        { "tipo": "uteis",     "nome": "Úteis",                "desc": "Ferramentas/utilidades diversas do fluxo.",      "arq": "7_Uteis.jsx" },
+        { "tipo": "micro",     "nome": "Micropontos",          "desc": "Aplica os micropontos.",                         "arq": "8_Micropontos.jsx" },
+        { "tipo": "box",       "nome": "Box Valfilm Mg",       "desc": "Gera o box Valfilm a partir da seleção.",        "arq": "9_Box_Valfilm.jsx" }
+      ]
+    },
+    {
+      "titulo": "Geral",
+      "operacoes": [
+        { "tipo": "checklist", "nome": "CheckList",   "desc": "Validação + XML do job (usa a O.S. do painel).", "arq": "CheckList.jsx",   "pasta": "raiz" },
+        { "tipo": "cotas",     "nome": "Cotas Alpha", "desc": "Gera as cotas do documento. Não precisa de O.S.", "arq": "Cotas_Alpha.jsx", "pasta": "raiz", "semOS": true }
+      ]
+    }
   ]
 }

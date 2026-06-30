@@ -42,7 +42,10 @@
     planta:   '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 11h7v9M11 4v7h9"/></svg>',
     uteis:    '<svg viewBox="0 0 24 24"><path d="M15.5 6.5a3.2 3.2 0 0 1-4 4l-5 5 1.5 1.5 5-5a3.2 3.2 0 0 0 4-4z"/></svg>',
     micro:    '<svg viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="7" cy="7" r="1.3"/><circle cx="12" cy="7" r="1.3"/><circle cx="17" cy="7" r="1.3"/><circle cx="7" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="17" cy="12" r="1.3"/><circle cx="7" cy="17" r="1.3"/><circle cx="12" cy="17" r="1.3"/><circle cx="17" cy="17" r="1.3"/></g></svg>',
-    box:      '<svg viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>'
+    box:      '<svg viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>',
+    // Geral (CheckList / Cotas)
+    checklist:'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="1.5"/><path d="M9 3.2h6V6H9z" fill="currentColor" stroke="none"/><path d="M8.6 11l1.4 1.4 2.6-2.6M8.6 15.6l1.4 1.4 2.6-2.6"/></svg>',
+    cotas:    '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 5v4M20 5v4"/><path d="M7 14h10M7 12v4M17 12v4"/></svg>'
   };
   var CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
@@ -71,19 +74,30 @@
     setStatus("");
   }
 
-  function montarOps(lista) {
+  function criarOpEl(op) {
+    var el = document.createElement("div");
+    el.className = "op";
+    el.innerHTML =
+      '<div class="ico">' + (ICON[op.tipo] || ICON.faca) + '</div>' +
+      '<div class="meta"><div class="name">' + op.nome + '</div>' +
+      '<div class="desc">' + (op.desc || "") + '</div></div>' +
+      '<span class="check">' + CHECK + '</span>';
+    el.addEventListener("click", function () { selecionar(op, el); });
+    return el;
+  }
+
+  // recebe SECOES: [{ titulo?, operacoes:[...] }]. Sem titulo = grupo sem cabecalho.
+  function montarSecoes(secoes) {
     opsEl.innerHTML = "";
     selecionada = null; selEl = null; execBtn.disabled = true;
-    lista.forEach(function (op) {
-      var el = document.createElement("div");
-      el.className = "op";
-      el.innerHTML =
-        '<div class="ico">' + (ICON[op.tipo] || ICON.faca) + '</div>' +
-        '<div class="meta"><div class="name">' + op.nome + '</div>' +
-        '<div class="desc">' + (op.desc || "") + '</div></div>' +
-        '<span class="check">' + CHECK + '</span>';
-      el.addEventListener("click", function () { selecionar(op, el); });
-      opsEl.appendChild(el);
+    secoes.forEach(function (sec) {
+      if (sec.titulo) {
+        var h = document.createElement("div");
+        h.className = "sec-title";
+        h.textContent = sec.titulo;
+        opsEl.appendChild(h);
+      }
+      (sec.operacoes || []).forEach(function (op) { opsEl.appendChild(criarOpEl(op)); });
     });
     setTimeout(ajustarLargura, 40);
   }
@@ -106,12 +120,13 @@
 
   function executar() {
     if (!selecionada) return;
-    if (!osValido()) { setStatus("Informe a O.S. (7 dígitos).", "err"); osInput.focus(); return; }
+    if (!selecionada.semOS && !osValido()) { setStatus("Informe a O.S. (7 dígitos).", "err"); osInput.focus(); return; }
     execBtn.disabled = true;
     execBtn.classList.add("loading");
     execBtn.textContent = "Executando…";
     setStatus("Executando " + selecionada.nome + "…");
-    evalScript("rodarOperacao(" + q(selecionada.arq) + "," + q(osInput.value) + ")", function (ret) {
+    var pasta = selecionada.pasta || "";
+    evalScript("rodarOperacao(" + q(selecionada.arq) + "," + q(osInput.value) + "," + q(pasta) + ")", function (ret) {
       execBtn.classList.remove("loading");
       execBtn.textContent = "Executar";
       execBtn.disabled = false;
@@ -121,9 +136,14 @@
     });
   }
 
-  function parseOps(txt) {
+  // aceita JSON com "secoes" [{titulo,operacoes}] OU "operacoes" (vira 1 secao).
+  function parseConfig(txt) {
     if (!txt || txt === "__SEM_CEP__" || txt.indexOf("ERRO:") === 0) return null;
-    try { var o = JSON.parse(txt); if (o && o.operacoes && o.operacoes.length) return o.operacoes; } catch (e) {}
+    try {
+      var o = JSON.parse(txt);
+      if (o && o.secoes && o.secoes.length) return o.secoes;
+      if (o && o.operacoes && o.operacoes.length) return [{ operacoes: o.operacoes }];
+    } catch (e) {}
     return null;
   }
 
@@ -132,26 +152,26 @@
   //          3) lista embutida (ultimo fallback).
   function carregarOperacoes() {
     evalScript("lerConfig()", function (ret) {
-      var rede = parseOps(ret);
-      if (rede) { montarOps(rede); return; }      // 1) rede
+      var rede = parseConfig(ret);
+      if (rede) { montarSecoes(rede); return; }    // 1) rede
       carregarBundlado();                          // 2) e 3)
     });
   }
 
   function carregarBundlado() {
     var feito = false;
-    function usar(lista) { if (feito) return; feito = true; montarOps(lista); }
+    function usar(secoes) { if (feito) return; feito = true; montarSecoes(secoes); }
     try {
       var xhr = new XMLHttpRequest();
       xhr.open("GET", "./operacoes.json", true);
       xhr.onreadystatechange = function () {
         if (xhr.readyState !== 4) return;
-        usar(parseOps(xhr.responseText) || OPS_PADRAO);
+        usar(parseConfig(xhr.responseText) || [{ operacoes: OPS_PADRAO }]);
       };
-      xhr.onerror = function () { usar(OPS_PADRAO); };
+      xhr.onerror = function () { usar([{ operacoes: OPS_PADRAO }]); };
       xhr.send();
-      setTimeout(function () { usar(OPS_PADRAO); }, 1500);
-    } catch (e) { usar(OPS_PADRAO); }
+      setTimeout(function () { usar([{ operacoes: OPS_PADRAO }]); }, 1500);
+    } catch (e) { usar([{ operacoes: OPS_PADRAO }]); }
   }
 
   // IPs das redes que precisam estar conectadas (ajuste aqui se mudar).
