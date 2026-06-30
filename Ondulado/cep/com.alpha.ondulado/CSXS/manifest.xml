@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Manifest do painel CEP "Ondulado".
+  Host ILST (Illustrator) versao [26.0,99.9] = 2022 (26.x) em diante.
+  RequiredRuntime CSXS 9.0 = minimo baixo -> carrega em CEP 9/10/11/12.
+  Largura FIXA (380); altura com folga pra caber as operacoes.
+-->
+<ExtensionManifest Version="9.0" ExtensionBundleId="com.alpha.ondulado"
+    ExtensionBundleVersion="0.2.0" ExtensionBundleName="Ondulado"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ExtensionList>
+    <Extension Id="com.alpha.ondulado.panel" Version="0.2.0"/>
+  </ExtensionList>
+  <ExecutionEnvironment>
+    <HostList>
+      <Host Name="ILST" Version="[26.0,99.9]"/>
+    </HostList>
+    <LocaleList>
+      <Locale Code="All"/>
+    </LocaleList>
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="9.0"/>
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="com.alpha.ondulado.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <ScriptPath>./host/host.jsx</ScriptPath>
+          <CEFCommandLine>
+            <Parameter>--allow-file-access-from-files</Parameter>
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
+          </CEFCommandLine>
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>Ondulado</Menu>
+          <Geometry>
+            <Size><Height>760</Height><Width>300</Width></Size>
+            <MinSize><Height>360</Height><Width>280</Width></MinSize>
+            <MaxSize><Height>2400</Height><Width>640</Width></MaxSize>
+          </Geometry>
+          <Icons>
+            <Icon Type="Normal">./img/icon-n.png</Icon>
+            <Icon Type="RollOver">./img/icon-r.png</Icon>
+            <Icon Type="DarkNormal">./img/icon-n.png</Icon>
+            <Icon Type="DarkRollOver">./img/icon-r.png</Icon>
+          </Icons>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>

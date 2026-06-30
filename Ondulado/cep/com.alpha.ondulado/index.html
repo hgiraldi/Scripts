@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ondulado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- HERO (navy, logo branco) -->
+    <header class="hero">
+      <img class="logo" src="./img/logo_alpha.png" alt="Alpha Clicheria"
+           onerror="this.style.display='none';document.getElementById('logoSvg').style.display='block';">
+      <svg id="logoSvg" class="logo logo-fallback" width="46" height="58" viewBox="0 0 64 80" style="display:none">
+        <g fill="#ffffff">
+          <path d="M22 8 C 12 24, 17 40, 19 52 C 14 42, 10 28, 22 8 Z" opacity="0.72"/>
+          <path d="M36 5 C 22 22, 27 39, 31 51 C 34 60, 32 69, 24 73 C 42 70, 53 55, 49 38 C 47 25, 44 14, 36 5 Z"/>
+          <circle cx="47" cy="60" r="12"/>
+        </g>
+      </svg>
+      <h1 class="titulo">SCRIPTS ONDULADO</h1>
+      <p class="subtitle">Automação de pré-impressão flexográfica</p>
+      <div class="conn">
+        <span id="dot" class="dot"></span>
+        <span id="connLbl" class="lbl">verificando…</span>
+      </div>
+    </header>
+
+    <!-- Ordem de Servico -->
+    <section class="card os-card">
+      <label class="field-label" for="os">Nº da Ordem de Serviço</label>
+      <div class="os-row">
+        <input id="os" type="text" inputmode="numeric" maxlength="7" placeholder="0000000" autocomplete="off">
+        <span class="hint">7 díg.</span>
+      </div>
+    </section>
+
+    <!-- Operacoes (selecionaveis; montadas pelo main.js a partir da rede) -->
+    <section class="ops" id="ops"></section>
+
+    <!-- Botao Executar -->
+    <button id="exec" class="btn-exec" disabled>Executar</button>
+
+    <!-- Rodape -->
+    <footer class="footer">
+      <span id="status" class="status"></span>
+      <span class="brandmark"><b>alpha</b> CLICHERIA</span>
+    </footer>
+
+  </div>
+
+  <script src="./js/main.js"></script>
+</body>
+</html>
