@@ -1,7 +1,11 @@
 // ---- mensagem ao usuario ----
-// alert() nativo, igual ao menu antigo (estado estavel: no maximo loopa, NAO
-// crasha). Banner/evento/guardar-msg foram revertidos.
+// Sob o PAINEL CEP: NAO mostra modal. O alert()/Window no motor do CEP NAO
+// bloqueia - o script segue, CONCLUI e grava (CSV/log existem), mas a janela
+// fica ORFA e REAPARECE a cada evalScript (= o "loop"), empilhando ate TRAVAR.
+// Entao, no painel: nada de modal; o painel mostra "concluido" no rodape.
+// Sem painel (menu antigo do Illustrator): alert() nativo normal.
 function msgUsuario(texto, tipo) {
+    if (typeof $.global !== "undefined" && typeof $.global.painelMsg === "function") { return; }
     alert(texto);
 }
 
