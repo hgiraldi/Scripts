@@ -1,10 +1,4 @@
 #include "Xml_upload.jsx"
-// === DIAGNOSTICO (temporario): grava etapa no Desktop/label_debug.txt ===
-function dbg(etapa){try{var f=new File(Folder.desktop+"/label_debug.txt");f.open("a");f.write(etapa+"
-");f.close();}catch(e){}}
-dbg("D inicio Label (Xml_upload OK)");
-
-// msgUsuario(texto, tipo) vem do Xml_upload.jsx (banner no painel / alert no menu antigo).
 
 // Obtém o nome completo do arquivo do script em execução
 var nomeScript = File($.fileName).name;
@@ -1071,22 +1065,16 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     // Altera para a layer "registros" antes de criar o texto
     doc.activeLayer = layerLabel;
 
-    dbg("E antes label()");
     label();
-    dbg("F apos label()");
-
-    msgUsuario("Nao esqueca de jogar o Label na layer correta", "info");
 
 
 
 
 
 
-} else if (coresComuns.length != cores.length) {
-    msgUsuario("Cores do arquivo nao batem com a OS", "erro");
-} else {
-    msgUsuario("Produto nao encontrado no nome do arquivo", "erro");
+
 }
+// Sem aviso/alert: cria o label e segue; o painel mostra "concluido".
 
 
 
@@ -1106,7 +1094,6 @@ function mostrarArrays() {
 
 //mostrarArrays();
 
-dbg("G antes remove layers");
 // Remover camadas vazias
 for (var i = doc.layers.length - 1; i >= 0; i--) {
     var currentLayer = doc.layers[i];
@@ -1152,7 +1139,6 @@ var conteudo = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>' +
 var arquivoTxt = new File(pastaDestino + "/" + nomeArquivoTxt + ".xml");
 
 // Cria o arquivo e escreve o conteúdo
-dbg("H antes XML write (.15)");
 arquivoTxt.open("w");
 arquivoTxt.write(conteudo);
 arquivoTxt.close();
@@ -1182,7 +1168,6 @@ var nomeArquivoTxtCopy = serviceOrderNumber + "_I_Illustrator_Label";
 var destinoDaCopia = new File(folderPathCopy + "/" + nomeArquivoTxtCopy + ".xml");
 
 // Copia o arquivo para o destino
-dbg("I antes copy Engine");
 if (arquivoTxt.copy(destinoDaCopia)) {
 
 } else {
@@ -1216,8 +1201,6 @@ var linhaCSV = resultadoOperadorNome + "," +
 var arquivoCSV = new File(pastaDestino + "/data_records.csv");
 
 // Abre o arquivo CSV para append (adicionar linha ao final)
-dbg("J antes CSV");
 arquivoCSV.open("a");
 arquivoCSV.write(linhaCSV);
 arquivoCSV.close();
-dbg("K FIM (concluiu tudo)");
