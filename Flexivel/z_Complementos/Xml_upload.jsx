@@ -1,21 +1,25 @@
-// ========== GUARDA ANTI-LOOP (CEP reexecuta o script em loop -> congela) ==========
-// Esta e a 1a coisa que roda (Xml_upload e #include no topo de todo script). Se o
-// MESMO script rodou ha < 3s, LANCA um throw -> desmonta o loop antes de qualquer
-// trabalho. A chave e o NOME do script: assim uma SEQUENCIA de scripts diferentes
-// (ex.: Montagem depois Distorcao) passa normal; so a re-execucao do MESMO aborta.
-// Formato do lock: "nomeDoScript|timestamp".
+// ========== GUARDA ANTI-LOOP (SO sob o painel CEP) ==========
+// O CEP reexecuta o script em loop -> congela. Esta trava (1a coisa que roda, pois
+// Xml_upload e #include no topo) aborta a re-execucao do MESMO script em < 3s. Chave
+// = NOME do script: assim Montagem->Distorcao (nomes diferentes) passa; so o MESMO
+// nome em loop aborta. Formato do lock: "nomeDoScript|timestamp".
+// >>> SO sob o PAINEL <<<: no menu antigo TUDO e #include dentro do Scripts.jsx (entao
+// $.fileName = "Scripts.jsx") e NAO ha esse loop; se a trava rodasse la o throw
+// quebraria o fluxo (ex.: montdist inclui o Xml_upload 2x no mesmo Scripts.jsx < 3s).
 var __lkNome = "?"; try { __lkNome = File($.fileName).name; } catch (eNm) {}
-var __lkA = (new Date()).getTime(), __lkU = 0, __lkPrev = "";
-try {
-    var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
-    if (__lkF.exists) {
-        __lkF.open("r"); var __lkRaw = String(__lkF.read()); __lkF.close();
-        var __lkBar = __lkRaw.indexOf("|");
-        if (__lkBar > -1) { __lkPrev = __lkRaw.substring(0, __lkBar); __lkU = parseInt(__lkRaw.substring(__lkBar + 1), 10) || 0; }
-    }
-} catch (eLk) {}
-if (__lkPrev === __lkNome && (__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
-try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(__lkNome + "|" + String(__lkA)); __lkW.close(); } catch (eLk2) {}
+if (__lkNome !== "Scripts.jsx") {
+    var __lkA = (new Date()).getTime(), __lkU = 0, __lkPrev = "";
+    try {
+        var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
+        if (__lkF.exists) {
+            __lkF.open("r"); var __lkRaw = String(__lkF.read()); __lkF.close();
+            var __lkBar = __lkRaw.indexOf("|");
+            if (__lkBar > -1) { __lkPrev = __lkRaw.substring(0, __lkBar); __lkU = parseInt(__lkRaw.substring(__lkBar + 1), 10) || 0; }
+        }
+    } catch (eLk) {}
+    if (__lkPrev === __lkNome && (__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
+    try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(__lkNome + "|" + String(__lkA)); __lkW.close(); } catch (eLk2) {}
+}
 // ===================================================================================
 
 // ---- mensagem ao usuario ----
