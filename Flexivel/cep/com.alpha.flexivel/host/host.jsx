@@ -127,7 +127,14 @@ function rodarOperacao(arq, os, pasta, token) {
             if (!nome) continue;
             var script = new File(dirScripts + "/" + nome);
             if (!script.exists) return "ERRO: script nao encontrado: " + script.fsName;
-            $.evalFile(script);
+            try {
+                $.evalFile(script);
+            } catch (eScript) {
+                // __LOOP_ABORT__ = re-execucao do CEP abortada para ESTE script (nao e
+                // erro): segue p/ o proximo da sequencia (ex.: Montagem+Distorcao).
+                // Qualquer outro erro real sobe pro catch de fora.
+                if (String(eScript).indexOf("__LOOP_ABORT__") === -1) throw eScript;
+            }
         }
         // devolve a msg que o script guardou (ex.: erro de cores) p/ o painel
         // mostrar no rodape SEM modal. "OK|tipo|texto" ou so "OK".

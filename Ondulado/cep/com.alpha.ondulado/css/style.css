@@ -115,13 +115,16 @@ body.alpha-dark .op.sel { background: rgba(22,163,74,.12); }
 /* ===== Banner de mensagem (vem do script via evento CEP) ===== */
 .banner {
   position: fixed; left: 10px; right: 10px; top: 10px; z-index: 50;
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 11px 12px; border-radius: var(--radius-sm);
-  font-size: 12px; font-weight: 600; line-height: 1.35; color: #fff;
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 12px 13px; border-radius: var(--radius-sm);
+  font-size: 12.5px; font-weight: 600; line-height: 1.4; color: #fff;
   box-shadow: var(--shadow-lg); transition: transform var(--t), opacity var(--t);
+  animation: bnrIn .3s cubic-bezier(.2,.8,.2,1);
 }
+.banner-ico { flex: none; font-size: 18px; line-height: 1.15; }
+@keyframes bnrIn { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: translateY(0); } }
 .banner.info { background: linear-gradient(135deg, #178a4a, #16a34a); }
-.banner.erro { background: linear-gradient(135deg, #c0264f, #e0395f); }
+.banner.erro { background: linear-gradient(135deg, #c0264f, #e0395f); box-shadow: 0 10px 26px rgba(192,38,79,.45); }
 .banner-txt { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; padding-top: 2px; }
 .banner-x {
   flex: none; background: rgba(255,255,255,.22); border: none; color: #fff;

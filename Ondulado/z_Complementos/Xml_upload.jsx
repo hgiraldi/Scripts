@@ -1,13 +1,21 @@
 // ========== GUARDA ANTI-LOOP (CEP reexecuta o script em loop -> congela) ==========
-// Esta e a 1a coisa que roda (Xml_upload e #include no topo de todo script). Se
-// rodou ha < 3s, LANCA um throw -> desmonta o loop antes de qualquer trabalho.
-// Clique normal do operador e > 3s, entao passa.
-var __lkA = (new Date()).getTime(), __lkU = 0;
-try { var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
-    if (__lkF.exists) { __lkF.open("r"); __lkU = parseInt(__lkF.read(), 10) || 0; __lkF.close(); }
+// Esta e a 1a coisa que roda (Xml_upload e #include no topo de todo script). Se o
+// MESMO script rodou ha < 3s, LANCA um throw -> desmonta o loop antes de qualquer
+// trabalho. A chave e o NOME do script: assim uma SEQUENCIA de scripts diferentes
+// (ex.: Montagem depois Distorcao) passa normal; so a re-execucao do MESMO aborta.
+// Formato do lock: "nomeDoScript|timestamp".
+var __lkNome = "?"; try { __lkNome = File($.fileName).name; } catch (eNm) {}
+var __lkA = (new Date()).getTime(), __lkU = 0, __lkPrev = "";
+try {
+    var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
+    if (__lkF.exists) {
+        __lkF.open("r"); var __lkRaw = String(__lkF.read()); __lkF.close();
+        var __lkBar = __lkRaw.indexOf("|");
+        if (__lkBar > -1) { __lkPrev = __lkRaw.substring(0, __lkBar); __lkU = parseInt(__lkRaw.substring(__lkBar + 1), 10) || 0; }
+    }
 } catch (eLk) {}
-if ((__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
-try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(String(__lkA)); __lkW.close(); } catch (eLk2) {}
+if (__lkPrev === __lkNome && (__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
+try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(__lkNome + "|" + String(__lkA)); __lkW.close(); } catch (eLk2) {}
 // ===================================================================================
 
 // ---- mensagem ao usuario ----

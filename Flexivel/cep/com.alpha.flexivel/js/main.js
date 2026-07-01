@@ -64,16 +64,19 @@
 
   // ---- banner de mensagem (o script dispara via evento CEP; o painel mostra) ----
   // Evita janelas ScriptUI do Illustrator (que entram em loop pelo CEP).
-  var bannerEl, bannerTxt, bannerTimer = null;
+  var bannerEl, bannerTxt, bannerIco, bannerTimer = null;
   function montarBanner() {
     if (bannerEl) return;
     bannerEl = document.createElement("div");
     bannerEl.className = "banner hidden";
+    bannerIco = document.createElement("span");
+    bannerIco.className = "banner-ico";
     bannerTxt = document.createElement("span");
     bannerTxt.className = "banner-txt";
     var x = document.createElement("button");
     x.className = "banner-x"; x.innerHTML = "&times;";
     x.addEventListener("click", esconderBanner);
+    bannerEl.appendChild(bannerIco);
     bannerEl.appendChild(bannerTxt);
     bannerEl.appendChild(x);
     document.body.appendChild(bannerEl);
@@ -87,10 +90,14 @@
     montarBanner();
     var s = String(data || ""), tipo = "info", texto = s, bar = s.indexOf("|");
     if (bar > -1) { tipo = s.substring(0, bar); texto = s.substring(bar + 1); }
+    var erro = (tipo === "erro");
+    bannerIco.innerHTML = erro ? "&#9888;" : "&#10003;"; // ⚠ erro / ✓ sucesso
     bannerTxt.textContent = texto;
-    bannerEl.className = "banner " + (tipo === "erro" ? "erro" : "info");
+    bannerEl.className = "banner " + (erro ? "erro" : "info");
+    // re-dispara a animacao de entrada mesmo se o banner ja estava na tela
+    if (bannerEl.style) { bannerEl.style.animation = "none"; void bannerEl.offsetWidth; bannerEl.style.animation = ""; }
     if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
-    if (tipo !== "erro") bannerTimer = setTimeout(esconderBanner, 5000);
+    if (!erro) bannerTimer = setTimeout(esconderBanner, 5000); // erro fica fixo (fecha no x)
   }
 
   function setStatus(msg, cls) {
@@ -154,16 +161,21 @@
       execBtn.classList.remove("loading");
       execBtn.textContent = "Executar";
       execBtn.disabled = false;
-      if (ret === "__SEM_CEP__") { setStatus("Painel fora do Illustrator (sem CEP).", "err"); return; }
-      if (ret && ret.indexOf("ERRO:") === 0) { setStatus(ret, "err"); return; }
-      // o script pode devolver uma msg: "OK|tipo|texto". erro -> rodape vermelho;
-      // sucesso/info -> "concluido". Sem modal (evita o alert orfao que loopa).
+      if (ret === "__SEM_CEP__") { mostrarBanner("erro|Painel fora do Illustrator (sem CEP)."); setStatus("Sem CEP.", "err"); return; }
+      if (ret && ret.indexOf("ERRO:") === 0) {
+        var txtErr = ret.replace(/^ERRO:\s*/, "");
+        mostrarBanner("erro|" + txtErr); setStatus(txtErr, "err"); return;
+      }
+      // o script pode devolver uma msg: "OK|tipo|texto". erro -> banner vermelho fixo;
+      // sucesso/info -> banner verde (some em 5s). Sem modal (evita o alert que loopa).
       if (ret && ret.indexOf("OK|") === 0) {
         var msg = ret.substring(3), bar = msg.indexOf("|");
         var tipo = bar > -1 ? msg.substring(0, bar) : "info";
         var texto = bar > -1 ? msg.substring(bar + 1) : msg;
-        if (tipo === "erro") { setStatus(texto, "err"); return; }
+        if (tipo === "erro") { mostrarBanner("erro|" + texto); setStatus(texto, "err"); return; }
+        if (texto) { mostrarBanner("info|" + texto); setStatus(texto, "ok"); return; }
       }
+      mostrarBanner("info|" + selecionada.nome + " concluído.");
       setStatus(selecionada.nome + " — concluído.", "ok");
     });
   }
