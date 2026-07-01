@@ -1294,7 +1294,18 @@ function findMaskBoundsInGroup(grp) {
     return grp.geometricBounds;
 }
 
-function getVisibleBoundsDeep(it) {
+// bounds da folha INCLUINDO o stroke: geometricBounds engordado por METADE da
+// espessura do traco (a "ultima mancha"). NAO usa visibleBounds (que pesa/varia).
+function boundsFolhaComStroke(it) {
+    var gb = it.geometricBounds; // [left, top, right, bottom]
+    var sw = 0;
+    try { if (it.stroked && it.strokeWidth) sw = it.strokeWidth / 2; } catch (e) {}
+    if (sw > 0) return [gb[0] - sw, gb[1] + sw, gb[2] + sw, gb[3] - sw];
+    return gb;
+}
+
+// recursao dos bounds. soVisiveis=true -> ignora none/branco cromia 0,0,0,0 no TAMANHO.
+function boundsDeep(it, soVisiveis) {
 
     if (!it || it.hidden || it.locked) return null;
 
@@ -1312,68 +1323,54 @@ function getVisibleBoundsDeep(it) {
                     var child = it.pageItems[j];
 
                     if (child.typename === "PathItem") {
-                        try {
-                            if (child.clipping) continue;
-                        } catch (e0) {}
+                        try { if (child.clipping) continue; } catch (e0) {}
                     }
 
                     if (child.typename === "CompoundPathItem") {
-
                         var isMask = false;
-
                         try {
                             for (var kk = 0; kk < child.pathItems.length; kk++) {
-
-                                var pp = child.pathItems[kk];
-
-                                try {
-                                    if (pp.clipping) {
-                                        isMask = true;
-                                        break;
-                                    }
-                                } catch (e01) {}
-
+                                try { if (child.pathItems[kk].clipping) { isMask = true; break; } } catch (e01) {}
                             }
                         } catch (e02) {}
-
                         if (isMask) continue;
                     }
 
-                    if (shouldIgnoreItemByStyle(child) && child.typename !== "GroupItem") continue;
+                    if (soVisiveis && shouldIgnoreItemByStyle(child) && child.typename !== "GroupItem") continue;
 
-                    var cb = getVisibleBoundsDeep(child);
-                    childrenB = unionBounds(childrenB, cb);
+                    childrenB = unionBounds(childrenB, boundsDeep(child, soVisiveis));
                 }
 
                 if (!childrenB) return null;
-
                 var inter = intersectBounds(maskB, childrenB);
                 return inter ? inter : null;
             }
 
             var b = null;
-
             for (var i = 0; i < it.pageItems.length; i++) {
-
                 var child2 = it.pageItems[i];
-
-                if (shouldIgnoreItemByStyle(child2) && child2.typename !== "GroupItem") continue;
-
-                var cb2 = getVisibleBoundsDeep(child2);
-                b = unionBounds(b, cb2);
+                if (soVisiveis && shouldIgnoreItemByStyle(child2) && child2.typename !== "GroupItem") continue;
+                b = unionBounds(b, boundsDeep(child2, soVisiveis));
             }
-
             return b;
         }
 
-        if (shouldIgnoreItemByStyle(it)) return null;
+        if (soVisiveis && shouldIgnoreItemByStyle(it)) return null;
 
-        // visibleBounds = inclui o STROKE (o que estamos vendo como ultima mancha).
-        return it.visibleBounds;
+        return boundsFolhaComStroke(it);
 
     } catch (e) {
         return null;
     }
+}
+
+// TAMANHO do grupo pro cut: 1o tenta SO o visivel (ignora none/0,0,0,0, conta stroke).
+// Se a exclusao ZERAR o grupo (ex.: dentro da mascara so sobrou 0,0,0,0), FAZ FALLBACK
+// e conta tudo (baseline) -> o grupo NUNCA some; so nao soma o invisivel quando da.
+function getVisibleBoundsDeep(it) {
+    var r = boundsDeep(it, true);
+    if (r) return r;
+    return boundsDeep(it, false);
 }
 
 // coleta os bounds da arte p/ COLISAO, CLIPADOS a mascara: recorta cada item-folha ao
