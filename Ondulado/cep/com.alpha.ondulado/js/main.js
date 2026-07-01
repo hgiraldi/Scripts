@@ -11,12 +11,6 @@
 
   var cep = window.__adobe_cep__;
 
-  // DEBUG TEMP (modo teste): loga no Desktop/label_debug.txt quem dispara o quê.
-  function dbgFile(m) {
-    try { var fs = require("fs"), os = require("os");
-      fs.appendFileSync(os.homedir() + "/Desktop/label_debug.txt", m + "\n"); } catch (e) {}
-  }
-
   function evalScript(src, cb) {
     if (!cep) { if (cb) cb("__SEM_CEP__"); return; }
     cep.evalScript(src, cb || function () {});
@@ -146,8 +140,7 @@
 
   function executar() {
     if (!selecionada) return;
-    if (ocupado) { dbgFile("!! MAIN.executar IGNORADO (ocupado)"); return; } // nao re-entra
-    dbgFile(">>> MAIN.executar '" + selecionada.arq + "' @" + Date.now());
+    if (ocupado) return; // nao re-entra enquanto uma operacao roda
     if (!selecionada.semOS && !osValido()) { setStatus("Informe a O.S. (7 dígitos).", "err"); osInput.focus(); return; }
     execBtn.disabled = true;
     execBtn.classList.add("loading");

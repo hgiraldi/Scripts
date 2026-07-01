@@ -100,7 +100,6 @@ function rodarOperacao(arq, os, pasta, token) {
             if (token && __last === String(token)) { return "OK"; }
             __tk.open("w"); __tk.write(String(token)); __tk.close();
         } catch (eTk) {}
-        try{var __df=new File(Folder.desktop+"/label_debug.txt");__df.open("a");__df.writeln(">> HOST.rodarOperacao('"+arq+"') token="+token+" @"+(new Date()).getTime());__df.close();}catch(eDbg){} // DEBUG TEMP
         if (app.documents.length === 0) return "ERRO: nenhum documento aberto.";
         var BASE = getBase();
         var pastaBase = new File(BASE);
