@@ -1308,9 +1308,14 @@ function findMaskBoundsInGroup(grp) {
     return grp.geometricBounds;
 }
 
-// bounds da folha INCLUINDO o stroke: geometricBounds engordado por METADE da
-// espessura do traco (a "ultima mancha"). NAO usa visibleBounds (que pesa/varia).
+// bounds da folha INCLUINDO o stroke (a "ultima mancha" que se ve). Usa visibleBounds,
+// que ja considera a espessura do traco (e efeitos). Se falhar por algum motivo, cai
+// no geometricBounds engordado por METADE da espessura do traco.
 function boundsFolhaComStroke(it) {
+    try {
+        var vb = it.visibleBounds;
+        if (vb && vb.length === 4) return vb;
+    } catch (eVb) {}
     var gb = it.geometricBounds; // [left, top, right, bottom]
     var sw = 0;
     try { if (it.stroked && it.strokeWidth) sw = it.strokeWidth / 2; } catch (e) {}
