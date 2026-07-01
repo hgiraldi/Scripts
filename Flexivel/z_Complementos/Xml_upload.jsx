@@ -1,3 +1,15 @@
+// ========== GUARDA ANTI-LOOP (CEP reexecuta o script em loop -> congela) ==========
+// Esta e a 1a coisa que roda (Xml_upload e #include no topo de todo script). Se
+// rodou ha < 3s, LANCA um throw -> desmonta o loop antes de qualquer trabalho.
+// Clique normal do operador e > 3s, entao passa.
+var __lkA = (new Date()).getTime(), __lkU = 0;
+try { var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
+    if (__lkF.exists) { __lkF.open("r"); __lkU = parseInt(__lkF.read(), 10) || 0; __lkF.close(); }
+} catch (eLk) {}
+if ((__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
+try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(String(__lkA)); __lkW.close(); } catch (eLk2) {}
+// ===================================================================================
+
 // ---- mensagem ao usuario ----
 // Sob o PAINEL CEP: NAO mostra modal (alert no motor do CEP nao bloqueia, fica
 // ORFAO e reaparece a cada evalScript = loop, empilha ate travar). So GUARDA a

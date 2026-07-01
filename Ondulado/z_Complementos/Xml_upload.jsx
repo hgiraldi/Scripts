@@ -1,3 +1,15 @@
+// ========== GUARDA ANTI-LOOP (CEP reexecuta o script em loop -> congela) ==========
+// Esta e a 1a coisa que roda (Xml_upload e #include no topo de todo script). Se
+// rodou ha < 3s, LANCA um throw -> desmonta o loop antes de qualquer trabalho.
+// Clique normal do operador e > 3s, entao passa.
+var __lkA = (new Date()).getTime(), __lkU = 0;
+try { var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
+    if (__lkF.exists) { __lkF.open("r"); __lkU = parseInt(__lkF.read(), 10) || 0; __lkF.close(); }
+} catch (eLk) {}
+if ((__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
+try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(String(__lkA)); __lkW.close(); } catch (eLk2) {}
+// ===================================================================================
+
 // ---- mensagem ao usuario ----
 // Sob o PAINEL CEP: NAO mostra modal (alert no motor do CEP nao bloqueia, fica
 // ORFAO e reaparece a cada evalScript = loop, empilha ate travar). So GUARDA a
@@ -61,6 +73,7 @@ function getFolderPath() {
 
     return folderPath;
 }
+
 
 
 function getLatestXMLFile(folderPath) {
@@ -263,37 +276,13 @@ if (operador) {
     resultadoOperador = "Sem Entrada";
 }
 
-//==========ONDULADO===========//
-if (depto == "ondulado") {
-    var tipoFaca = jsonObject.Job[0].Ondulado[0].@attributes.Tipo;
-    var maquina = jsonObject.Job[0].Ondulado[0].@attributes.maquina;
-    var perfilMaq = jsonObject.Job[0].Ondulado[0].@attributes.perfil;
-    var altP = jsonObject.Job[0].Ondulado[0].@attributes.AltP;
-    var larP = jsonObject.Job[0].Ondulado[0].@attributes.LarP;
-    var medIntC = jsonObject.Job[0].Ondulado[0].@attributes.MedIntC;
-    var medIntL = jsonObject.Job[0].Ondulado[0].@attributes.MedIntL;
-    var medIntA = jsonObject.Job[0].Ondulado[0].@attributes.MedIntA;
-    var onda = jsonObject.Job[0].Ondulado[0].@attributes.Onda;
-    var ladoLap = jsonObject.Job[0].Ondulado[0].@attributes.LadoLap;
-    var larLap = jsonObject.Job[0].Ondulado[0].@attributes.Larlap;
-    var pnlLap = jsonObject.Job[0].Ondulado[0].@attributes.PnlLap;
-    var altAbaS = jsonObject.Job[0].Ondulado[0].@attributes.AltAbaS;
-    var altAbaP = jsonObject.Job[0].Ondulado[0].@attributes.AltAbaP;
-    var altAbaI = jsonObject.Job[0].Ondulado[0].@attributes.AltAbaI;
-    var pnl1 = jsonObject.Job[0].Ondulado[0].@attributes.P1;
-    var pnl2 = jsonObject.Job[0].Ondulado[0].@attributes.P2;
-    var pnl3 = jsonObject.Job[0].Ondulado[0].@attributes.P3;
-    var pnl4 = jsonObject.Job[0].Ondulado[0].@attributes.P4;
-}
-
-
+//Ondulado
 var cp = produtoComUnderline.split("_")[0];
 var rev = produtoComUnderline.split("_")[1];
 var v = produtoComUnderline.split("_")[2];
 var clienteOnd = nomeArte.split("-")[0];
 var ref = nomeArte.split("-")[1];
 var medInt = nomeArte.split("-")[2];
-
 //Original
 var tipoOriginal = "proprio";
 
@@ -306,7 +295,7 @@ if (supplied && supplied.toLowerCase().indexOf("via e-mail") !== -1) {
 var tipoCliche = "";
 var temRepremont = false;
 
-// verifica RS ou RC --- repremontagem e gravação
+// verifica RS ou RC
 if (
     requested &&
     (requested.indexOf("RS") !== -1 || requested.indexOf("RC") !== -1)
@@ -390,6 +379,7 @@ for (i = cores.length - 1; i >= 0; i--) {
     if (cores[i] === "X" || cores[i] === "W" || cores[i] === "Z" || cores[i] === "All" || cores[i].indexOf("##") !== -1) {
         cores.splice(i, 1);
         dotShape.splice(i, 1);
+        referenciaCor.splice(i, 1);
         coresD.splice(i, 1);
         uScreen.splice(i, 1);
         coresSemVernizBranco.splice(i, 1);

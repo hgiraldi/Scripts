@@ -135,6 +135,7 @@ function rodarOperacao(arq, os, pasta, token) {
         var __m = $.global.__msgPainel || "";
         return __m ? ("OK|" + __m) : "OK";
     } catch (e) {
+        if (String(e).indexOf("__LOOP_ABORT__") !== -1) return "OK"; // re-run do loop abortado (nao e erro)
         return "ERRO: " + e.toString() + (e.line ? (" (linha " + e.line + ")") : "");
     }
 }
