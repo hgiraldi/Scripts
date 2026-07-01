@@ -2,6 +2,9 @@
 function dbg(m){try{var f=new File(Folder.desktop+"/label_debug.txt");f.open("a");f.writeln(m);f.close();}catch(e){}}
 dbg("========== NOVA EXECUCAO " + (new Date()).getTime() + " ==========");
 dbg("E label inicio (Xml_upload OK)");
+dbg("STACK: " + String($.stack).replace(/[
+]+/g," || "));
+dbg("DOC: " + (app.documents.length?app.activeDocument.name:"(nenhum)"));
 
 // Obtém o nome completo do arquivo do script em execução
 var nomeScript = File($.fileName).name;
