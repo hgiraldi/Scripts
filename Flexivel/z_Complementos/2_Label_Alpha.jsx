@@ -1058,6 +1058,7 @@ function label(cust) {
 dbg("E6 antes if principal");
 var nomeArquivo = app.activeDocument.name;
 if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == cores.length)) {
+    dbg("E7 ENTROU no if");
     // Criando o texto no Illustrator somente se o produto estiver no nome do arquivo
     var doc = app.activeDocument;
 
@@ -1071,6 +1072,7 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     }
 
     // Altera para a layer "registros" antes de criar o texto
+    dbg("E7b antes doc.activeLayer");
     doc.activeLayer = layerLabel;
 
     // Suprime dialogos do Illustrator durante a geracao (fonte ausente, avisos,
@@ -1113,6 +1115,7 @@ function mostrarArrays() {
 
 //mostrarArrays();
 
+dbg("W0 FORA do if (condicao falsa?), antes remove layers");
 // Remover camadas vazias
 for (var i = doc.layers.length - 1; i >= 0; i--) {
     var currentLayer = doc.layers[i];
@@ -1158,6 +1161,7 @@ var conteudo = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>' +
 var arquivoTxt = new File(pastaDestino + "/" + nomeArquivoTxt + ".xml");
 
 // Cria o arquivo e escreve o conteúdo
+dbg("W1 antes XML write .15");
 arquivoTxt.open("w");
 arquivoTxt.write(conteudo);
 arquivoTxt.close();
@@ -1187,6 +1191,7 @@ var nomeArquivoTxtCopy = serviceOrderNumber + "_I_Illustrator_Label";
 var destinoDaCopia = new File(folderPathCopy + "/" + nomeArquivoTxtCopy + ".xml");
 
 // Copia o arquivo para o destino
+dbg("W2 antes copy Engine");
 if (arquivoTxt.copy(destinoDaCopia)) {
 
 } else {
@@ -1220,6 +1225,7 @@ var linhaCSV = resultadoOperadorNome + "," +
 var arquivoCSV = new File(pastaDestino + "/data_records.csv");
 
 // Abre o arquivo CSV para append (adicionar linha ao final)
+dbg("W3 antes CSV");
 arquivoCSV.open("a");
 arquivoCSV.write(linhaCSV);
 arquivoCSV.close();
