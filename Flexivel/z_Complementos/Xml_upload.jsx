@@ -22,6 +22,13 @@ if (__lkNome !== "Scripts.jsx") {
 }
 // ===================================================================================
 
+// Limpa lixo antigo do Desktop (versoes anteriores gravavam la): alpha_token.txt (o
+// host.jsx antigo ainda cria) e alpha_run_lock.txt (agora vai pra Folder.temp). Como
+// este script vem da REDE e roda em toda operacao, os txt somem em qualquer maquina
+// SEM precisar reinstalar o painel.
+try { var __liT = new File(Folder.desktop + "/alpha_token.txt"); if (__liT.exists) __liT.remove(); } catch (eLiT) {}
+try { var __liL = new File(Folder.desktop + "/alpha_run_lock.txt"); if (__liL.exists) __liL.remove(); } catch (eLiL) {}
+
 // ---- mensagem ao usuario ----
 // Sob o PAINEL CEP: NAO mostra modal (alert no motor do CEP nao bloqueia, fica
 // ORFAO e reaparece a cada evalScript = loop, empilha ate travar). So GUARDA a
