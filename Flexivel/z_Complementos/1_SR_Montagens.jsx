@@ -69,6 +69,19 @@ var newArtboardRect = [
     -(alturaArtboard / 2) // bottom (note o sinal negativo aqui)
 ];
 
+// DIAG TEMP (achar o 'AOoc' da linha 72): grava os valores do artboard. Remover depois.
+try {
+    var __dm = new File(Folder.desktop + "/label_debug.txt");
+    __dm.open("a");
+    __dm.writeln("MONTAGEM rect=[" + newArtboardRect.join(", ") + "]"
+        + " | alturaAB=" + alturaArtboard + " larguraAB=" + larguraArtboard
+        + " | cylinderSize=" + cylinderSize + " desloc=" + displacementBetweenLanes
+        + " distRetangulos=" + distanceBetweenRectangles
+        + " | objW=" + objectWidth + " objH=" + objectHeight + " lanes=" + lanes + " reps=" + repetitions
+        + " sizeCameron=" + sizeCameron + " distCameron=" + distanceCameron);
+    __dm.close();
+} catch (eDm) {}
+
 doc.artboards[0].artboardRect = newArtboardRect;
 
 // Selecionar toda a camada "arte"
