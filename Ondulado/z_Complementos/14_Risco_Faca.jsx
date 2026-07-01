@@ -1,5 +1,9 @@
 #include "Xml_upload.jsx"
 
+// DIAG TEMP: rastreia onde o Risco para (grava em Desktop/risco_debug.txt). Remover depois.
+function dbgRisco(m){try{var f=new File(Folder.desktop+"/risco_debug.txt");f.open("a");f.writeln(String(m)+" @"+(new Date()).getTime());f.close();}catch(e){}}
+dbgRisco("== RISCO start");
+
 /* ========= Helpers ========= */
 function getDataAtualFormatada() {
     var hoje = new Date();
@@ -2118,6 +2122,7 @@ function getLayersFonteRisco(doc, arte) {
 
 // --- cria os quadrados (cut) e registros (+/x) - 1 por grupo da arte/medidas ---
 function criarRiscosArte(doc) {
+    dbgRisco("criarRiscosArte: entrou");
     // Imagem nao gera risco: avisa (sem bloquear) que cada cor da imagem deve
     // virar um quadrado de cromia na "arte"/"medidas". A layer de imagens fica fora.
     if (docTemImagem(doc)) {
@@ -2136,6 +2141,7 @@ function criarRiscosArte(doc) {
     nomeLayerArte = arte.name;
     nomesLayersRisco = [];
     for (var _nf = 0; _nf < fontesRisco.length; _nf++) nomesLayersRisco.push(fontesRisco[_nf].name);
+    dbgRisco("fontesRisco=" + fontesRisco.length + " (arte='" + nomeLayerArte + "')");
 
     var margens = getMargensCliente(); // [left, top, right, bottom] em pt (por cliente, via JSON)
     margensCut = margens; // o label pode ocupar a area do cut (com a margem), sem crescer o cut
@@ -2200,6 +2206,8 @@ function criarRiscosArte(doc) {
             });
         }
     }
+
+    dbgRisco("grupos coletados=" + grupos.length);
 
     // ===== PASSO 2: encaixes (cores DIFERENTES com folga <= 15mm) =====
     var pares = [];
@@ -2516,7 +2524,9 @@ function recolorirRegistro(grupo, corPreta) {
     }
 }
 
+dbgRisco("== antes criarRiscosArte");
 criarRiscosArte(doc);
+dbgRisco("== depois criarRiscosArte");
 
 
 
