@@ -8,6 +8,19 @@ var nomeScript = File($.fileName).name;
 // Salvar o objeto selecionado em uma variável
 var selectedObject = app.activeDocument.selection[0];
 
+// ===== VALIDACAO ANTES DE MEXER NO DOCUMENTO =====
+// Sem isto, uma O.S. sem dados de montagem no XML (pistas/repeticoes/pacote/cilindro
+// vazios) faria o script APAGAR o objeto original (selectedObject.remove, mais abaixo)
+// e quebrar no artboard com o erro cru 'AOoc' (linha ~72). Aqui paramos ANTES de tocar
+// no documento, com aviso claro. throw de string -> rodape (painel) / aviso (menu antigo).
+if (!selectedObject) {
+    throw "Montagem: nenhum objeto selecionado. Selecione a arte antes de montar.";
+}
+if (!(lanes >= 1) || !(repetitions >= 1) || !(objectWidth > 0) || !(objectHeight > 0) || !isFinite(cylinderSize) || !(cylinderSize > 0)) {
+    throw "Montagem: a O.S. nao tem dados de montagem (pistas=" + lanes + ", repeticoes=" + repetitions + ", cilindro=" + cylinderSizeMM + "mm). Verifique Cilindro/Pacote/Repeticoes no XML da O.S.";
+}
+// =================================================
+
 //Verificar posicao do arquivo
 if ((objectHeight >= objectWidth) && (selectedObject.height >= selectedObject.width)) {
 
@@ -68,19 +81,6 @@ var newArtboardRect = [
     larguraArtboard, // right
     -(alturaArtboard / 2) // bottom (note o sinal negativo aqui)
 ];
-
-// DIAG TEMP (achar o 'AOoc' da linha 72): grava os valores do artboard. Remover depois.
-try {
-    var __dm = new File(Folder.desktop + "/label_debug.txt");
-    __dm.open("a");
-    __dm.writeln("MONTAGEM rect=[" + newArtboardRect.join(", ") + "]"
-        + " | alturaAB=" + alturaArtboard + " larguraAB=" + larguraArtboard
-        + " | cylinderSize=" + cylinderSize + " desloc=" + displacementBetweenLanes
-        + " distRetangulos=" + distanceBetweenRectangles
-        + " | objW=" + objectWidth + " objH=" + objectHeight + " lanes=" + lanes + " reps=" + repetitions
-        + " sizeCameron=" + sizeCameron + " distCameron=" + distanceCameron);
-    __dm.close();
-} catch (eDm) {}
 
 doc.artboards[0].artboardRect = newArtboardRect;
 
