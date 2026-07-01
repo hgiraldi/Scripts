@@ -1,5 +1,17 @@
 #include "Xml_upload.jsx"
 
+// cabVal(fn): valor da funcao; se a variavel faltar na O.S. (ou der QUALQUER erro) -> ""
+// (vazio). Evita que "variavel faltando" (ex.: O.S. sem onda) pare o script -> o campo
+// do cabecalho fica em branco e o Risco segue normal. Mesma logica do Preenchimento.
+function cabVal(fn) {
+    try {
+        var r = fn();
+        return (r === undefined || r === null) ? "" : r;
+    } catch (e) {
+        return "";
+    }
+}
+
 /* ========= Helpers ========= */
 function getDataAtualFormatada() {
     var hoje = new Date();
@@ -865,32 +877,34 @@ if (cores.length > 1) {
     //alert("ARQUIVO DE UMA COR, NÃO PRECISA DE SEPARAÇÃO")
 }
 
-var partesNome = resultadoOperadorNome.split(" ");
+var partesNome = (typeof resultadoOperadorNome !== "undefined" && resultadoOperadorNome)
+    ? String(resultadoOperadorNome).split(" ") : [];
 
+// cada valor passa pelo cabVal(...) -> se faltar na O.S. (ex.: onda), fica vazio.
 var mapping = {
-    "cliente": cliente,
-    "ref": ref,
-    "descr": clienteOnd,
-    "medint": medInt,
-    "fi": np,
-    "Cor1": cores[0] || "",
-    "Cor2": cores[1] || "",
-    "Cor3": cores[2] || "",
-    "Cor4": cores[3] || "",
-    "Cor5": cores[4] || "",
-    "Cor6": cores[5] || "",
-    "data": getDataAtualFormatada(),
-    "rep": repetitions,
-    "pist": lanes,
-    "onda": onda,
-    "os": serviceOrderNumber,
-    "esp": espessura,
-    "cp": cp,
-    "rev": rev.split("v")[1],
-    "v": v.split("v")[1],
-    "q": q,
-    "maq": (maquina ? primeirasDuasPalavras(maquina) : ""),
-    "operador": partesNome.slice(0, 2).join(" ")
+    "cliente": cabVal(function(){ return cliente; }),
+    "ref": cabVal(function(){ return ref; }),
+    "descr": cabVal(function(){ return clienteOnd; }),
+    "medint": cabVal(function(){ return medInt; }),
+    "fi": cabVal(function(){ return np; }),
+    "Cor1": cabVal(function(){ return cores[0]; }),
+    "Cor2": cabVal(function(){ return cores[1]; }),
+    "Cor3": cabVal(function(){ return cores[2]; }),
+    "Cor4": cabVal(function(){ return cores[3]; }),
+    "Cor5": cabVal(function(){ return cores[4]; }),
+    "Cor6": cabVal(function(){ return cores[5]; }),
+    "data": cabVal(function(){ return getDataAtualFormatada(); }),
+    "rep": cabVal(function(){ return repetitions; }),
+    "pist": cabVal(function(){ return lanes; }),
+    "onda": cabVal(function(){ return onda; }),
+    "os": cabVal(function(){ return serviceOrderNumber; }),
+    "esp": cabVal(function(){ return espessura; }),
+    "cp": cabVal(function(){ return cp; }),
+    "rev": cabVal(function(){ return rev.split("v")[1]; }),
+    "v": cabVal(function(){ return v.split("v")[1]; }),
+    "q": cabVal(function(){ return q; }),
+    "maq": cabVal(function(){ return maquina ? primeirasDuasPalavras(maquina) : ""; }),
+    "operador": cabVal(function(){ return partesNome.slice(0, 2).join(" "); })
 };
 
 var doc = app.activeDocument;
@@ -3090,9 +3104,9 @@ function criarEtiquetaCentro(docAlvo, indiceCor) {
 function criarEtiquetaDeCor(docAlvo, indiceCor) {
     var qtdc = (indiceCor + 1) + "/" + cores.length;
     var mapaCor = {
-        "cor": cores[indiceCor],
-        "ref": ref,
-        "descr": clienteOnd,
+        "cor": cabVal(function(){ return cores[indiceCor]; }),
+        "ref": cabVal(function(){ return ref; }),
+        "descr": cabVal(function(){ return clienteOnd; }),
         "qtdc": qtdc
     };
 
@@ -3125,21 +3139,21 @@ function criarEtiquetaDeCor(docAlvo, indiceCor) {
 
 // --- cria as 2 etiquetas Penha (1/4 e 3/4) para a cor indiceCor ---
 function criarEtiquetasPenha(docAlvo, indiceCor) {
-    var fiBarra = extrairAntesDaBarra(np);
-    var codcorAtual = extrairDepoisDaBarraSeguro(referenciaCor[indiceCor]);
+    var fiBarra = cabVal(function(){ return extrairAntesDaBarra(np); });
+    var codcorAtual = cabVal(function(){ return extrairDepoisDaBarraSeguro(referenciaCor[indiceCor]); });
     var qtdc = (indiceCor + 1) + "/" + cores.length;
 
     // Tokens [[...]] do template (keys sem colchetes; replaceInTextFrames cuida do regex)
     var mapaPenha = {
-        "cor": cores[indiceCor],
-        "data": getDataAtualFormatada(),
-        "esp": espessura,
-        "maq": (maquina ? primeirasDuasPalavras(maquina) : ""),
+        "cor": cabVal(function(){ return cores[indiceCor]; }),
+        "data": cabVal(function(){ return getDataAtualFormatada(); }),
+        "esp": cabVal(function(){ return espessura; }),
+        "maq": cabVal(function(){ return maquina ? primeirasDuasPalavras(maquina) : ""; }),
         "fi/": fiBarra,
         "codcor": codcorAtual,
-        "lpc": lpc,
+        "lpc": cabVal(function(){ return lpc; }),
         "qtdc": qtdc,
-        "loc": localizacaoPenha
+        "loc": cabVal(function(){ return localizacaoPenha; })
     };
 
     var grupoNoAlvo = abrirTemplateParaDoc(
