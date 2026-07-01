@@ -146,6 +146,7 @@
 
   function executar() {
     if (!selecionada) return;
+    if (ocupado) { dbgFile("!! MAIN.executar IGNORADO (ocupado)"); return; } // nao re-entra
     dbgFile(">>> MAIN.executar '" + selecionada.arq + "' @" + Date.now());
     if (!selecionada.semOS && !osValido()) { setStatus("Informe a O.S. (7 dígitos).", "err"); osInput.focus(); return; }
     execBtn.disabled = true;
@@ -153,8 +154,9 @@
     execBtn.textContent = "Executando…";
     setStatus("Executando " + selecionada.nome + "…");
     var pasta = selecionada.pasta || "";
+    var token = String(Date.now()); // token unico deste clique (anti re-execucao do CEP)
     ocupado = true; // pausa o poll de rede enquanto o script roda (dialogos!)
-    evalScript("rodarOperacao(" + q(selecionada.arq) + "," + q(osInput.value) + "," + q(pasta) + ")", function (ret) {
+    evalScript("rodarOperacao(" + q(selecionada.arq) + "," + q(osInput.value) + "," + q(pasta) + "," + q(token) + ")", function (ret) {
       ocupado = false;
       execBtn.classList.remove("loading");
       execBtn.textContent = "Executar";
