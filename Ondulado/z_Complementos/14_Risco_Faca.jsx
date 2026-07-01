@@ -981,8 +981,8 @@ function corPredominanteDoGrupo(grupo) {
         if (!cor) return;
         if (cor.typename === "SpotColor" && cor.spot) {
             var nm = cor.spot.name;
-            if (corEhBrancoNome(nm)) return;
-            if (spotEhBranco(cor.spot)) return;
+            if (corEhBrancoNome(nm)) return; // so [none]/[registration] fica de fora;
+            // branco spot CONTA (imprime tinta) - por isso NAO checo spotEhBranco aqui.
             contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
             return;
         }
@@ -1218,26 +1218,25 @@ function intersectBounds(a, b) {
     return [left, top, right, bottom];
 }
 
-// --- cor "invisivel" p/ o cut: sem tinta = none, CMYK 0,0,0,0, Gray 0, RGB branco,
-// ou spot branco/none (reusa corEhBrancoNome/spotEhBranco). Esses NAO contam pro cut. ---
+// --- cor "invisivel" (NAO conta pro cut nem pra cor prioritaria):
+//   [none] (NoColor / nome tecnico), branco PROCESS (CMYK 0,0,0,0 / Gray 0 / RGB
+//   branco). SPOT SEMPRE conta (inclusive branco spot, que imprime tinta) - so olho
+//   o NOME tecnico ([none]/[registration]), nunca o valor do spot. ---
 function corEhInvisivel(cor) {
-    if (!cor) return true;
+    if (!cor) return true;                 // sem cor = [none]
     var t = cor.typename;
-    if (t === "NoColor") return true;
+    if (t === "NoColor") return true;      // [none]
+    if (t === "SpotColor" && cor.spot) {
+        return corEhBrancoNome(cor.spot.name); // so [none]/[registration] fica de fora
+    }
     if (t === "CMYKColor") return (cor.cyan === 0 && cor.magenta === 0 && cor.yellow === 0 && cor.black === 0);
     if (t === "GrayColor") return (cor.gray === 0);
     if (t === "RGBColor") return (cor.red === 255 && cor.green === 255 && cor.blue === 255);
-    if (t === "SpotColor" && cor.spot) {
-        if (corEhBrancoNome(cor.spot.name)) return true;
-        if (spotEhBranco(cor.spot)) return true;
-        try { if (cor.tint === 0) return true; } catch (eT) {}
-        return false;
-    }
     return false;
 }
 
-// --- item TEM pintura visivel? fill OU stroke com tinta de verdade (nao branco/none).
-// E o que decide se o item entra no tamanho do cut ("contar o que estamos vendo"). ---
+// --- item TEM pintura visivel? fill OU stroke com tinta de verdade. Decide se o
+// item entra no tamanho do cut ("contar o que estamos vendo"). ---
 function itemTemPintura(it) {
     var fillVis = false, strokeVis = false;
     try { fillVis = it.filled && !corEhInvisivel(it.fillColor); } catch (e1) {}
@@ -1253,7 +1252,7 @@ function shouldIgnoreItemByStyle(it) {
 
     if (it.typename === "PathItem") {
         try {
-            // ignora sem pintura visivel: none OU fill/stroke branco 0,0,0,0
+            // ignora sem pintura visivel: [none] ou branco process 0,0,0,0 (spot conta)
             if (!itemTemPintura(it)) return true;
         } catch (e1) {}
         return false;
