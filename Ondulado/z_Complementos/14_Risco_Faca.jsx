@@ -1,9 +1,5 @@
 #include "Xml_upload.jsx"
 
-// DIAG TEMP: rastreia onde o Risco para (grava em Desktop/risco_debug.txt). Remover depois.
-function dbgRisco(m){try{var f=new File(Folder.desktop+"/risco_debug.txt");f.open("a");f.writeln(String(m)+" @"+(new Date()).getTime());f.close();}catch(e){}}
-dbgRisco("== RISCO start");
-
 /* ========= Helpers ========= */
 function getDataAtualFormatada() {
     var hoje = new Date();
@@ -985,8 +981,8 @@ function corPredominanteDoGrupo(grupo) {
         if (!cor) return;
         if (cor.typename === "SpotColor" && cor.spot) {
             var nm = cor.spot.name;
-            if (corEhBrancoNome(nm)) return; // so [none]/[registration] fica de fora;
-            // branco spot CONTA (imprime tinta) - por isso NAO checo spotEhBranco aqui.
+            if (corEhBrancoNome(nm)) return;
+            if (spotEhBranco(cor.spot)) return;
             contagemSpot[nm] = (contagemSpot[nm] || 0) + 1;
             return;
         }
@@ -1222,30 +1218,17 @@ function intersectBounds(a, b) {
     return [left, top, right, bottom];
 }
 
-// --- cor "invisivel" (NAO conta pro cut nem pra cor prioritaria):
-//   [none] (NoColor / nome tecnico), branco PROCESS (CMYK 0,0,0,0 / Gray 0 / RGB
-//   branco). SPOT SEMPRE conta (inclusive branco spot, que imprime tinta) - so olho
-//   o NOME tecnico ([none]/[registration]), nunca o valor do spot. ---
-function corEhInvisivel(cor) {
-    if (!cor) return true;                 // sem cor = [none]
-    var t = cor.typename;
-    if (t === "NoColor") return true;      // [none]
-    if (t === "SpotColor" && cor.spot) {
-        return corEhBrancoNome(cor.spot.name); // so [none]/[registration] fica de fora
-    }
-    if (t === "CMYKColor") return (cor.cyan === 0 && cor.magenta === 0 && cor.yellow === 0 && cor.black === 0);
-    if (t === "GrayColor") return (cor.gray === 0);
-    if (t === "RGBColor") return (cor.red === 255 && cor.green === 255 && cor.blue === 255);
-    return false;
+// branco cromia = CMYK 0,0,0,0 (process, sem tinta). SPOT nao entra aqui -> spot conta.
+function ehBrancoCromia(cor) {
+    if (!cor) return false;
+    return (cor.typename === "CMYKColor" && cor.cyan === 0 && cor.magenta === 0 && cor.yellow === 0 && cor.black === 0);
 }
-
-// --- item TEM pintura visivel? fill OU stroke com tinta de verdade. Decide se o
-// item entra no tamanho do cut ("contar o que estamos vendo"). ---
-function itemTemPintura(it) {
-    var fillVis = false, strokeVis = false;
-    try { fillVis = it.filled && !corEhInvisivel(it.fillColor); } catch (e1) {}
-    try { strokeVis = it.stroked && (it.strokeWidth > 0) && !corEhInvisivel(it.strokeColor); } catch (e2) {}
-    return fillVis || strokeVis;
+// item TEM pintura visivel? fill OU stroke que NAO seja none nem branco cromia 0,0,0,0.
+function temPinturaVisivel(it) {
+    var f = false, s = false;
+    try { f = it.filled && !ehBrancoCromia(it.fillColor); } catch (e) {}
+    try { s = it.stroked && !ehBrancoCromia(it.strokeColor); } catch (e) {}
+    return f || s;
 }
 
 function shouldIgnoreItemByStyle(it) {
@@ -1256,8 +1239,8 @@ function shouldIgnoreItemByStyle(it) {
 
     if (it.typename === "PathItem") {
         try {
-            // ignora sem pintura visivel: [none] ou branco process 0,0,0,0 (spot conta)
-            if (!itemTemPintura(it)) return true;
+            // ignora vazio (none) OU so branco cromia 0,0,0,0
+            if (!temPinturaVisivel(it)) return true;
         } catch (e1) {}
         return false;
     }
@@ -1271,7 +1254,7 @@ function shouldIgnoreItemByStyle(it) {
                     try {
                         if (p.opacity === 0) continue;
                     } catch (e0) {}
-                    if (itemTemPintura(p)) {
+                    if (temPinturaVisivel(p)) {
                         anyVis = true;
                         break;
                     }
@@ -1385,8 +1368,7 @@ function getVisibleBoundsDeep(it) {
 
         if (shouldIgnoreItemByStyle(it)) return null;
 
-        // visibleBounds = inclui o STROKE (o que estamos VENDO), ao contrario do
-        // geometricBounds (so o caminho). E o que o cut precisa considerar.
+        // visibleBounds = inclui o STROKE (o que estamos vendo como ultima mancha).
         return it.visibleBounds;
 
     } catch (e) {
@@ -2122,7 +2104,6 @@ function getLayersFonteRisco(doc, arte) {
 
 // --- cria os quadrados (cut) e registros (+/x) - 1 por grupo da arte/medidas ---
 function criarRiscosArte(doc) {
-    dbgRisco("criarRiscosArte: entrou");
     // Imagem nao gera risco: avisa (sem bloquear) que cada cor da imagem deve
     // virar um quadrado de cromia na "arte"/"medidas". A layer de imagens fica fora.
     if (docTemImagem(doc)) {
@@ -2141,7 +2122,6 @@ function criarRiscosArte(doc) {
     nomeLayerArte = arte.name;
     nomesLayersRisco = [];
     for (var _nf = 0; _nf < fontesRisco.length; _nf++) nomesLayersRisco.push(fontesRisco[_nf].name);
-    dbgRisco("fontesRisco=" + fontesRisco.length + " (arte='" + nomeLayerArte + "')");
 
     var margens = getMargensCliente(); // [left, top, right, bottom] em pt (por cliente, via JSON)
     margensCut = margens; // o label pode ocupar a area do cut (com a margem), sem crescer o cut
@@ -2206,8 +2186,6 @@ function criarRiscosArte(doc) {
             });
         }
     }
-
-    dbgRisco("grupos coletados=" + grupos.length);
 
     // ===== PASSO 2: encaixes (cores DIFERENTES com folga <= 15mm) =====
     var pares = [];
@@ -2524,9 +2502,7 @@ function recolorirRegistro(grupo, corPreta) {
     }
 }
 
-dbgRisco("== antes criarRiscosArte");
 criarRiscosArte(doc);
-dbgRisco("== depois criarRiscosArte");
 
 
 
