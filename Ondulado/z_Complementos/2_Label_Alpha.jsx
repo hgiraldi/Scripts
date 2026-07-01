@@ -1,4 +1,7 @@
 #include "Xml_upload.jsx"
+function dbg(m){try{var f=new File(Folder.desktop+"/label_debug.txt");f.open("a");f.writeln(m);f.close();}catch(e){}}
+try{var __c=new File(Folder.desktop+"/label_debug.txt");__c.open("w");__c.close();}catch(e){}
+dbg("E label inicio (Xml_upload OK)");
 
 // Obtém o nome completo do arquivo do script em execução
 var nomeScript = File($.fileName).name;
@@ -1048,8 +1051,10 @@ function label(cust) {
 
 
 // Verificando se o produto está no nome do arquivo
+dbg("E6 antes if principal");
 var nomeArquivo = app.activeDocument.name;
 if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == cores.length)) {
+    dbg("E7 ENTROU no if (label vai ser gerado)");
     // Criando o texto no Illustrator somente se o produto estiver no nome do arquivo
     var doc = app.activeDocument;
 
@@ -1068,6 +1073,7 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     // Suprime dialogos do Illustrator durante a geracao (fonte ausente, avisos,
     // substituicao...): no motor do CEP um dialogo implicito fica ORFAO e CONGELA
     // o Illustrator. Restaura sempre (try/finally), mesmo se der erro.
+    dbg("F antes label()");
     var __uilLabel = app.userInteractionLevel;
     app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
     try {
@@ -1075,6 +1081,7 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     } finally {
         app.userInteractionLevel = __uilLabel;
     }
+    dbg("G apos label()");
 
 
 
@@ -1148,6 +1155,7 @@ var conteudo = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>' +
 var arquivoTxt = new File(pastaDestino + "/" + nomeArquivoTxt + ".xml");
 
 // Cria o arquivo e escreve o conteúdo
+dbg("W1 antes XML write (.15)");
 arquivoTxt.open("w");
 arquivoTxt.write(conteudo);
 arquivoTxt.close();
@@ -1177,6 +1185,7 @@ var nomeArquivoTxtCopy = serviceOrderNumber + "_I_Illustrator_Label";
 var destinoDaCopia = new File(folderPathCopy + "/" + nomeArquivoTxtCopy + ".xml");
 
 // Copia o arquivo para o destino
+dbg("W2 antes copy p/ Engine");
 if (arquivoTxt.copy(destinoDaCopia)) {
 
 } else {
@@ -1184,6 +1193,7 @@ if (arquivoTxt.copy(destinoDaCopia)) {
 }
 
 
+dbg("W2b apos copy Engine (Engine OK)");
 //============================CSV====================================//
 
 // Função para obter a data atual em formato "YYYY-MM-DD HH:MM:SS"
@@ -1213,3 +1223,4 @@ var linhaCSV = resultadoOperadorNome + "," +
 // [CSV desativado] arquivoCSV.open("a");
 // [CSV desativado] arquivoCSV.write(linhaCSV);
 // [CSV desativado] arquivoCSV.close();
+dbg("Z END (Label terminou tudo)");
