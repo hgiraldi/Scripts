@@ -90,6 +90,7 @@ function lerConfig() {
 // em sequencia, ex.: montagem + distorcao). 'os' = O.S.
 function rodarOperacao(arq, os, pasta) {
     try {
+        try{var __df=new File(Folder.desktop+"/label_debug.txt");__df.open("a");__df.writeln(">> HOST.rodarOperacao('"+arq+"') @"+(new Date()).getTime());__df.close();}catch(eDbg){} // DEBUG TEMP
         if (app.documents.length === 0) return "ERRO: nenhum documento aberto.";
         var BASE = getBase();
         var pastaBase = new File(BASE);

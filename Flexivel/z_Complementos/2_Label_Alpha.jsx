@@ -1,5 +1,10 @@
 #include "Xml_upload.jsx"
 
+// ---- DEBUG TEMP (modo teste): achar quem re-executa o Label ----
+function dbg(m){try{var f=new File(Folder.desktop+"/label_debug.txt");f.open("a");f.writeln(m);f.close();}catch(e){}}
+dbg("   -- LABEL run @" + (new Date()).getTime() + " | docs=" + app.documents.length + " | ativo=" + (app.documents.length ? app.activeDocument.name : "-"));
+dbg("   STACK: " + String($.stack).split(String.fromCharCode(10)).join(" | "));
+
 // Obtém o nome completo do arquivo do script em execução
 var nomeScript = File($.fileName).name;
 
