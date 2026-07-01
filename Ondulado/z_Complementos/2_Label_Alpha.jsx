@@ -1082,8 +1082,13 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
 
 
 
+} else if (coresComuns.length != cores.length) {
+    // as cores da O.S. nao batem com as swatches do documento -> avisa o operador
+    alert("Cores do arquivo nao batem com a OS");
+} else {
+    // o produto nao esta no nome do arquivo -> avisa o operador
+    alert("Produto nao encontrado no nome do arquivo");
 }
-// Sem aviso/alert: cria o label e segue; o painel mostra "concluido".
 
 
 
