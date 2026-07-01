@@ -7,6 +7,19 @@ var nomeScript = File($.fileName).name;
 // Salvar o objeto selecionado em uma variável
 var selectedObject = app.activeDocument.selection[0];
 
+// ===== VALIDACAO ANTES DE DISTORCER =====
+// A distorcao calcula a escala vertical a partir de cylinderSizeMM e closureInput
+// (Cilindro/fechamento do XML). Sem esses dados eles vem NaN e o resize (linha ~48)
+// quebra com "Numeric value expected", deixando a arte num grupo temporario. Aqui
+// paramos antes, com aviso claro. throw de string -> banner (painel) / aviso (menu antigo).
+if (app.activeDocument.selection.length === 0) {
+    throw "Distorcao: nenhum objeto selecionado. Selecione a arte antes de distorcer.";
+}
+if (!isFinite(cylinderSizeMM) || !(cylinderSizeMM > 0) || !isFinite(closureInput) || !(closureInput > 0)) {
+    throw "Distorcao: a O.S. nao tem dados do cilindro (cilindro=" + cylinderSizeMM + "mm, fechamento=" + closureInput + "mm). Verifique o Cilindro no XML da O.S.";
+}
+// =========================================
+
 // Função para redimensionar objetos selecionados verticalmente
 function redimensionarVerticalmente() {
     // Obter os tamanhos do cilindro e do fechamento das entradas do diálogo
@@ -21,7 +34,7 @@ function redimensionarVerticalmente() {
 
     // Verificar se a seleção não está vazia
     if (selecao.length === 0) {
-        alert("Nenhum objeto selecionado.");
+        msgUsuario("Distorcao: nenhum objeto selecionado.", "erro");
         return;
     }
 
@@ -58,7 +71,7 @@ function redimensionarVerticalmente() {
     grupoTemporario.remove();
 
     // Alertar o usuário sobre a operação de redimensionamento
-    alert("Objetos selecionados distorcidos verticalmente em " + porcentagemRedimensionamento + "%");
+    msgUsuario("Distorcao aplicada: " + porcentagemRedimensionamento + "% na vertical.", "info");
 }
 
 
