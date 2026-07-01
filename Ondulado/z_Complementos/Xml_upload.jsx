@@ -94,7 +94,6 @@ function getFolderPath() {
 }
 
 
-
 function getLatestXMLFile(folderPath) {
     var folder = new Folder(folderPath);
     var files = folder.getFiles("*.xml");
@@ -295,13 +294,37 @@ if (operador) {
     resultadoOperador = "Sem Entrada";
 }
 
-//Ondulado
+//==========ONDULADO===========//
+if (depto == "ondulado") {
+    var tipoFaca = jsonObject.Job[0].Ondulado[0].@attributes.Tipo;
+    var maquina = jsonObject.Job[0].Ondulado[0].@attributes.maquina;
+    var perfilMaq = jsonObject.Job[0].Ondulado[0].@attributes.perfil;
+    var altP = jsonObject.Job[0].Ondulado[0].@attributes.AltP;
+    var larP = jsonObject.Job[0].Ondulado[0].@attributes.LarP;
+    var medIntC = jsonObject.Job[0].Ondulado[0].@attributes.MedIntC;
+    var medIntL = jsonObject.Job[0].Ondulado[0].@attributes.MedIntL;
+    var medIntA = jsonObject.Job[0].Ondulado[0].@attributes.MedIntA;
+    var onda = jsonObject.Job[0].Ondulado[0].@attributes.Onda;
+    var ladoLap = jsonObject.Job[0].Ondulado[0].@attributes.LadoLap;
+    var larLap = jsonObject.Job[0].Ondulado[0].@attributes.Larlap;
+    var pnlLap = jsonObject.Job[0].Ondulado[0].@attributes.PnlLap;
+    var altAbaS = jsonObject.Job[0].Ondulado[0].@attributes.AltAbaS;
+    var altAbaP = jsonObject.Job[0].Ondulado[0].@attributes.AltAbaP;
+    var altAbaI = jsonObject.Job[0].Ondulado[0].@attributes.AltAbaI;
+    var pnl1 = jsonObject.Job[0].Ondulado[0].@attributes.P1;
+    var pnl2 = jsonObject.Job[0].Ondulado[0].@attributes.P2;
+    var pnl3 = jsonObject.Job[0].Ondulado[0].@attributes.P3;
+    var pnl4 = jsonObject.Job[0].Ondulado[0].@attributes.P4;
+}
+
+
 var cp = produtoComUnderline.split("_")[0];
 var rev = produtoComUnderline.split("_")[1];
 var v = produtoComUnderline.split("_")[2];
 var clienteOnd = nomeArte.split("-")[0];
 var ref = nomeArte.split("-")[1];
 var medInt = nomeArte.split("-")[2];
+
 //Original
 var tipoOriginal = "proprio";
 
@@ -314,7 +337,7 @@ if (supplied && supplied.toLowerCase().indexOf("via e-mail") !== -1) {
 var tipoCliche = "";
 var temRepremont = false;
 
-// verifica RS ou RC
+// verifica RS ou RC --- repremontagem e gravação
 if (
     requested &&
     (requested.indexOf("RS") !== -1 || requested.indexOf("RC") !== -1)
@@ -398,7 +421,6 @@ for (i = cores.length - 1; i >= 0; i--) {
     if (cores[i] === "X" || cores[i] === "W" || cores[i] === "Z" || cores[i] === "All" || cores[i].indexOf("##") !== -1) {
         cores.splice(i, 1);
         dotShape.splice(i, 1);
-        referenciaCor.splice(i, 1);
         coresD.splice(i, 1);
         uScreen.splice(i, 1);
         coresSemVernizBranco.splice(i, 1);

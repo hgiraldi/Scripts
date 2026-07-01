@@ -3107,7 +3107,10 @@ function criarEtiquetaDeCor(docAlvo, indiceCor) {
         "cor": cabVal(function(){ return cores[indiceCor]; }),
         "ref": cabVal(function(){ return ref; }),
         "descr": cabVal(function(){ return clienteOnd; }),
-        "qtdc": qtdc
+        "qtdc": qtdc,
+        "cp": cabVal(function(){ return cp; }),
+        "rev": cabVal(function(){ return rev.split("v")[1]; }),
+        "v": cabVal(function(){ return v.split("v")[1]; })
     };
 
     var grupoNoAlvo = abrirTemplateParaDoc(
