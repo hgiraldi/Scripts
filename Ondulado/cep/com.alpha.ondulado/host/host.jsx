@@ -6,10 +6,14 @@
  * ============================================================ */
 
 // --- pasta "Ondulado" dos scripts na rede (1o caminho que existir) ---
+// >>> MODO TESTE <<< : se existir a pasta Desktop/AlphaTeste, o painel roda os
+// scripts DE LA (nao toca em producao). Some a pasta -> volta pra rede (producao).
+var TESTE_BASE = String(Folder.desktop.fsName).replace(/\\/g, "/") + "/AlphaTeste/Ondulado";
 var CANDIDATOS_BASE = [
-    "//192.168.1.15/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado",   // Windows (UNC)
-    "/Volumes/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado",          // Mac
-    "/Volumes/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado"                 // Mac (outra montagem)
+    TESTE_BASE,                                                                  // TESTE (Desktop)
+    "//192.168.1.15/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado",   // producao (Windows)
+    "/Volumes/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado",          // producao (Mac)
+    "/Volumes/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado"                 // producao (Mac 2)
 ];
 // --- pasta Engine (192.168.1.96) que tambem precisa estar conectada/montada ---
 var CANDIDATOS_ENGINE = [
