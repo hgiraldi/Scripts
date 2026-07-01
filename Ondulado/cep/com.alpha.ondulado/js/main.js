@@ -224,6 +224,10 @@
   // IPs das redes que precisam estar conectadas (ajuste aqui se mudar).
   var SCRIPTS_IP = "192.168.1.15"; // servidor dos scripts/operacoes
   var ENGINE_IP  = "192.168.1.96"; // servidor Engine
+  // No MAC os volumes montam por NOME (nao por IP) e o teste TCP por IP nao da
+  // timeout confiavel no Node do CEP -> "verificando" eterno. Entao no Mac pulamos
+  // o teste TCP e usamos so a checagem de PASTAS (File.exists local em /Volumes).
+  var IS_MAC = /Mac/i.test(navigator.platform);
 
   // checa se um host responde na porta 445 (SMB) com TIMEOUT, via Node. Roda no
   // processo do PAINEL (nao na thread do Illustrator) -> NUNCA trava/crasha o
@@ -232,22 +236,26 @@
     var tentativa = 0;
     function tentar() {
       tentativa++;
+      var feito = false, s = null;
+      // timeout RIGIDO em JS: garante o callback mesmo se o socket travar sem disparar
+      // evento (acontece no Node do CEP no Mac) -> nunca fica "verificando" pra sempre.
+      var hard = setTimeout(function () { fim(false); }, 3500);
+      function fim(ok) {
+        if (feito) return; feito = true;
+        clearTimeout(hard);
+        try { if (s) s.destroy(); } catch (e) {}
+        if (!ok && tentativa < 2) { tentar(); return; } // 1 retry: evita falso "fora" em rede lenta
+        cb(ok);
+      }
       try {
         var net = require("net");
-        var s = new net.Socket();
-        var feito = false;
-        function fim(ok) {
-          if (feito) return; feito = true;
-          try { s.destroy(); } catch (e) {}
-          if (!ok && tentativa < 2) { tentar(); return; } // 1 retry: evita falso "fora" em rede lenta
-          cb(ok);
-        }
+        s = new net.Socket();
         s.setTimeout(3000);
         s.once("connect", function () { fim(true); });
         s.once("timeout", function () { fim(false); });
         s.once("error",   function () { fim(false); });
         s.connect(445, ip);
-      } catch (e) { if (tentativa < 2) { tentar(); } else { cb(false); } } // sem Node -> nao confirma
+      } catch (e) { fim(false); } // sem Node -> nao confirma
     }
     tentar();
   }
@@ -260,8 +268,21 @@
   // 2 etapas: (1) servidores respondem? (TCP, nao trava). (2) se sim, as PASTAS
   // estao acessiveis/montadas? (host -> File.exists no caminho real; rapido pq o
   // servidor ja respondeu). Verde so quando a pasta existe MESMO = o run funciona.
+  function verificarPastas() {
+    evalScript("statusRede()", function (st) {
+      if (st === "OK") { setDot(true, "conectado às redes"); return; }
+      if (st && st.indexOf("OFF|") === 0) { setDot(false, "pasta não montada: " + st.substring(4)); return; }
+      setDot(false, "rede inacessível");
+    });
+  }
   function checarConexao() {
     if (ocupado) return; // operacao rodando -> nao dispara evalScript (evita loop de dialogo)
+    if (IS_MAC) {
+      // Mac: volumes ja montados em /Volumes. Pula o teste TCP por IP (que trava aqui)
+      // e vai direto na checagem de PASTAS -> no Mac e File.exists local, nao trava.
+      verificarPastas();
+      return;
+    }
     checkHost(SCRIPTS_IP, function (sOk) {
       checkHost(ENGINE_IP, function (eOk) {
         if (!sOk || !eOk) {
@@ -272,11 +293,7 @@
           return;
         }
         if (ocupado) return; // operacao comecou durante o teste TCP -> nao mexe no motor
-        evalScript("statusRede()", function (st) {
-          if (st === "OK") { setDot(true, "conectado às redes"); return; }
-          if (st && st.indexOf("OFF|") === 0) { setDot(false, "pasta não montada: " + st.substring(4)); return; }
-          setDot(false, "rede inacessível");
-        });
+        verificarPastas();
       });
     });
   }
