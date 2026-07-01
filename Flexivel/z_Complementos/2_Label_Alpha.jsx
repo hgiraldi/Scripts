@@ -1053,6 +1053,7 @@ function label(cust) {
 
 // Verificando se o produto está no nome do arquivo
 var nomeArquivo = app.activeDocument.name;
+dbg("   COND: arq='" + nomeArquivo + "' produto='" + produtoComUnderline + "' noNome=" + (nomeArquivo.indexOf(produtoComUnderline) !== -1) + " | cores(" + cores.length + ")=[" + cores.join(",") + "] coresComuns(" + coresComuns.length + ")=[" + coresComuns.join(",") + "] match=" + (coresComuns.length == cores.length));
 if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == cores.length)) {
     // Criando o texto no Illustrator somente se o produto estiver no nome do arquivo
     var doc = app.activeDocument;
