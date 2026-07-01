@@ -17,6 +17,7 @@ function adicionarZero(numero) {
 //Registration
 var doc = app.activeDocument;
 var registrationColor = findRegistrationColor(doc);
+dbg("E1 apos registrationColor");
 
 function findRegistrationColor(document) {
     var swatches = document.swatches;
@@ -77,7 +78,9 @@ var documentoAtivo = app.activeDocument;
 var paletaAmostras = documentoAtivo.swatches;
 
 // Chama a função para excluir as cores
+dbg("E2a antes excluirCores");
 excluirCores(paletaAmostras, nomesCoresParaRemover);
+dbg("E2b apos excluirCores");
 
 
 // Criar cores Spot na paleta de amostras
@@ -85,6 +88,7 @@ createSpotColor(100, 0, 0, 0, "Cyan");
 createSpotColor(0, 100, 0, 0, "Magenta");
 createSpotColor(0, 0, 100, 0, "Yellow");
 createSpotColor(0, 0, 0, 100, "Black");
+dbg("E3 apos createSpotColor");
 
 // Listar todas as cores na paleta de amostras
 var allColors = [];
@@ -112,6 +116,7 @@ for (var k = 0; k < doc.swatches.length; k++) {
 }
 
 
+dbg("E4 apos allColors loop");
 // Array para armazenar as cores em comum
 var coresComuns = [];
 
@@ -136,6 +141,7 @@ for (var i = 0; i < cores.length; i++) {
 }
 
 
+dbg("E5 apos coresComuns loop");
 function aplicarCorTexto(texto, cor) {
     // Converte a cor de entrada para minúsculas
     var corNormalizada = cor.toLowerCase();
@@ -1049,6 +1055,7 @@ function label(cust) {
 
 
 // Verificando se o produto está no nome do arquivo
+dbg("E6 antes if principal");
 var nomeArquivo = app.activeDocument.name;
 if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == cores.length)) {
     // Criando o texto no Illustrator somente se o produto estiver no nome do arquivo
