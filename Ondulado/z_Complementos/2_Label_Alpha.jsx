@@ -1,6 +1,6 @@
 #include "Xml_upload.jsx"
 function dbg(m){try{var f=new File(Folder.desktop+"/label_debug.txt");f.open("a");f.writeln(m);f.close();}catch(e){}}
-try{var __c=new File(Folder.desktop+"/label_debug.txt");__c.open("w");__c.close();}catch(e){}
+dbg("========== NOVA EXECUCAO " + (new Date()).getTime() + " ==========");
 dbg("E label inicio (Xml_upload OK)");
 
 // Obtém o nome completo do arquivo do script em execução
