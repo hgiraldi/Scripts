@@ -1065,7 +1065,16 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     // Altera para a layer "registros" antes de criar o texto
     doc.activeLayer = layerLabel;
 
-    label();
+    // Suprime dialogos do Illustrator durante a geracao (fonte ausente, avisos,
+    // substituicao...): no motor do CEP um dialogo implicito fica ORFAO e CONGELA
+    // o Illustrator. Restaura sempre (try/finally), mesmo se der erro.
+    var __uilLabel = app.userInteractionLevel;
+    app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
+    try {
+        label();
+    } finally {
+        app.userInteractionLevel = __uilLabel;
+    }
 
 
 
