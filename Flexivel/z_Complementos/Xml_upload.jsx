@@ -1,6 +1,3 @@
-function dbg(m){try{var f=new File(Folder.desktop+"/label_debug.txt");f.open("a");f.writeln(m);f.close();}catch(e){}}
-try{var __fclr=new File(Folder.desktop+"/label_debug.txt");__fclr.open("w");__fclr.close();}catch(e){}
-dbg("A xml_upload inicio");
 // ---- mensagem ao usuario ----
 // Sob o PAINEL CEP: NAO mostra modal (alert no motor do CEP nao bloqueia, fica
 // ORFAO e reaparece a cada evalScript = loop, empilha ate travar). So GUARDA a
@@ -23,7 +20,6 @@ var folderPath = getFolderPath();
 
 // 🔒 Força validação de acesso no Illustrator 26 / Sonoma
 var folder = new Folder(folderPath);
-dbg("B antes folder.exists (Engine SMB)");
 
 if (!folder.exists || folder.getFiles().length === 0) {
     alert(
@@ -41,15 +37,11 @@ if (!folder.exists || folder.getFiles().length === 0) {
 }
 
 // Construct the XML file path
-dbg("C antes getLatestXMLFile");
 var xmlFilePath = getLatestXMLFile(folderPath);
-dbg("C2 apos getLatestXMLFile");
 
 if (xmlFilePath !== "") {
     xmlData = loadXML(xmlFilePath);
-    dbg("D antes parse XML");
     var jsonObject = convertXMLtoJSON(xmlData.contents);
-    dbg("D2 apos parse XML");
     //runRemainingScripts(jsonObject);
 } else {
     alert("OS nao encontrada no Automation.");

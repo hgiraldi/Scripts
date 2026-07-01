@@ -730,10 +730,10 @@ var linhaCSV = resultadoOperadorNome + "," +
                getCurrentDateTime() + "\n";
 
 // Caminho do arquivo CSV
-var arquivoCSV = new File(pastaDestino + "/data_records.csv");
+// [CSV desativado] var arquivoCSV = new File(pastaDestino + "/data_records.csv");
 
 // Abre o arquivo CSV para append (adicionar linha ao final)
-arquivoCSV.open("a");
-arquivoCSV.write(linhaCSV);
-arquivoCSV.close();
+// [CSV desativado] arquivoCSV.open("a");
+// [CSV desativado] arquivoCSV.write(linhaCSV);
+// [CSV desativado] arquivoCSV.close();
 
