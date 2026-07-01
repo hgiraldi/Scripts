@@ -87,16 +87,7 @@ function lerConfig() {
 // em sequencia, ex.: montagem + distorcao). 'os' = O.S.
 function rodarOperacao(arq, os, pasta, token) {
     try {
-        // ANTI RE-EXECUCAO: o CEP re-dispara o MESMO evalScript em loop, com o
-        // $.global RESETADO a cada vez -> guardo o token do clique em ARQUIVO.
-        // Se este token ja rodou, ignora (re-disparo). Clique novo -> token novo -> roda.
-        try {
-            var __tk = new File(Folder.desktop + "/alpha_token.txt");
-            var __last = "";
-            if (__tk.exists) { __tk.open("r"); __last = String(__tk.read()); __tk.close(); }
-            if (token && __last === String(token)) { return "OK"; }
-            __tk.open("w"); __tk.write(String(token)); __tk.close();
-        } catch (eTk) {}
+        // (a trava anti-loop fica no Xml_upload; aqui nao precisa mais de token)
         if (app.documents.length === 0) return "ERRO: nenhum documento aberto.";
         var BASE = getBase();
         var pastaBase = new File(BASE);

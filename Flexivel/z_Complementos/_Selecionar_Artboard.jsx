@@ -17,7 +17,7 @@ var __lkNome = "?"; try { __lkNome = File($.fileName).name; } catch (eNm) {}
 if (__lkNome !== "Scripts.jsx") {
     var __lkA = (new Date()).getTime(), __lkU = 0, __lkPrev = "";
     try {
-        var __lkF = new File(Folder.desktop + "/alpha_run_lock.txt");
+        var __lkF = new File(Folder.temp + "/alpha_run_lock.txt");
         if (__lkF.exists) {
             __lkF.open("r"); var __lkRaw = String(__lkF.read()); __lkF.close();
             var __lkBar = __lkRaw.indexOf("|");
@@ -25,7 +25,7 @@ if (__lkNome !== "Scripts.jsx") {
         }
     } catch (eLk) {}
     if (__lkPrev === __lkNome && (__lkA - __lkU) < 3000) { throw new Error("__LOOP_ABORT__"); }
-    try { var __lkW = new File(Folder.desktop + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(__lkNome + "|" + String(__lkA)); __lkW.close(); } catch (eLk2) {}
+    try { var __lkW = new File(Folder.temp + "/alpha_run_lock.txt"); __lkW.open("w"); __lkW.write(__lkNome + "|" + String(__lkA)); __lkW.close(); } catch (eLk2) {}
 }
 // -------------------------------------------------------------------------------------
 
