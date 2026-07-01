@@ -179,9 +179,9 @@ function aplicarCorTexto(texto, cor) {
         }
     }
 
-    // Se nenhuma cor for encontrada, exibe um aviso
+    // Se nenhuma cor for encontrada: NAO usar alert (orfao no CEP trava o Illustrator)
     if (!corEncontrada) {
-        alert("Cor não encontrada: " + cor);
+        // alert("Cor não encontrada: " + cor);
     }
 }
 
@@ -252,10 +252,10 @@ function label(cust) {
                 
                 if (dotShape[i] == "C") {
                     corTexto.contents = uScreen[i];
-                    alert("Aqui")
+                    // alert("Aqui")  // debug removido (alert orfao trava o CEP)
                 } else {
                     corTexto.contents = coresD[i];
-                    alert("Aqui 2")
+                    // alert("Aqui 2")  // debug removido (alert orfao trava o CEP)
                 }
             } else {
                 // Advantage ou Bellissima sem não-C: usa uScreen puro
@@ -1088,7 +1088,7 @@ function mostrarArrays() {
         "coresD: " + coresD.join(",") + "\n" +
         "coresSemVernizBranco: " + coresSemVernizBranco.join(",") + "\n" +
         "dotShape: " + dotShape.join(",");
-    alert(alertText);
+    // alert(alertText); // debug; nunca usar alert pelo painel (orfao trava o CEP)
 }
 
 
