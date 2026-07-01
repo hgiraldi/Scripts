@@ -1,4 +1,5 @@
 #include "Xml_upload.jsx"
+dbg("E label inicio (Xml_upload terminou)");
 
 // Obtém o nome completo do arquivo do script em execução
 var nomeScript = File($.fileName).name;
@@ -1068,6 +1069,7 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     // Suprime dialogos do Illustrator durante a geracao (fonte ausente, avisos,
     // substituicao...): no motor do CEP um dialogo implicito fica ORFAO e CONGELA
     // o Illustrator. Restaura sempre (try/finally), mesmo se der erro.
+    dbg("F antes label()");
     var __uilLabel = app.userInteractionLevel;
     app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
     try {
@@ -1075,6 +1077,7 @@ if ((nomeArquivo.indexOf(produtoComUnderline) !== -1) && (coresComuns.length == 
     } finally {
         app.userInteractionLevel = __uilLabel;
     }
+    dbg("G apos label()");
 
 
 
@@ -1213,3 +1216,4 @@ var arquivoCSV = new File(pastaDestino + "/data_records.csv");
 arquivoCSV.open("a");
 arquivoCSV.write(linhaCSV);
 arquivoCSV.close();
+dbg("H FIM (concluiu tudo)");
