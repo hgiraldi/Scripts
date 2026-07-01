@@ -1218,6 +1218,33 @@ function intersectBounds(a, b) {
     return [left, top, right, bottom];
 }
 
+// --- cor "invisivel" p/ o cut: sem tinta = none, CMYK 0,0,0,0, Gray 0, RGB branco,
+// ou spot branco/none (reusa corEhBrancoNome/spotEhBranco). Esses NAO contam pro cut. ---
+function corEhInvisivel(cor) {
+    if (!cor) return true;
+    var t = cor.typename;
+    if (t === "NoColor") return true;
+    if (t === "CMYKColor") return (cor.cyan === 0 && cor.magenta === 0 && cor.yellow === 0 && cor.black === 0);
+    if (t === "GrayColor") return (cor.gray === 0);
+    if (t === "RGBColor") return (cor.red === 255 && cor.green === 255 && cor.blue === 255);
+    if (t === "SpotColor" && cor.spot) {
+        if (corEhBrancoNome(cor.spot.name)) return true;
+        if (spotEhBranco(cor.spot)) return true;
+        try { if (cor.tint === 0) return true; } catch (eT) {}
+        return false;
+    }
+    return false;
+}
+
+// --- item TEM pintura visivel? fill OU stroke com tinta de verdade (nao branco/none).
+// E o que decide se o item entra no tamanho do cut ("contar o que estamos vendo"). ---
+function itemTemPintura(it) {
+    var fillVis = false, strokeVis = false;
+    try { fillVis = it.filled && !corEhInvisivel(it.fillColor); } catch (e1) {}
+    try { strokeVis = it.stroked && (it.strokeWidth > 0) && !corEhInvisivel(it.strokeColor); } catch (e2) {}
+    return fillVis || strokeVis;
+}
+
 function shouldIgnoreItemByStyle(it) {
 
     try {
@@ -1226,7 +1253,8 @@ function shouldIgnoreItemByStyle(it) {
 
     if (it.typename === "PathItem") {
         try {
-            if (!it.filled && !it.stroked) return true;
+            // ignora sem pintura visivel: none OU fill/stroke branco 0,0,0,0
+            if (!itemTemPintura(it)) return true;
         } catch (e1) {}
         return false;
     }
@@ -1240,7 +1268,7 @@ function shouldIgnoreItemByStyle(it) {
                     try {
                         if (p.opacity === 0) continue;
                     } catch (e0) {}
-                    if (p.filled || p.stroked) {
+                    if (itemTemPintura(p)) {
                         anyVis = true;
                         break;
                     }
@@ -1354,7 +1382,9 @@ function getVisibleBoundsDeep(it) {
 
         if (shouldIgnoreItemByStyle(it)) return null;
 
-        return it.geometricBounds;
+        // visibleBounds = inclui o STROKE (o que estamos VENDO), ao contrario do
+        // geometricBounds (so o caminho). E o que o cut precisa considerar.
+        return it.visibleBounds;
 
     } catch (e) {
         return null;
