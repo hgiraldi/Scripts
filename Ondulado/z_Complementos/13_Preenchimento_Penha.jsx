@@ -305,57 +305,68 @@ if (cores.length > 1) {
     alert("ARQUIVO DE UMA COR, NÃO PRECISA DE SEPARAÇÃO")
 }
 
-var partesNome = resultadoOperadorNome.split(" ");
+// cabVal(fn): devolve o valor da funcao; se a variavel NAO existir na O.S. (ou der
+// QUALQUER erro), nao quebra -> devolve "" (vazio). Assim o cabecalho segue e o
+// campo faltante fica em branco, em vez de dar erro de "variavel faltando".
+function cabVal(fn) {
+    try {
+        var r = fn();
+        return (r === undefined || r === null) ? "" : r;
+    } catch (e) {
+        return "";
+    }
+}
 
+var partesNome = (typeof resultadoOperadorNome !== "undefined" && resultadoOperadorNome)
+    ? String(resultadoOperadorNome).split(" ") : [];
 
-
-// Mapeamento: chave -> valor.
-// A chave é o nome da variável sem colchetes; o token esperado no documento é [[chave]]
+// Mapeamento: chave -> valor. Token no documento: [[chave]]. Cada valor passa pelo
+// cabVal(...) -> se faltar na O.S., fica vazio (segue sem erro).
 var mapping = {
-    "cliente": clienteOnd,
-    "cli": cliente,
-    "ref": ref,
-    "descr": nomeArte,
-    "medint": medInt,
-    "fi": np,
-    "Cor1" : cores[0] || "",
-    "Cor2" : cores[1] || "",
-    "Cor3" : cores[2] || "",
-    "Cor4" : cores[3] || "",
-    "Cor5" : cores[4] || "",
-    "Cor6" : cores[5] || "",
-    "codCor1": getCor(referenciaCor, 0, 0),
-    "fka1": getCor(referenciaCor, 0, 1),
-    "codCor2": getCor(referenciaCor, 1, 0),
-    "fka2": getCor(referenciaCor, 1, 1),
-    "codCor3": getCor(referenciaCor, 2, 0),
-    "fka3": getCor(referenciaCor, 2, 1),
-    "codCor4": getCor(referenciaCor, 3, 0),
-    "fka4": getCor(referenciaCor, 3, 1),
-    "codCor5": getCor(referenciaCor, 4, 0),
-    "fka5": getCor(referenciaCor, 4, 1),
-    "email": marcaSeContem(tipoOriginal, "email"),
-    "proprio": marcaSeContem(tipoOriginal, "proprio"),
-    "amostra": marcaSeContem(tipoOriginal, "amostra"),
-    "total": marcaSeContem(tipoCliche, "total"),
-    "parcial": marcaSeContem(tipoCliche, "parcial"),
-    "repremont": marcaSeContem(tipoCliche, "repremont"),
-    "data": dataEntrega,
-    "dataAtual" : getDataAtualFormatada(),
-    "rep": repetitions,
-    "pist": lanes,
-    "onda": onda,
-    "os": serviceOrderNumber,
-    "esp": espessura,
-    "cp": cp,
-    "rev": rev.split("v")[1],
-    "v": v.split("v")[1], 
-    "q": q,
-    "maq": maquina,
-    "mm": dataEntrega.split(" ")[1],
-    "yy": dataEntrega.split(" ")[2],
-    "dd": dataEntrega.split(" ")[0],
-    "operador": partesNome.slice(0, 2).join(" ")
+    "cliente": cabVal(function(){ return clienteOnd; }),
+    "cli": cabVal(function(){ return cliente; }),
+    "ref": cabVal(function(){ return ref; }),
+    "descr": cabVal(function(){ return nomeArte; }),
+    "medint": cabVal(function(){ return medInt; }),
+    "fi": cabVal(function(){ return np; }),
+    "Cor1": cabVal(function(){ return cores[0]; }),
+    "Cor2": cabVal(function(){ return cores[1]; }),
+    "Cor3": cabVal(function(){ return cores[2]; }),
+    "Cor4": cabVal(function(){ return cores[3]; }),
+    "Cor5": cabVal(function(){ return cores[4]; }),
+    "Cor6": cabVal(function(){ return cores[5]; }),
+    "codCor1": cabVal(function(){ return getCor(referenciaCor, 0, 0); }),
+    "fka1": cabVal(function(){ return getCor(referenciaCor, 0, 1); }),
+    "codCor2": cabVal(function(){ return getCor(referenciaCor, 1, 0); }),
+    "fka2": cabVal(function(){ return getCor(referenciaCor, 1, 1); }),
+    "codCor3": cabVal(function(){ return getCor(referenciaCor, 2, 0); }),
+    "fka3": cabVal(function(){ return getCor(referenciaCor, 2, 1); }),
+    "codCor4": cabVal(function(){ return getCor(referenciaCor, 3, 0); }),
+    "fka4": cabVal(function(){ return getCor(referenciaCor, 3, 1); }),
+    "codCor5": cabVal(function(){ return getCor(referenciaCor, 4, 0); }),
+    "fka5": cabVal(function(){ return getCor(referenciaCor, 4, 1); }),
+    "email": cabVal(function(){ return marcaSeContem(tipoOriginal, "email"); }),
+    "proprio": cabVal(function(){ return marcaSeContem(tipoOriginal, "proprio"); }),
+    "amostra": cabVal(function(){ return marcaSeContem(tipoOriginal, "amostra"); }),
+    "total": cabVal(function(){ return marcaSeContem(tipoCliche, "total"); }),
+    "parcial": cabVal(function(){ return marcaSeContem(tipoCliche, "parcial"); }),
+    "repremont": cabVal(function(){ return marcaSeContem(tipoCliche, "repremont"); }),
+    "data": cabVal(function(){ return dataEntrega; }),
+    "dataAtual": cabVal(function(){ return getDataAtualFormatada(); }),
+    "rep": cabVal(function(){ return repetitions; }),
+    "pist": cabVal(function(){ return lanes; }),
+    "onda": cabVal(function(){ return onda; }),
+    "os": cabVal(function(){ return serviceOrderNumber; }),
+    "esp": cabVal(function(){ return espessura; }),
+    "cp": cabVal(function(){ return cp; }),
+    "rev": cabVal(function(){ return rev.split("v")[1]; }),
+    "v": cabVal(function(){ return v.split("v")[1]; }),
+    "q": cabVal(function(){ return q; }),
+    "maq": cabVal(function(){ return maquina; }),
+    "mm": cabVal(function(){ return dataEntrega.split(" ")[1]; }),
+    "yy": cabVal(function(){ return dataEntrega.split(" ")[2]; }),
+    "dd": cabVal(function(){ return dataEntrega.split(" ")[0]; }),
+    "operador": cabVal(function(){ return partesNome.slice(0, 2).join(" "); })
 };
 
 var doc = app.activeDocument;
