@@ -2686,7 +2686,7 @@ function clonarArtboardParaDoc(origem, destino) {
 
                 app.activeDocument = destino;
                 app.redraw();
-                app.paste();
+                app.executeMenuCommand("pasteInPlace"); // cola na MESMA posicao do arquivo mae (nao centraliza)
 
                 if (destino.pageItems.length > 0) return true;
             }
