@@ -25,6 +25,8 @@ var tolerancia = 0.1;
 // Fator de conversão de pontos (unidade padrão do Illustrator) para milímetros
 var pontoParaMM = 2.83464567;
 
+var linksRuins = 0; // links da arte INCORPORADOS (embed) ou AUSENTES (sem arquivo)
+
 // Iterar sobre os links para capturar coordenadas
 for (var i = 0; i < placedItems.length; i++) {
     var currentLink = placedItems[i];
@@ -36,7 +38,14 @@ for (var i = 0; i < placedItems.length; i++) {
         // Capturar as coordenadas x e y do link na layer "arte"
         var posX = currentLink.position[0];
         var posY = currentLink.position[1];
-        var linkName = currentLink.file.name; // Nome do link
+        // .file estoura 'Error 9062' se o link estiver INCORPORADO (embed) ou AUSENTE.
+        var linkName;
+        try {
+            linkName = currentLink.file.name; // Nome do link
+        } catch (eLink) {
+            linkName = "[incorporado/ausente]";
+            linksRuins++;
+        }
 
         coordenadasLinksArte.push({
             x: posX,
@@ -69,6 +78,19 @@ for (var i = 0; i < placedItems.length; i++) {
         if (!grupoXEncontrado) {
             gruposPorX[posX] = [linkName];
         }
+    }
+}
+
+// Se algum link da arte estiver INCORPORADO ou AUSENTE (sem arquivo): AVISA e PARA,
+// pra o operador relinkar/verificar antes. Menu antigo -> alert; painel -> banner.
+if (linksRuins > 0) {
+    var msgLink = linksRuins + " link(s) na arte estao INCORPORADOS ou AUSENTES. "
+                + "Relinke/verifique os arquivos antes de rodar o CheckList.";
+    if (typeof $.global !== "undefined" && typeof $.global.painelMsg === "function") {
+        throw msgLink;      // PAINEL: banner "ERRO: ..." e PARA
+    } else {
+        alert(msgLink);     // MENU ANTIGO: alert na tela
+        throw msgLink;      // PARA a execucao
     }
 }
 
