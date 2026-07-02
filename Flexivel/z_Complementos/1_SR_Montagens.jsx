@@ -231,14 +231,22 @@ function createSpotColorCMYK(c, m, y, k, colorName) {
 
 // Função para excluir cores da paleta de amostras
 function excluirCores(paleta, nomesCores) {
-    for (var i = paleta.length - 1; i >= 0; i--) {
+    // 1) COLETA as amostras a remover pelo NOME. Le o nome com try/catch: uma amostra
+    //    "especial" (gradiente/pattern/grupo de cores, ex.: criada pelo RemapCores) pode
+    //    estourar o erro 'MRAP' ao ler .name -> nesse caso PULA (nunca e Cyan/Magenta/
+    //    Yellow/Black mesmo). Assim as 4 cores continuam sendo deletadas normalmente.
+    var aRemover = [];
+    for (var i = 0; i < paleta.length; i++) {
         var cor = paleta[i];
+        var nm = null;
+        try { nm = cor.name; } catch (eNome) { continue; } // amostra que nao deixa ler o nome -> pula
         for (var j = 0; j < nomesCores.length; j++) {
-            if (cor.name === nomesCores[j]) {
-                cor.remove();
-                break; // Sair do loop interno após encontrar a cor
-            }
+            if (nm === nomesCores[j]) { aRemover.push(cor); break; }
         }
+    }
+    // 2) REMOVE depois (nao mexe na paleta durante a varredura). try/catch por seguranca.
+    for (var k = 0; k < aRemover.length; k++) {
+        try { aRemover[k].remove(); } catch (eRem) {}
     }
 }
 
