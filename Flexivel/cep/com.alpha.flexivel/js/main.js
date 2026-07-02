@@ -194,14 +194,20 @@
   // Render IMEDIATO do bundlado (nao trava no boot). Depois, SE o servidor de
   // scripts responder (TCP), sobrescreve com o operacoes.json da REDE (editavel
   // sem reinstalar). Assim, rede caida no boot nao congela o painel.
+  function lerOperacoesRede() {
+    evalScript("lerConfig()", function (ret) {
+      var rede = parseConfig(ret);
+      if (rede) montarSecoes(rede);
+    });
+  }
   function carregarOperacoes() {
     carregarBundlado();
+    // Mac: o teste TCP por IP nao e confiavel (monta por nome) -> le a rede DIRETO,
+    // senao o painel fica so no operacoes.json empacotado (sem o Geral).
+    if (IS_MAC) { lerOperacoesRede(); return; }
     checkHost(SCRIPTS_IP, function (ok) {
       if (!ok) return;
-      evalScript("lerConfig()", function (ret) {
-        var rede = parseConfig(ret);
-        if (rede) montarSecoes(rede);
-      });
+      lerOperacoesRede();
     });
   }
 

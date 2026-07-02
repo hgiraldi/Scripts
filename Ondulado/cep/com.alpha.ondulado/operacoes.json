@@ -1,9 +1,25 @@
 {
-  "operacoes": [
-    { "tipo": "label",    "nome": "Label Alpha",             "desc": "Aplica a etiqueta/label padrão Alpha no documento.",       "arq": "2_Label_Alpha.jsx" },
-    { "tipo": "regua",    "nome": "Medição Ondulado",        "desc": "Gera as medidas das placas (por grupo/cor predominante).", "arq": "10_Medicao_Ondulado.jsx" },
-    { "tipo": "header",   "nome": "Preenchimento Cabeçalho", "desc": "Preenche os campos do cabeçalho automaticamente.",         "arq": "13_Preenchimento_Penha.jsx" },
-    { "tipo": "faca",     "nome": "Risco Poliéster",         "desc": "Gera o risco/faca em poliéster com data.",                 "arq": "14_Risco_Faca.jsx" },
-    { "tipo": "etiqueta", "nome": "Gerar Etiquetas",         "desc": "Gera as etiquetas (Penha ou cor) empilhadas numa página.", "arq": "12_Gerar_Etiquetas.jsx" }
+  "secoes": [
+    {
+      "titulo": "Ondulado",
+      "operacoes": [
+        { "tipo": "label",    "nome": "Label Alpha",             "desc": "Aplica a etiqueta/label padrão Alpha no documento.",       "arq": "2_Label_Alpha.jsx" },
+        { "tipo": "regua",    "nome": "Medição Ondulado",        "desc": "Gera as medidas das placas (por grupo/cor predominante).", "arq": "10_Medicao_Ondulado.jsx" },
+        { "tipo": "header",   "nome": "Preenchimento Cabeçalho", "desc": "Preenche os campos do cabeçalho automaticamente.",         "arq": "13_Preenchimento_Penha.jsx" },
+        { "tipo": "faca",     "nome": "Risco Poliéster",         "desc": "Gera o risco/faca em poliéster com data.",                 "arq": "14_Risco_Faca.jsx" },
+        { "tipo": "etiqueta", "nome": "Gerar Etiquetas",         "desc": "Gera as etiquetas (Penha ou cor) empilhadas numa página.", "arq": "12_Gerar_Etiquetas.jsx" }
+      ]
+    },
+    {
+      "titulo": "Geral",
+      "operacoes": [
+        { "tipo": "addcut",    "nome": "Add Cut",         "desc": "Cria as margens de corte (cut).",                 "arq": "AddCut.jsx",          "pasta": "modulo", "semOS": true },
+        { "tipo": "remap",     "nome": "Remapear Cores",  "desc": "Remapeia/normaliza as cores do documento.",       "arq": "RemapCores.jsx",      "pasta": "modulo", "semOS": true },
+        { "tipo": "checklist", "nome": "CheckList",       "desc": "Validação + XML do job (usa a O.S. do painel).",  "arq": "CheckList.jsx",       "pasta": "raiz" },
+        { "tipo": "cotas",     "nome": "Cotas Alpha",     "desc": "Gera as cotas do documento. Não precisa de O.S.", "arq": "Cotas_Alpha.jsx",     "pasta": "raiz",   "semOS": true },
+        { "tipo": "maleta",    "nome": "Ondulado Maleta", "desc": "Faca de maleta a partir das entradas (mm).",      "arq": "Ondulado_Maleta.jsx", "pasta": "modulo", "semOS": true },
+        { "tipo": "pics",      "nome": "PICS",            "desc": "Gera os PICS (usa a O.S. do painel).",            "arq": "PICS.jsx",            "pasta": "modulo" }
+      ]
+    }
   ]
 }
