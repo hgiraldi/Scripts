@@ -7,22 +7,13 @@ var nomeScript = File($.fileName).name;
 // Salvar o objeto selecionado em uma variável
 var selectedObject = app.activeDocument.selection[0];
 
-// Veio da "Montagem + Distorcao" (combo do painel)? A montagem grava um sinal
-// (Folder.temp/alpha_montou.txt) ao terminar. Se for recente, a distorcao esta rodando
-// LOGO APOS a montagem -> seleciona TODA a arte do artboard. Avulso (sem sinal) usa a
-// selecao do operador.
-try {
-    var __mfDist = new File(Folder.temp + "/alpha_montou.txt");
-    if (__mfDist.exists) {
-        __mfDist.open("r"); var __mtDist = parseInt(__mfDist.read(), 10) || 0; __mfDist.close();
-        try { __mfDist.remove(); } catch (eRm) {}           // consome o sinal
-        if (((new Date()).getTime() - __mtDist) < 20000) {  // veio logo apos a montagem
-            try { app.activeDocument.selection = null; } catch (e1) {}
-            app.activeDocument.selectObjectsOnActiveArtboard();
-            selectedObject = app.activeDocument.selection[0];
-        }
-    }
-} catch (eDist) {}
+// Se NADA estiver selecionado (ex.: rodou a Distorcao logo apos a Montagem, que nao
+// deixa selecao), seleciona TODA a arte do artboard -> distorce o que foi montado.
+// Igual o menu antigo faz na juncao dos dois. Com selecao do operador, usa so a dele.
+if (app.activeDocument.selection.length === 0) {
+    try { app.activeDocument.selectObjectsOnActiveArtboard(); } catch (eSel) {}
+    selectedObject = app.activeDocument.selection[0];
+}
 
 // ===== VALIDACAO ANTES DE DISTORCER =====
 // A distorcao calcula a escala vertical a partir de cylinderSizeMM e closureInput
