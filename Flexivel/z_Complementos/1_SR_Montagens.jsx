@@ -750,3 +750,11 @@ var linhaCSV = resultadoOperadorNome + "," +
 // [CSV desativado] arquivoCSV.write(linhaCSV);
 // [CSV desativado] arquivoCSV.close();
 
+// SINAL para a "Montagem + Distorcao": avisa a Distorcao que a montagem ACABOU agora.
+// A Distorcao, ao ver esse sinal recente, mostra a layer "arte" (que a montagem esconde)
+// e seleciona toda a arte do artboard antes de distorcer. Timestamp em Folder.temp.
+try {
+    var __mfMont = new File(Folder.temp + "/alpha_montou.txt");
+    __mfMont.open("w"); __mfMont.write(String((new Date()).getTime())); __mfMont.close();
+} catch (eMfMont) {}
+

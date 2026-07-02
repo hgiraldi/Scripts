@@ -7,6 +7,26 @@ var nomeScript = File($.fileName).name;
 // Salvar o objeto selecionado em uma variável
 var selectedObject = app.activeDocument.selection[0];
 
+// Veio da "Montagem + Distorcao"? A montagem grava um sinal (alpha_montou.txt) ao
+// terminar. Se ele existir e for recente, a montagem ACABOU de rodar: ela escondeu a
+// layer "arte" e nao deixou selecao -> aqui a gente MOSTRA a "arte" e seleciona TODA a
+// arte do artboard, pra distorcer o que foi montado (equivale ao selectObjectsOnActive
+// Artboard do menu antigo, mas reexibindo a "arte"). Consome o sinal p/ nao afetar a
+// distorcao avulsa (que usa a selecao manual do operador).
+try {
+    var __mfDist = new File(Folder.temp + "/alpha_montou.txt");
+    if (__mfDist.exists) {
+        __mfDist.open("r"); var __mtDist = parseInt(__mfDist.read(), 10) || 0; __mfDist.close();
+        try { __mfDist.remove(); } catch (eRmDist) {}
+        if (((new Date()).getTime() - __mtDist) < 60000) {
+            try { var _laDist = app.activeDocument.layers.getByName("arte"); _laDist.visible = true; _laDist.locked = false; } catch (eLaDist) {}
+            try { app.activeDocument.selection = null; } catch (eSnDist) {}
+            try { app.activeDocument.selectObjectsOnActiveArtboard(); } catch (eSelDist) {}
+            selectedObject = app.activeDocument.selection[0];
+        }
+    }
+} catch (eMfDist) {}
+
 // ===== VALIDACAO ANTES DE DISTORCER =====
 // A distorcao calcula a escala vertical a partir de cylinderSizeMM e closureInput
 // (Cilindro/fechamento do XML). Sem esses dados eles vem NaN e o resize (linha ~48)

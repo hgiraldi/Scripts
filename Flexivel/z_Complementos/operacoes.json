@@ -4,7 +4,7 @@
       "titulo": "Flexível",
       "operacoes": [
         { "tipo": "montagem",  "nome": "Montagem",             "desc": "Monta (step-and-repeat) os itens selecionados.", "arq": "1_SR_Montagens.jsx" },
-        { "tipo": "montdist",  "nome": "Montagem + Distorção", "desc": "Monta e aplica a distorção em sequência.",       "arq": "1_SR_Montagens.jsx,_Selecionar_Artboard.jsx,3_Distorcao_Alpha.jsx" },
+        { "tipo": "montdist",  "nome": "Montagem + Distorção", "desc": "Monta e aplica a distorção em sequência.",       "arq": "1_SR_Montagens.jsx,3_Distorcao_Alpha.jsx" },
         { "tipo": "label",     "nome": "Label Alpha",          "desc": "Aplica a etiqueta/label padrão Alpha.",          "arq": "2_Label_Alpha.jsx" },
         { "tipo": "distorcao", "nome": "Distorção",            "desc": "Aplica a distorção nos itens selecionados.",     "arq": "3_Distorcao_Alpha.jsx" },
         { "tipo": "numeros",   "nome": "Números Pistas",       "desc": "Insere a numeração das pistas.",                 "arq": "5_Numeros_PPPrintBRL.jsx" },
