@@ -287,6 +287,16 @@ function corPredominanteDoGrupo(grupo) {
 
     function conta(cor) {
         if (!cor) return;
+        // GRADIENTE (ex.: criado pelo RemapCores): conta a cor de CADA parada do
+        // gradiente (spot ou cromia). Sem isto, o grupo do gradiente ficava sem cor
+        // detectada -> era pulado e nao entrava no XML.
+        if (cor.typename === "GradientColor" && cor.gradient) {
+            try {
+                var _st = cor.gradient.gradientStops;
+                for (var _gi = 0; _gi < _st.length; _gi++) conta(_st[_gi].color);
+            } catch (eG) {}
+            return;
+        }
         if (cor.typename === "SpotColor" && cor.spot) {
             var nm = cor.spot.name;
             if (corEhBrancoNome(nm)) return;
