@@ -393,7 +393,7 @@ function groupsAndGenerateXML(repetitions) {
     var doc = app.activeDocument;
 
     var plateInfoArray = [];
-    var colorCounters = {};   // nome da spot -> quantas placas dessa cor ja saíram
+    var totalPorCor = {};     // nome da cor -> total de placas dessa cor (1a passada)
     var distinctColors = {};  // nome da spot -> true (para contar JobColors)
     var uniqueColorCount = 0;
 
@@ -441,12 +441,12 @@ function groupsAndGenerateXML(repetitions) {
                 uniqueColorCount++;
             }
 
-            // nome da placa = nome da spot + indice (preto1, preto2, ...)
-            colorCounters[nomeCor] = (colorCounters[nomeCor] || 0) + 1;
-            var plateName = nomeCor + colorCounters[nomeCor];
+            // guarda a cor; o NOME final (com/sem indice) e definido depois de saber
+            // quantas placas cada cor tem (indice so quando ha MAIS DE UMA).
+            totalPorCor[nomeCor] = (totalPorCor[nomeCor] || 0) + 1;
 
             plateInfoArray.push({
-                name: plateName,
+                nomeCor: nomeCor,
                 widthInMM: widthInMM,
                 heightInMM: heightInMM,
                 widthInCM: widthInCM,
@@ -458,6 +458,20 @@ function groupsAndGenerateXML(repetitions) {
     if (plateInfoArray.length === 0) {
         alert("Nenhum grupo com cor predominante foi encontrado.\nVerifique se a arte esta agrupada e com spots (nao branco).");
         return;
+    }
+
+    // NOME da placa: cor com UMA placa -> nome puro (ex.: black2, que o RemapCores ja
+    // numerou -> nao vira black21); cor com VARIAS placas -> nome + indice (black1,
+    // black2, ...).
+    var idxPorCor = {};
+    for (var p = 0; p < plateInfoArray.length; p++) {
+        var nc = plateInfoArray[p].nomeCor;
+        if (totalPorCor[nc] > 1) {
+            idxPorCor[nc] = (idxPorCor[nc] || 0) + 1;
+            plateInfoArray[p].name = nc + idxPorCor[nc];
+        } else {
+            plateInfoArray[p].name = nc;
+        }
     }
 
     var platesCount = plateInfoArray.length;
