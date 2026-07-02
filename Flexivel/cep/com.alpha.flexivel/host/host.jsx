@@ -101,6 +101,9 @@ function rodarOperacao(arq, os, pasta, token) {
         if (pasta === "raiz") {
             dirScripts = pastaBase.parent.fsName;       // .../Scripts
             dirScriptDir = dirScripts;
+        } else if (pasta === "modulo") {
+            dirScripts = pastaBase.fsName;              // .../Scripts/<modulo> (raiz do modulo)
+            dirScriptDir = pastaBase.fsName;
         } else {
             dirScripts = pastaBase.fsName + "/z_Complementos";
             dirScriptDir = pastaBase.fsName;            // z_pdfs etc. ficam aqui

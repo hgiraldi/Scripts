@@ -7,8 +7,12 @@
 // (Logica DUPLICADA do 14_Risco_Faca.jsx -- corrigir bug numa = replicar na outra.)
 // ============================================================
 
-// O.S. (so os 4 ultimos digitos viram o label)
-var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+// O.S. (so os 4 ultimos digitos viram o label). Se ja veio do painel CEP
+// ($.global.serviceOrderNumber), usa ela (sem perguntar); senao pergunta (menu antigo).
+if (typeof $.global.serviceOrderNumber === "undefined" || !$.global.serviceOrderNumber) {
+    $.global.serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+}
+var serviceOrderNumber = $.global.serviceOrderNumber;
 
 // ===== Conversao mm -> pt =====
 function mmToPt(mm) {

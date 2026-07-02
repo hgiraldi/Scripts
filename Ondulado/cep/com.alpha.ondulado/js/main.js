@@ -45,7 +45,11 @@
     box:      '<svg viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>',
     // Geral (CheckList / Cotas)
     checklist:'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="1.5"/><path d="M9 3.2h6V6H9z" fill="currentColor" stroke="none"/><path d="M8.6 11l1.4 1.4 2.6-2.6M8.6 15.6l1.4 1.4 2.6-2.6"/></svg>',
-    cotas:    '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 5v4M20 5v4"/><path d="M7 14h10M7 12v4M17 12v4"/></svg>'
+    cotas:    '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 5v4M20 5v4"/><path d="M7 14h10M7 12v4M17 12v4"/></svg>',
+    addcut:   '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.5"/></svg>',
+    remap:    '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.2"/><circle cx="16" cy="16" r="3.2"/><path d="M13 6h5v5M11 18H6v-5"/></svg>',
+    maleta:   '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="1.5"/><path d="M9 8V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18"/></svg>',
+    pics:     '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="M4 17l5-4 3 2 4-3 4 3"/></svg>'
   };
   var CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
