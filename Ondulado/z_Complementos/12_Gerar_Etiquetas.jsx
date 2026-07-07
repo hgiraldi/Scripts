@@ -2,7 +2,7 @@
 // 12_Gerar_Etiquetas.jsx
 // Gera as etiquetas de cor EMPILHADAS numa pagina (layer "etiquetaCores" do doc
 // ATIVO), pro operador usar como quiser. Condicional por cliente:
-//   - Penha (folder = penha_sa) -> Etiqueta_Penha.pdf (2 barcodes Code128 + localizacao)
+//   - Penha (folder = penha_sa ou penha_ba) -> Etiqueta_Penha.pdf (2 barcodes Code128 + localizacao)
 //   - demais                    -> etiqueta_cor.pdf   (cor / ref / descr / qtdc)
 // Usa a logica MELHORADA do 14_Risco_Faca.jsx (tokens [[...]], achatamento, robusto).
 // Atualiza/renomeia o antigo 12_Gerar_Etiqueta_Penha.jsx. SEM logs.
@@ -324,8 +324,9 @@ function gerarCode128SobreRect(docCB, texto, rectItem, alturaPt, larguraPt, indi
  * =================================================================== */
 var docPrincipal = app.activeDocument;
 
-// cliente Penha?
-var isPenha = (String(folder).toLowerCase() === "penha_sa");
+// cliente Penha? (penha_sa e penha_ba - mesma logica)
+var folderLowerPenha = String(folder).toLowerCase();
+var isPenha = (folderLowerPenha === "penha_sa" || folderLowerPenha === "penha_ba");
 
 // layer de destino (cria se nao existir; LIMPA se ja existir)
 var layerEtiquetas;
