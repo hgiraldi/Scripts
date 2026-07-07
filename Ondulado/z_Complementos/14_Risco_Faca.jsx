@@ -2732,7 +2732,7 @@ function copiarSpots(origem, destino) {
 }
 
 // ======================================================
-// ETIQUETA PENHA (somente cliente penha_sa)
+// ETIQUETA PENHA (clientes penha_sa e penha_ba - mesma logica)
 // ======================================================
 // Juncao do antigo 12_Gerar_Etiqueta_Penha.jsx. Para cada cor (cada risco),
 // abre o template Etiqueta_Penha.pdf, troca os [[tokens]], gera os 2 codigos
@@ -2740,7 +2740,8 @@ function copiarSpots(origem, destino) {
 // posiciona 40mm ACIMA da faca: uma no centro de 1/4 e outra no centro de 3/4
 // da largura da faca. Tudo na layer "cotas".
 
-var isPenha = (String(folder).toLowerCase() === "penha_sa");
+var folderLowerPenha = String(folder).toLowerCase();
+var isPenha = (folderLowerPenha === "penha_sa" || folderLowerPenha === "penha_ba");
 var localizacaoPenha = "";
 
 // --- helpers de texto ---
@@ -3370,7 +3371,7 @@ for (var i = 0; i < quantidadeDocumentos; i++) {
     // Etiqueta de centro: todos os clientes.
     criarEtiquetaCentro(novoDoc, i);
 
-    // Etiquetas Penha: somente penha_sa (2 por cor, 1/4 e 3/4).
+    // Etiquetas Penha: penha_sa e penha_ba (2 por cor, 1/4 e 3/4).
     if (isPenha) {
         criarEtiquetasPenha(novoDoc, i);
     }
