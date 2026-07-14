@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Alpha Screen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ============ TOPBAR ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../assets/logo_alpha.png" class="brand-logo" alt="Alpha" />
+      <div class="brand-txt">
+        <div class="app">Alpha<span>Screen</span></div>
+        <div class="tag">Screening · junção de tintas · dual na mesma chapa</div>
+      </div>
+    </div>
+    <div class="ver">v1.0</div>
+  </header>
+
+  <main>
+    <!-- ============ HERO / DROP ============ -->
+    <section id="hero" class="hero">
+      <div id="drop" class="drop">
+        <div class="drop-glow"></div>
+        <img src="../assets/logo_alpha.png" class="hero-logo" alt="" />
+        <h1>Converta o screening do seu PDF</h1>
+        <p>Arraste o <b>PDF normalizado</b> aqui — ou clique para escolher.<br>
+           O Alpha Screen funde as tintas <span class="hh">##</span> na base mantendo o screen de cada região.</p>
+        <button id="pick" class="btn-pick">Escolher arquivo</button>
+      </div>
+    </section>
+
+    <!-- ============ WORKSPACE ============ -->
+    <section id="workspace" class="workspace" style="display:none">
+      <div class="wsbar">
+        <div class="pdf-chip">
+          <span class="doticon"></span>
+          <div class="pdf-meta"><b id="pdfName">arquivo.pdf</b><span id="pdfMeta"></span></div>
+        </div>
+        <div class="os-box">
+          <input id="os" type="text" inputmode="numeric" placeholder="Ordem de serviço" />
+          <button id="btnPull" class="btn-sec">Puxar OS</button>
+        </div>
+        <button id="btnReset" class="btn-ghost">Trocar</button>
+      </div>
+
+      <div id="xmlInfo" class="infobar" style="display:none"></div>
+
+      <div class="ink-card">
+        <div class="ink-head">
+          <h2>Tintas &amp; junções</h2>
+          <div class="filters" id="filters">
+            <button class="chip active" data-f="all">Todas</button>
+            <button class="chip" data-f="process">Processo</button>
+            <button class="chip" data-f="spot">Spots</button>
+            <button class="chip" data-f="dual">Dual ##</button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="ink-tbl">
+            <thead>
+              <tr><th class="c-sw"></th><th>Tinta</th><th>Tipo</th><th class="num">Âng</th><th class="num">LPI</th><th>Ponto</th><th>Chapa destino (merge)</th></tr>
+            </thead>
+            <tbody id="inkBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="foot">
+    <div id="log" class="log">Pronto.</div>
+    <button id="btnConvert" class="btn-cta" disabled>
+      <span class="cta-txt">Converter &amp; salvar no _prepress</span>
+    </button>
+  </footer>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

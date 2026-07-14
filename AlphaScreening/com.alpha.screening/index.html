@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AlphaScreening</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dark">
+  <header class="head">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#g)"/>
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1fc7d8"/><stop offset="1" stop-color="#1490b6"/>
+        </linearGradient></defs>
+        <circle cx="22.5" cy="27" r="9.5" fill="#fff"/>
+        <circle cx="22.5" cy="27" r="5.1" fill="#1490b6"/>
+        <rect x="29.4" y="17.5" width="4.5" height="19" rx="2.1" fill="#fff"/>
+      </svg>
+      <div class="brand-txt"><span class="t1">Alpha</span><span class="t2">Screening</span></div>
+    </div>
+    <div class="conn"><span id="dot" class="dot off"></span><span id="connLbl">—</span></div>
+  </header>
+
+  <div class="toolbar">
+    <div class="os-field">
+      <input id="scOS" type="text" inputmode="numeric" placeholder="Ordem de serviço" />
+      <button id="btnScPull" class="btn primary">Puxar OS</button>
+    </div>
+    <button id="btnScReadPdf" class="btn ghost" title="Ler screening gravado no PDF linkado">Ler do PDF linkado</button>
+  </div>
+
+  <div id="scInfo" class="infobar" style="display:none"></div>
+
+  <div class="filters" id="scFilters" style="display:none">
+    <button class="chip active" data-f="all">Todas</button>
+    <button class="chip" data-f="process">Processo</button>
+    <button class="chip" data-f="spot">Spots</button>
+    <button class="chip" data-f="dual">Dual ##</button>
+  </div>
+
+  <main class="ink">
+    <div id="scWrap" class="ink-wrap" style="display:none">
+      <table class="ink-tbl">
+        <thead>
+          <tr>
+            <th class="c-sw"></th><th>Tinta</th><th>Tipo</th>
+            <th class="num">Âng</th><th class="num">LPI</th><th>Ponto</th><th class="c-dual">Dual</th>
+          </tr>
+        </thead>
+        <tbody id="scBody"></tbody>
+      </table>
+    </div>
+
+    <div id="scEmpty" class="empty">
+      <div class="empty-ico">◔</div>
+      <p><b>Nenhum screening carregado.</b><br>Digite a OS e <b>Puxar OS</b>, ou <b>Ler do PDF linkado</b>.</p>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div id="scPdfBox" class="pdf-box" style="display:none">
+      <div class="pdf-row">
+        <input id="scPdfPath" type="text" placeholder="PDF de destino (vazio = PDF linkado)" />
+        <button id="btnScPick" class="btn ghost sm">…</button>
+      </div>
+      <button id="btnScWrite" class="btn primary block">Gravar screening no PDF (halftone + XMP)</button>
+    </div>
+    <div id="scMsg" class="msg"></div>
+  </footer>
+
+  <script src="js/pdfwrite.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

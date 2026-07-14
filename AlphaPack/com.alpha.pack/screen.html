@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AlphaPack Screening</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="ap-dark ap-win">
+  <header class="ap-head">
+    <div class="ap-brand">
+      <svg class="ap-logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="13" fill="#17b2c4"/>
+        <circle cx="22.5" cy="26" r="10" fill="#fff"/>
+        <circle cx="22.5" cy="26" r="5.4" fill="#17b2c4"/>
+        <rect x="29.6" y="16" width="4.7" height="20" rx="2.2" fill="#fff"/>
+      </svg>
+      <span>Screening</span>
+    </div>
+    <div class="ap-conn"><span id="dot" class="dot off"></span><span id="connLbl">—</span></div>
+  </header>
+
+  <main class="ink">
+    <!-- barra de acoes -->
+    <div class="ink-bar">
+      <div class="field os">
+        <label>OS</label>
+        <input id="scOS" type="text" inputmode="numeric" placeholder="do arquivo" />
+      </div>
+      <button id="btnScPull" class="go sm">Puxar OS</button>
+      <button id="btnScReadPdf" class="ghost sm">Ler do PDF linkado</button>
+    </div>
+
+    <div class="ink-sub">
+      <div class="field">
+        <label>Ver screening</label>
+        <select id="scSetSel">
+          <option value="all">Todos</option>
+          <option value="main">Principal</option>
+          <option value="dual">Dual ##</option>
+        </select>
+      </div>
+      <div id="scInfo" class="msg"></div>
+    </div>
+
+    <!-- tabela estilo Ink Manager -->
+    <div id="scWrap" class="ink-wrap" style="display:none">
+      <table class="ink-tbl">
+        <thead>
+          <tr>
+            <th>Tinta</th><th>Tipo</th><th>Âng.</th><th>LPI</th><th>Ponto</th><th>Dual</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="scBody"></tbody>
+      </table>
+    </div>
+
+    <div id="scEmpty" class="ink-empty">
+      Sem screening carregado. <b>Puxar OS</b> (do XML) ou <b>Ler do PDF linkado</b>.
+    </div>
+
+    <!-- gravar no pdf -->
+    <div id="scPdfBox" class="sc-pdf" style="display:none">
+      <div class="field">
+        <label>PDF de destino (vazio = PDF linkado ativo)</label>
+        <div class="grid2">
+          <input id="scPdfPath" type="text" placeholder="…\\1762051_HDF_SP_PS_ITP_114_INT.pdf" />
+          <button id="btnScPick" class="ghost">Escolher…</button>
+        </div>
+      </div>
+      <button id="btnScWrite" class="go">Gravar screening no PDF</button>
+    </div>
+
+    <div id="scMsg" class="msg"></div>
+  </main>
+
+  <div id="banner" class="banner"></div>
+
+  <script src="js/pdfwrite.js"></script>
+  <script src="js/screen.js"></script>
+</body>
+</html>

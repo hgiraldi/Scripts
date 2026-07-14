@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AlphaPack</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="ap-dark">
+  <header class="ap-head">
+    <div class="ap-brand">
+      <svg class="ap-logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="13" fill="#17b2c4"/>
+        <circle cx="22.5" cy="26" r="10" fill="#fff"/>
+        <circle cx="22.5" cy="26" r="5.4" fill="#17b2c4"/>
+        <rect x="29.6" y="16" width="4.7" height="20" rx="2.2" fill="#fff"/>
+      </svg>
+      <span>AlphaPack</span>
+    </div>
+    <div class="ap-conn"><span id="dot" class="dot off"></span><span id="connLbl">—</span></div>
+  </header>
+
+  <nav class="ap-tabs">
+    <button class="tab active" data-tab="trap">Trapping</button>
+    <button class="tab" data-tab="barcode">Barcode</button>
+    <button class="tab" data-tab="white">Branco</button>
+    <button class="tab tab-win" data-tab="screen">Screening <span class="win-ico">&#8599;</span></button>
+  </nav>
+
+  <main>
+    <!-- ================= TRAPPING ================= -->
+    <section id="pane-trap" class="pane active">
+      <h2>Trapping vetorial</h2>
+      <p class="hint">Espalha a cor mais clara na mais escura entre regiões adjacentes, com overprint. Funciona em spots/CMYK chapados. Converta textos em curvas antes.</p>
+      <div class="field">
+        <label>Largura do trap (mm)</label>
+        <input id="trapMm" type="number" step="0.01" min="0.01" value="0.10" />
+      </div>
+      <div class="field">
+        <label>Escopo</label>
+        <select id="trapScope">
+          <option value="sel">Seleção</option>
+          <option value="doc">Documento todo</option>
+        </select>
+      </div>
+      <button id="btnTrap" class="go">Gerar trapping</button>
+      <div id="trapMsg" class="msg"></div>
+    </section>
+
+    <!-- ================= BARCODE ================= -->
+    <section id="pane-barcode" class="pane">
+      <h2>Código de barras EAN-13</h2>
+      <div class="field">
+        <label>Código (12 ou 13 dígitos)</label>
+        <input id="bcCode" type="text" inputmode="numeric" placeholder="789123456789" />
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Magnificação (%)</label>
+          <input id="bcMag" type="number" step="1" min="80" max="200" value="100" />
+        </div>
+        <div class="field">
+          <label>BWR (mm)</label>
+          <input id="bcBwr" type="number" step="0.01" min="0" value="0.00" />
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Altura (mm, 0=auto)</label>
+          <input id="bcHeight" type="number" step="0.1" min="0" value="0" />
+        </div>
+        <div class="field">
+          <label>Tinta (vazio = preto)</label>
+          <input id="bcInk" type="text" placeholder="Black" />
+        </div>
+      </div>
+      <button id="btnBarcode" class="go">Gerar barcode</button>
+      <div id="bcMsg" class="msg"></div>
+    </section>
+
+    <!-- ================= WHITE ================= -->
+    <section id="pane-white" class="pane">
+      <h2>White Underprint</h2>
+      <p class="hint">Cria a chapa de branco sob a arte selecionada, une, estrangula (choke) e coloca em overprint na spot informada.</p>
+      <div class="grid2">
+        <div class="field">
+          <label>Choke (mm)</label>
+          <input id="wChoke" type="number" step="0.01" min="0" value="0.10" />
+        </div>
+        <div class="field">
+          <label>Spot de branco</label>
+          <input id="wSpot" type="text" value="White" />
+        </div>
+      </div>
+      <label class="check"><input id="wOver" type="checkbox" checked /><span>Marcar em overprint</span></label>
+      <button id="btnWhite" class="go">Gerar branco</button>
+      <div id="wMsg" class="msg"></div>
+    </section>
+  </main>
+
+  <div id="banner" class="banner"></div>
+
+  <script src="lib/clipper.js"></script>
+  <script src="js/trap.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionList>
+  <Extension Id="com.alpha.pack.panel">
+    <HostList>
+      <Host Name="ILST" Port="8092"/>
+    </HostList>
+  </Extension>
+  <Extension Id="com.alpha.pack.screen">
+    <HostList>
+      <Host Name="ILST" Port="8093"/>
+    </HostList>
+  </Extension>
+</ExtensionList>

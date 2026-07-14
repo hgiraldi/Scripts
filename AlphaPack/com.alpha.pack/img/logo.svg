@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect x="3" y="3" width="42" height="42" rx="13" fill="#17b2c4"/>
+  <!-- "a" no estilo do wordmark Alpha: bowl (anel) + haste reta a direita -->
+  <circle cx="22.5" cy="26" r="10" fill="#ffffff"/>
+  <circle cx="22.5" cy="26" r="5.4" fill="#17b2c4"/>
+  <rect x="29.6" y="16" width="4.7" height="20" rx="2.2" fill="#ffffff"/>
+</svg>

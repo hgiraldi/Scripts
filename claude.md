@@ -16,6 +16,49 @@ Antes de sugerir qualquer alteração, sempre analise os arquivos relacionados a
 
 ---
 
+# Documentação por Assunto (LER ANTES DE CODAR)
+
+Cada frente do projeto tem seu documento. **Antes de responder ou editar, identifique o
+assunto abaixo e leia o(s) .md correspondente(s)** — não explore os fontes para se
+situar. Toda mudança estrutural deve ser refletida no .md da frente.
+
+| Assunto do pedido | Ler primeiro |
+| --- | --- |
+| Qualquer código JSX (API do Illustrator, gotchas, debug, performance) | `GUIA_JSX_ILLUSTRATOR.md` |
+| Onde fica o quê, dependências, `#include`, quem chama quem | `PROJECT_STRUCTURE.md` |
+| Painel CEP do fluxo **Ondulado** (instalação, host.jsx, rede) | `Ondulado/cep/README.md` |
+| Painel CEP do fluxo **Flexível** | `Flexivel/cep/README.md` |
+| **Alpha Compare** (comparador original × tratado) | `AlphaCompare/ARQUITETURA.md` → depois `AlphaCompare/README.md` |
+| **AlphaPack** (trapping, barcode, white underprint — estilo DeskPack) | `AlphaPack/README.md` + `AlphaPack/ROADMAP.md` |
+| **AlphaScreening** (Ink Manager, screening por tinta, XML da OS, XMP) | `AlphaScreening/README.md` |
+| **Alpha Screen** (app Electron que junta colorantes mantendo screening) | `AlphaScreenApp/README.md` |
+| Visual / CSS / HTML (AlphaForms, páginas, identidade Alpha) | `design.md` |
+
+Regras de uso:
+
+1. Se o assunto está na tabela, **abrir o .md antes de qualquer Grep/Read nos fontes**.
+2. Ler os fontes apenas do trecho que for realmente editar.
+3. Depois de mudança estrutural (arquivo novo, pipeline alterado, regra nova),
+   **atualizar o .md daquela frente** — e o `PROJECT_STRUCTURE.md` se mudou o mapa.
+4. Regras de código (sem ES6, cores, PDFs, layers) continuam valendo sempre — este
+   arquivo (`CLAUDE.md`) tem precedência sobre os demais .md.
+
+---
+
+# Deploy × Commit (pastas `Alpha*`)
+
+**Toda pasta que começa com `Alpha` (`AlphaCompare/`, `AlphaPack/`, `AlphaScreening/`,
+`AlphaScreenApp/`, e qualquer `Alpha…` futura) NÃO vai para produção.**
+
+* **Nunca** copiar essas pastas para a pasta de rede da produção
+  (`\\192.168.1.15\uteis\_Padroes_clientes_Alpha\_Scripts\Scripts`).
+* Elas são projetos internos/de teste: o único destino delas é o **commit no git**
+  (ficam versionadas no repositório, não são mais gitignored).
+* Deploy em produção continua valendo **somente** para os scripts do fluxo produtivo
+  (raiz, `Flexivel/`, `Ondulado/`).
+
+---
+
 # Ambiente
 
 ## Adobe Illustrator
@@ -185,6 +228,23 @@ Se o usuário enviar apenas um trecho:
 * Procurar dependências.
 * Perguntar apenas quando realmente necessário.
 * Caso o contexto seja dedutível, entregar a solução completa.
+
+---
+
+---
+
+# Projeto Alpha Compare (extensão CEP)
+
+Se o assunto for **Alpha Compare** (a extensão de conferência visual original × arquivo
+tratado, em `AlphaCompare/`), **LEIA PRIMEIRO `AlphaCompare/ARQUITETURA.md`**.
+
+Esse documento é a base do projeto: mapa dos arquivos, pipeline do motor, o porquê de
+cada filtro, as regras que não podem ser violadas (worker_threads, GenerateContent,
+srcPath, doc transiente), a bancada de aceite e o que já se tentou e falhou.
+
+**Não explore os fontes do AlphaCompare para se situar** — parta do ARQUITETURA.md e só
+abra o arquivo do trecho que for realmente editar. Toda mudança estrutural deve ser
+refletida nele.
 
 ---
 
