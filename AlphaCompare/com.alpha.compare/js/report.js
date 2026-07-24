@@ -7,8 +7,8 @@
   "use strict";
 
   var NAVY = [18, 35, 59], ACCENT = [51, 174, 91], GREYT = [110, 120, 135];
-  var COL = { miss: [220, 38, 38], extra: [37, 99, 235], diff: [220, 38, 38], moved: [245, 158, 11], ok: [34, 165, 91] };   // erro=vermelho, a mais=azul, deslocado=laranja, confere=verde
-  var LABEL = { miss: "Faltando no arquivo", extra: "Sobrando no arquivo", diff: "Diferente", moved: "Bloco deslocado (observação)", ok: "Código de barras confere" };
+  var COL = { miss: [220, 38, 38], extra: [37, 99, 235], diff: [220, 38, 38], moved: [245, 158, 11], ok: [34, 165, 91], check: [245, 158, 11] };   // erro=vermelho, a mais=azul, deslocado=laranja, confere=verde
+  var LABEL = { miss: "Faltando no arquivo", extra: "Sobrando no arquivo", diff: "Diferente", moved: "Bloco deslocado (observação)", ok: "Código de barras confere", check: "Confira este texto (observacao)" };
 
   function safeName(s) {
     return String(s || "").replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_");

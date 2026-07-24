@@ -147,6 +147,17 @@
       </details>
     </section>
 
+    <!-- SENSIBILIDADE (o operador escolhe o quanto filtrar) -->
+    <div class="sens-row">
+      <span class="sens-title">Sensibilidade</span>
+      <div class="sens-group">
+        <button id="sensBaixa" class="sens-btn" type="button" title="Só erros claros, sem falso">Baixa · Precisa</button>
+        <button id="sensMedia" class="sens-btn" type="button" title="Original × tratado normal">Média</button>
+        <button id="sensAlta" class="sens-btn on" type="button" title="Trapping pesado / textura / fundo escuro — aceita falsos">Alta · Sensível</button>
+      </div>
+      <div id="sensLegenda" class="sens-legenda">Alta: pega a troca mesmo sob trapping pesado/textura/fundo escuro (DUX, Perdigão). Aceita alguns falsos — confira cada marca. Baixe se quiser menos falso em arte limpa.</div>
+    </div>
+
     <!-- BOTAO COMPARAR -->
     <div class="cta-row">
       <button id="btnCompare" class="btn cta" disabled>⚖ COMPARAR</button>
@@ -187,10 +198,12 @@
             <input id="ovBlink" type="checkbox">
             <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt">⚡ piscar</span></span>
           </label>
-          <span class="ov-toggle" title="Roda = zoom · arraste = retângulo de zoom · direito = afastar · meio/espaço = mover · 2 cliques = ajustar">
+          <span class="ov-toggle" title="Roda = zoom no cursor · arraste = mover · Shift+arraste = retângulo de zoom · botão direito = afastar · 2 cliques = ajustar">
             <button id="ovZoomOut" class="btn ghost xs" title="Afastar (roda p/ baixo ou botão direito)">−</button>
             <button id="ovZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques na imagem)">⛶</button>
-            <button id="ovZoomIn" class="btn ghost xs" title="Aproximar (roda p/ cima ou arraste um retângulo)">+</button>
+            <button id="ovZoomIn" class="btn ghost xs" title="Aproximar (roda p/ cima)">+</button>
+            <span id="ovZoomLbl" class="ov-zlbl">100%</span>
+            <button id="ovFullBtn" class="btn ghost xs" title="Tela cheia para inspecionar (Esc para sair)">⤢</button>
           </span>
         </div>
       </div>
@@ -221,6 +234,29 @@
 
   <!-- LUPA de recorte (segue o cursor) -->
   <canvas id="loupe" class="loupe" style="display:none"></canvas>
+
+  <!-- TELA CHEIA de inspeção: recebe o MESMO viewer (o ovWrap é movido pra cá) -->
+  <div id="ovFull" class="ov-full" style="display:none">
+    <div class="ov-full-bar">
+      <span class="ov-full-title">🔍 Inspeção</span>
+      <button id="fsPrev" class="btn ghost xs" title="Divergência anterior (←)">‹</button>
+      <span id="fsPos" class="ov-full-pos">—</span>
+      <button id="fsNext" class="btn ghost xs" title="Próxima divergência (→)">›</button>
+      <span id="fsDesc" class="ov-full-desc"></span>
+      <span class="ov-full-sp"></span>
+      <label class="ov-toggle"><input id="fsSwap" type="checkbox"> ver original</label>
+      <label class="blink-toggle" title="Alterna original ↔ arquivo (B)">
+        <input id="fsBlink" type="checkbox">
+        <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt">⚡ piscar</span></span>
+      </label>
+      <button id="fsZoomOut" class="btn ghost xs" title="Afastar">−</button>
+      <button id="fsZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques)">⛶</button>
+      <button id="fsZoomIn" class="btn ghost xs" title="Aproximar">+</button>
+      <span id="ovZoomLbl2" class="ov-zlbl">100%</span>
+      <button id="fsClose" class="btn ghost xs" title="Fechar (Esc)">✕ fechar</button>
+    </div>
+    <div class="ov-full-body" id="ovFullBody"></div>
+  </div>
 
   <!-- libs vendorizadas -->
   <script src="./lib/pdfium/pdfrender.js"></script>

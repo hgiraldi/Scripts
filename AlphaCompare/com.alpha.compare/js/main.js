@@ -313,6 +313,19 @@
     });
   }
 
+  // Camadas de ACABAMENTO/TÉCNICAS: não são conteúdo da embalagem e, renderizadas
+  // sem overprint, cobrem a arte (o pdfium não simula overprint). Ficam ocultas por
+  // padrão; o operador pode religar qualquer uma no ⚗ Limpar.
+  var TEC_RE = /^(branco|white|opaque\s*white|verniz|verniz\s*loc|varnish|uv|faca|corte|cut|die\s*line|dieline|vinco|crease|cotas?|medidas?|dimens|registro|marcas?|tecnic|técnic|control|sangria|bleed|guias?|guide)/i;
+  function autoHideTecnicas(layers) {
+    var out = [], i, nm;
+    for (i = 0; i < layers.length; i++) {
+      nm = layers[i].name || "";
+      if (TEC_RE.test(nm.replace(/^[\s_\-.]+/, ""))) out.push(nm);
+    }
+    return out;
+  }
+
   function loadPdfPane(pane, u8, srcPath) {
     progStart(); progSet(30, "lendo PDF…");
     // com caminho conhecido (Desktop/Engine) NÃO segura ~700MB de bytes na RAM —
@@ -325,12 +338,28 @@
     withPdf(u8, null, function (h) {
       pane.pages = ACPdf.pageCount(h);
       var sz = ACPdf.pageSize(h, 0); pane.pageW = sz.w; pane.pageH = sz.h;
+      // Lê a estrutura JÁ no carregamento p/ ocultar as camadas TÉCNICAS sozinho
+      // (branco de suporte, verniz, faca...). Sem isso o render sai irreconhecível:
+      // são tintas de acabamento que na impressão vão em overprint/por baixo, mas o
+      // pdfium (renderizador de tela) pinta OPACAS por cima e escondem a arte.
+      var st = null;
+      try { st = ACPdf.readStructure(h, 0); } catch (eS) {}
+      if (st) {
+        pane.struct = st;
+        var tec = autoHideTecnicas(st.layers || []);
+        for (var t = 0; t < tec.length; t++) pane.hideL[tec[t]] = true;
+        pane._tec = tec;
+        if (tec.length) applyHidesOn(h, pane);
+      }
       return ACPdf.render(h, 0, null, Math.min(1.5, 800 / Math.max(sz.w, sz.h)));
     }, function (err, cv) {
       if (err) { pane.pdf = false; pane.bytes = null; pane.srcPath = null; progEnd("erro"); setStatus("Falha ao ler PDF: " + err, true); pane._onLoaded = null; return; }
       $(pane.ids.pdfNav).style.display = pane.pages > 1 ? "flex" : "none";
       $(pane.ids.prepBtn).style.display = "inline-block";   // habilita ⚗ Limpar (só PDF)
-      setSource(pane, cv); progEnd("preview pronto");
+      setSource(pane, cv);
+      progEnd(pane._tec && pane._tec.length
+        ? "preview pronto · camadas técnicas ocultadas: " + pane._tec.join(", ")
+        : "preview pronto");
     });
   }
 
@@ -481,7 +510,24 @@
     return { colorTol: +$("tolColor").value, slack: +$("tolThick").value,
              minArea: +$("tolArea").value, dpi: +$("dpi").value,
              structural: !!($("modoForma") && $("modoForma").checked),   // comparar por forma
+             sens: _sensLevel,                                           // 0=Baixa 1=Média 2=Alta
              trapTol: $("tolTrap") ? +$("tolTrap").value : 3 };
+  }
+  // Sensibilidade (GlobalVision-style): o operador escolhe o quanto filtrar. Baixa = só erro
+  // claro (0 falso). Alta = pega troca sob trapping pesado/textura/fundo escuro (aceita falsos).
+  // PADRÃO = Alta (2): captura o erro mesmo no caso difícil; o operador baixa se quiser menos falso.
+  var _sensLevel = 2;
+  function setSens(n) {
+    _sensLevel = n;
+    var ids = ["sensBaixa", "sensMedia", "sensAlta"], i;
+    for (i = 0; i < 3; i++) { var el = $(ids[i]); if (el) el.className = "sens-btn" + (i === n ? " on" : ""); }
+    var leg = $("sensLegenda");
+    if (leg) leg.textContent = n === 0
+      ? "Baixa: só erros claros, sem falso. Use em revisão×revisão ou arte limpa."
+      : n === 1
+      ? "Média: original × tratado normal. Pega mais, com pouco falso."
+      : "Alta: pega a troca mesmo sob trapping pesado/textura/fundo escuro (DUX, Perdigão). Aceita alguns falsos — confira cada marca.";
+    if (RESULT) scheduleCompare();   // re-compara no novo nível
   }
   // ---- barra de progresso (anda suave enquanto espera + tempo decorrido) ----
   var _progT0 = 0, _progTimer = null, _progStage = "", _progCur = 0, _progTarget = 4;
@@ -568,8 +614,10 @@
               var opt = readTol(); opt.prescaled = true; opt.maxWork = WORKRES;
               opt.photoF = rf.ph; opt.photoO = ro.ph;
               RESULT = window.ACEngine.compare(rf.cv, ro.cv, opt);
-              MANUAL = false; renderResult(); progEnd("pronto");
-              applyOcrTextCheck();       // inspeção de texto por OCR (modo forma)
+              MANUAL = false; progEnd("pronto");
+              // se o OCR vai rodar, a lista só aparece DEPOIS de ler tudo (finish());
+              // senão, mostra já. Evita a lista "piscar" com marcadores intermediários.
+              if (!applyOcrTextCheck()) renderResult();
             } catch (e) { progEnd("erro"); setStatus("Erro na comparação: " + e, true); }
           }, 20);
         });
@@ -583,16 +631,14 @@
         var opt = readTol(); opt.maxWork = WORKRES;
         RESULT = window.ACEngine.compare(cropCanvas(F), cropCanvas(O), opt);
         MANUAL = false;
-        renderResult();
-        applyOcrTextCheck();       // inspeção de texto por OCR (modo forma)
-        setStatus("");
+        if (!applyOcrTextCheck()) { renderResult(); setStatus(""); }
       } catch (e) { setStatus("Erro na comparação: " + e, true); }
     }, 30);
   }
 
   var MODE = "all";
   function modeSet() {
-    return MODE === "miss" ? { miss: 1, ok: 1 } : MODE === "struct" ? { miss: 1, extra: 1, ok: 1 } : { miss: 1, extra: 1, diff: 1, ok: 1 };
+    return MODE === "miss" ? { miss: 1, ok: 1, check: 1 } : MODE === "struct" ? { miss: 1, extra: 1, ok: 1, check: 1 } : { miss: 1, extra: 1, diff: 1, ok: 1, check: 1 };
   }
   function imgToCanvas(imgData) {
     var c = document.createElement("canvas"); c.width = imgData.width; c.height = imgData.height;
@@ -834,6 +880,21 @@
     return { x: cr.x + (rx / fr.w) * cr.w, y: cr.y + (ry / fr.h) * cr.h,
              w: (rw / fr.w) * cr.w, h: (rh / fr.h) * cr.h };
   }
+  // idem para o ORIGINAL. Duas correções que o lado do arquivo não precisa:
+  //  1) desfaz o deslocamento do alinhamento (align.ox/oy) — na tela do compare o
+  //     original está deslocado por ele;
+  //  2) usa origRect (o render do ORIGINAL), não fileRect — as páginas têm tamanhos
+  //     diferentes (Perdigão: 2147 x 2132 px).
+  // Sem isso a fase B relê o lugar ERRADO no original, lê vazio e descarta a troca
+  // real (foi o que escondeu o 0763→0591).
+  function toPageRectO(rx, ry, rw, rh) {
+    var cr = (O.crop && isCropped(O)) ? O.crop : { x: 0, y: 0, w: 1, h: 1 };
+    var al2 = (RESULT && RESULT.align) || { ox: 0, oy: 0 };
+    var orr = (RESULT && RESULT.origRect) || RESULT.fileRect || { w: RESULT.W, h: RESULT.H };
+    var x2 = Math.max(0, rx - (al2.ox || 0)), y2 = Math.max(0, ry - (al2.oy || 0));
+    return { x: cr.x + (x2 / orr.w) * cr.w, y: cr.y + (y2 / orr.h) * cr.h,
+             w: (rw / orr.w) * cr.w, h: (rh / orr.h) * cr.h };
+  }
 
   // Pipeline: cada BLOCO do detector -> divide em LINHAS apertadas -> re-renderiza cada
   // linha dos DOIS PDFs em DPI ALTO (ACPdf) -> OCR -> portão de similaridade (só confia se
@@ -854,7 +915,15 @@
         if (rot) pr = rotFracInv(pr, rot);
         var cn = { x: Math.max(0, pr.x), y: Math.max(0, pr.y),
                    w: Math.min(1, pr.w), h: Math.min(1, pr.h) };
-        var s = Math.max(1, Math.min(targetPx / Math.max(1, cn.h * pg.h), 16));   // DPI alto
+        // DPI por item: TEXTO PEQUENO precisa de mais resolução p/ a releitura ser
+        // confiável; texto grande com DPI alto começa a inventar caractere (falsos).
+        var tgt = items[i].target || targetPx;
+        // A meta (tgt) é a ALTURA DA LINHA DEPOIS de girar. Com rot 90/270 a altura
+        // final vem da LARGURA do recorte na página crua — usar a altura crua fazia o
+        // recorte do original sair ~4× menor que o do arquivo (436x110 x 110x28) e o
+        // texto chegava ilegível ao leitor. Era isso que impedia confirmar o 28→29.
+        var altEfe = (rot === 90 || rot === 270) ? cn.w * pg.w : cn.h * pg.h;
+        var s = Math.max(1, Math.min(tgt / Math.max(1, altEfe), 16));
         var outW = cn.w * pg.w * s, outPix = outW * (cn.h * pg.h * s);
         if (outW > 2200) { s = s * (2200 / outW); outPix = (cn.w * pg.w * s) * (cn.h * pg.h * s); }
         if (outPix > 500000) s = s * Math.sqrt(500000 / outPix);                    // teto do OCR
@@ -892,13 +961,66 @@
   // localiza AS regiões que mudaram -> re-renderiza SÓ essas linhas em DPI alto ->
   // OCR dos 2 lados -> portão de similaridade da linha (mata ruído "forno/forna") ->
   // reporta TROCOU / SUMIU / A MAIS. Nunca lê a label inteira (falso-positivo + lento).
+  // respiro p/ o painel repintar entre leituras (o OCR roda na thread da UI:
+  // sem ceder o controle, a tela congela e o operador acha que travou)
+  function respira(fn) { setTimeout(fn, 16); }
+  // O leitor de OCR é treinado em texto ESCURO sobre fundo CLARO. Rótulo de fundo
+  // preto (texto branco) era lido errado — é por isso que o Perdigão (fundo claro)
+  // saía limpo e o DUX (fundo preto) não. Inverte quando o fundo é escuro.
+  function prepOcr(img) {
+    if (!img || !img.data) return img;
+    var d = img.data, n = img.width * img.height, i, soma = 0, passo = Math.max(1, (n / 4000) | 0), c = 0;
+    for (i = 0; i < n; i += passo) { var q = i * 4; soma += 0.299 * d[q] + 0.587 * d[q + 1] + 0.114 * d[q + 2]; c++; }
+    if (!c || soma / c >= 118) return img;                 // fundo já é claro
+    var out = new Uint8Array(n * 4);
+    for (i = 0; i < n; i++) {
+      var o = i * 4;
+      out[o] = 255 - d[o]; out[o + 1] = 255 - d[o + 1]; out[o + 2] = 255 - d[o + 2]; out[o + 3] = 255;
+    }
+    return { data: out, width: img.width, height: img.height };
+  }
   function applyOcrTextCheck() {
     // fim de pipeline sem OCR? devolve a memória do pdfium (heap não encolhe sozinho)
     function pdfDone() { if (window.ACPdf) ACPdf.reset(); }
-    if (!RESULT || RESULT.mode !== "forma" || !window.ACOcr || !window.ACPdf) { pdfDone(); return; }
-    if (!(F.pdf && O.pdf)) { pdfDone(); return; }
+    // ===================================================================================
+    // OCR de texto por STRING INTEIRA (v23) DESLIGADO — 23/07/2026.
+    // Prova visual (scratchpad) mostrou que, no modo forma (original×tratado), a seleção
+    // por resíduo entrega FOTO/gráfico ao OCR -> lê lixo e emite FALSOS; a troca pequena
+    // (0763, 28g) nem sobressai como região (o resíduo fica todo na foto/trapping/fundo).
+    // Decisão do Henrique: focar no FORTE real = rev×rev (mesma arte, 2 revisões), onde o
+    // pixel-diff crava a mudança. Validado no scratchpad: identidade revA×revA = 0 comps;
+    // marca de 6px (menor que um ponto) = 1 comp exatamente no local, modo cor, 0 falso.
+    // Marcadores vagos de texto já são escondidos pelo applyMode, então o forma fica
+    // silencioso (só objeto/foto/faca reais), não ruidoso. Backup do v23 e o material do
+    // v22 (ocrPairs/verifyTokens) estão no scratchpad p/ reativar com detecção de linha
+    // real + OCR melhor no futuro.
+    pdfDone(); return false;
+    // eslint-disable-next-line no-unreachable  (código do v23 mantido p/ referência abaixo)
+    if (!RESULT || RESULT.mode !== "forma" || !window.ACOcr || !window.ACPdf) { pdfDone(); return false; }
+    if (!(F.pdf && O.pdf)) { pdfDone(); return false; }
     var regs = RESULT.textRegions;
-    if (!regs || !regs.length) { pdfDone(); return; }
+    // ===== REDE DE SEGURANÇA (ideia do Henrique) =====
+    // O pixel não acusou nada? Antes de dizer "sem divergências", o OCR confere TODAS
+    // as linhas de texto. É exatamente quando o operador precisa de certeza — e é o
+    // caso em que uma troca pequena (28→29 num texto com trapping) escapa do pixel.
+    var reais = 0, cR;
+    for (cR = 0; cR < RESULT.comps.length; cR++) {
+      var c0R = RESULT.comps[cR];
+      if (c0R.type === "ok") continue;                       // barcode/QR conferido não conta
+      if (c0R.kind === "text" && !c0R.textFile && !c0R.textOrig) continue;   // marcador vago
+      reais++;
+    }
+    if (reais === 0 && window.ACText && window.ACText.findRestyledRegions) {
+      try {
+        var rrV = window.ACText.findRestyledRegions(RESULT.fileImg, RESULT.origImg, { varreduraTotal: true });
+        if (rrV && rrV.regions && rrV.regions.length) {
+          regs = RESULT.textRegions = rrV.regions;
+          if (rrV.resid) RESULT.textResid = rrV.resid;
+          RESULT._varredura = true;
+        }
+      } catch (eV) {}
+    }
+    if (!regs || !regs.length) { pdfDone(); return false; }
     var reqId = (RESULT._ocrReq = (RESULT._ocrReq || 0) + 1);
     // linhas das regiões que o pixel-diff marcou como texto (com o retângulo na página)
     var lines = [], ri;
@@ -910,6 +1032,9 @@
       return c;
     }
     for (ri = 0; ri < regs.length; ri++) {
+      // região de RESÍDUO CONCENTRADO (conc): a troca é curta dentro de uma linha longa,
+      // então a densidade média é baixa por natureza — o filtro abaixo a mataria.
+      var isConc = !!regs[ri].conc;
       var subs = splitRegionLines(regs[ri]), si, gi;
       for (si = 0; si < subs.length; si++) {
         var ln = subs[si];
@@ -919,185 +1044,132 @@
         for (gi = 0; gi < segs.length; gi++) {
           var sg = segs[gi];
           if (sg.h < 10 || sg.w < 20) continue;
-          sg.resid = residCount(sg);
-          if (sg.resid < Math.max(24, sg.w * sg.h * 0.012)) continue;   // nada mudou ali de fato — não gasta OCR
+          // na VARREDURA (conferência ampla), linha SEM nenhum resíduo é texto
+          // idêntico pixel a pixel — não gasta OCR com ela.
+          if (residCount(sg) === 0) continue;   // pixel IDÊNTICO nos 2 lados = texto igual -> não lê
+          sg.resid = isConc ? 1e9 : residCount(sg);
+          if (sg.resid < 8) continue;           // resíduo desprezível = ruído de borda, não muda texto
           sg.region = ri; lines.push(sg);
         }
       }
     }
-    // mais residual (mudança mais densa) primeiro — o teto corta o lixo, não o registro
-    lines.sort(function (a, b) { return (b.resid / (b.w * b.h)) - (a.resid / (a.w * a.h)); });
-    if (lines.length > 24) lines = lines.slice(0, 24);              // teto (tempo)
-    if (!lines.length) { pdfDone(); return; }
+    // ordena por RESÍDUO TOTAL (não densidade): uma troca curta numa linha longa tem
+    // densidade baixa mas resíduo real — a string inteira decide se é troca ou trapping.
+    lines.sort(function (a, b) { return b.resid - a.resid; });
+    var tetoL = 26;                            // teto de linhas (tempo ~2-3min no pior caso)
+    if (lines.length > tetoL) lines = lines.slice(0, tetoL);
+    if (!lines.length) { pdfDone(); return false; }
     var touchedReg = {};
     RESULT._ocrMsg = "lendo textos (OCR)…"; setStatus("lendo textos (OCR)…", false, true);
 
-    // FASE A SEM re-render: recorta as linhas das imagens JÁ ALINHADAS do compare
-    // (estilo GlobalVision — rasteriza 1x e inspeciona da imagem). O MESMO retângulo
-    // serve pros 2 lados (o compare já alinhou o original ao arquivo).
-    var fImgs = [], oImgs = [], li2;
-    for (li2 = 0; li2 < lines.length; li2++) {
-      var L2 = lines[li2];
-      var cf = cropImgData(RESULT.fileImg, L2.x, L2.y, L2.w, L2.h);
-      var co = cropImgData(RESULT.origImg, L2.x, L2.y, L2.w, L2.h);
-      fImgs.push(cf); oImgs.push(co);
+    // ===== COMPARAÇÃO DE STRING INTEIRA (estilo GlobalVision Text Inspection) =====
+    // Renderiza cada linha em ALTA RESOLUÇÃO nos 2 lados, lê o TEXTO COMPLETO (letra,
+    // número E acento) e compara as strings da esquerda p/ a direita. Erro de OCR é
+    // comum aos 2 lados e se cancela; a diferença REAL é localizada por prefixo/sufixo
+    // comum. Sem regras de dígito frágeis. O pixel cuida do resto (objeto/faca/foto),
+    // sempre ignorando as regiões de texto.
+    var TGT = 150;   // altura-alvo da linha no recorte -> caractere legível p/ o OCR
+    var items = [], itemsO = [], li3;
+    for (li3 = 0; li3 < lines.length; li3++) {
+      var L3 = lines[li3], mx3 = L3.w * 0.02 + 8, my3 = L3.h * 0.5 + 4, prA, prB;
+      try { prA = toPageRect(Math.max(0, L3.x - mx3), Math.max(0, L3.y - my3), L3.w + 2 * mx3, L3.h + 2 * my3); } catch (e3a) { prA = null; }
+      try { prB = toPageRectO(Math.max(0, L3.x - mx3), Math.max(0, L3.y - my3), L3.w + 2 * mx3, L3.h + 2 * my3); } catch (e3b) { prB = null; }
+      items.push({ pr: prA || { x: 0, y: 0, w: 0.001, h: 0.001 }, target: TGT });
+      itemsO.push({ pr: prB || { x: 0, y: 0, w: 0.001, h: 0.001 }, target: TGT });
     }
-    ocrPairs(lines, fImgs, oImgs, reqId, touchedReg, null);
+    setStatus("lendo textos (OCR) — 0/" + lines.length, false, true);
+    renderCropsHi(F, items, TGT, function (fT) {
+      if (!RESULT || RESULT._ocrReq !== reqId) return;
+      renderCropsHi(O, itemsO, TGT, function (oT) {
+        if (!RESULT || RESULT._ocrReq !== reqId) return;
+        runLineDiff(lines, fT, oT, reqId);
+      });
+    });
+    return true;   // OCR começou; a lista sai no finish()
   }
 
-  function ocrPairs(lines, fImgs, oImgs, reqId, touchedReg, renderErr) {
-    var total = lines.length, done = 0, cands = [], seen = {}, readOk = 0, firstErr = null;
-    if (renderErr) firstErr = "render: " + String((renderErr && renderErr.message) || renderErr).slice(0, 100);
-    function noteErr(e) { if (!firstErr) firstErr = String((e && e.message) || e).slice(0, 120); }
-
-    // fase A: OCR das linhas -> COLETA candidatos (token numérico divergente + posição)
-    function step(k) {
+  // Lê o TEXTO COMPLETO de cada linha nos 2 lados e localiza a diferença por STRING.
+  function runLineDiff(lines, fT, oT, reqId) {
+    var total = lines.length, k = 0, added = 0, readOk = 0, firstErr = null;
+    function finish() {
       if (!RESULT || RESULT._ocrReq !== reqId) return;
-      if (k >= total) { verifyTokens(); return; }
-      var fR = fImgs[k], oR = oImgs[k], L = lines[k];
-      if (!fR || !oR) { done++; return step(k + 1); }
-      setStatus("lendo textos (OCR) — " + (done + 1) + "/" + total, false, true);
-      var w = Math.min(fR.img.width, oR.img.width), h = Math.min(fR.img.height, oR.img.height), sec = { id: 0, x: 0, y: 0, w: w, h: h };
-      var pre = (k > 0 && k % 6 === 0 && window.ACOcr.terminate) ? window.ACOcr.terminate() : Promise.resolve();
-      pre.then(function () {
-        // crops em resolução do compare (linha ~18px) -> upscale 3 deixa legível
-        return window.ACOcr.diffSections(fR.img, oR.img, [sec], { numericAll: true, upscale: 3 });
-      }).then(function (res) {
-        if (!RESULT || RESULT._ocrReq !== reqId) return;
-        touchedReg[L.region] = true; readOk++;
-        var stt = (res.sectionsText && res.sectionsText[0]) || {};
-        // PORTÃO: só confia se os 2 lados leram a MESMA linha (senão é ruído de leitura)
-        if (simText(stt.textFile || "", stt.textOrig || "") >= 0.45) {
-          var cps = res.comps || [], j;
-          for (j = 0; j < cps.length; j++) {
-            var c = cps[j];
-            if (!(digTokens(c.textFile).length || digTokens(c.textOrig).length)) continue;
-            // bbox do token (px do crop, s=1) -> px do COMPARE (soma o offset do crop)
-            var xc = fR.x0 + c.x, yc = fR.y0 + c.y;
-            var key = Math.round(xc / 10) + "," + Math.round(yc / 10);
-            if (seen[key]) continue; seen[key] = 1;
-            cands.push({ type: c.type, tO: c.textOrig || "", tF: c.textFile || "",
-                         xc: xc, yc: yc, wc: Math.max(4, c.w), hc: Math.max(4, c.h), line: L,
-                         lineDigsF: ((stt.textFile || "").match(/\d/g) || []).join(""),
-                         lineDigsO: ((stt.textOrig || "").match(/\d/g) || []).join("") });
-          }
-        }
-        done++; step(k + 1);
-      }).catch(function (e) { if (!RESULT || RESULT._ocrReq !== reqId) return; noteErr(e); done++; step(k + 1); });
-    }
-
-    // fase B: VERIFICAÇÃO por token (anti-falso): re-renderiza o token isolado em DPI
-    // máximo nos 2 lados e re-lê SÓ dígitos. Igual dos 2 lados = leitura tropeçou na
-    // linha longa -> DESCARTA. Diferente = troca REAL -> emite (com o de→para limpo).
-    function verifyTokens() {
-      // candidatos com MAIS dígitos primeiro (códigos reais tipo 0763/0591) — o teto
-      // corta o fragmento de leitura, nunca o token de verdade
-      function digN(c) { return (digTokens(c.tO).join("") + digTokens(c.tF).join("")).length; }
-      cands.sort(function (a, b) { return digN(b) - digN(a); });
-      if (cands.length > 16) cands = cands.slice(0, 16);   // teto
-      if (!cands.length) { finish(0); return; }
-      // token (px do compare) -> fração da página, com margem: MUITO contexto horizontal
-      // (bbox do OCR vem estreito), POUCO vertical (1 linha só — 2ª linha confunde o psm7)
-      var items = [], i;
-      for (i = 0; i < cands.length; i++) {
-        var cd0 = cands[i];
-        var mx = cd0.wc * 1.2 + 12, my = cd0.hc * 0.3 + 2;
-        var pr;
-        try { pr = toPageRect(Math.max(0, cd0.xc - mx), Math.max(0, cd0.yc - my), cd0.wc + 2 * mx, cd0.hc + 2 * my); }
-        catch (e0) { pr = null; }
-        items.push({ pr: pr || { x: 0, y: 0, w: 0.001, h: 0.001 } });
-      }
-      setStatus("confirmando números…", false, true);
-      renderCropsHi(F, items, 110, function (fT) {
-        if (!RESULT || RESULT._ocrReq !== reqId) return;
-        renderCropsHi(O, items, 110, function (oT) {
-          if (!RESULT || RESULT._ocrReq !== reqId) return;
-          runVerify(fT, oT);
-        });
-      });
-      function runVerify(fT, oT) {
-          if (!RESULT || RESULT._ocrReq !== reqId) return;
-          var added = 0;
-          function digitsOf(txt) { return ((txt || "").match(/\d/g) || []).join(""); }
-          function vstep(i2) {
-            if (!RESULT || RESULT._ocrReq !== reqId) return;
-            if (i2 >= cands.length) { finish(added); return; }
-            var cd = cands[i2], fR2 = fT[i2], oR2 = oT[i2];
-            if (!fR2 || !oR2) { return vstep(i2 + 1); }
-            var secF = { id: 0, x: 0, y: 0, w: fR2.img.width, h: fR2.img.height, numeric: true, psm: "7" };
-            var secO = { id: 0, x: 0, y: 0, w: oR2.img.width, h: oR2.img.height, numeric: true, psm: "7" };
-            window.ACOcr.readSections(fR2.img, [secF], { upscale: 2 }).then(function (rf) {
-              return window.ACOcr.readSections(oR2.img, [secO], { upscale: 2 }).then(function (ro) {
-                var dF = digitsOf(rf[0] && rf[0].text), dO = digitsOf(ro[0] && ro[0].text);
-                // TROCA real = mesma estrutura, conteúdo diferente (0763/3515 vs 0591/3515:
-                // 8 vs 8 dígitos). Comprimentos díspares = crop caiu em trecho re-diagramado
-                // (falso). SUMIU/A MAIS só confirma se a fase A também viu um lado vazio.
-                var ok = false;
-                if (dF !== dO) {
-                  if (dF && dO) ok = Math.min(dF.length, dO.length) >= 3 && Math.abs(dF.length - dO.length) <= 1;
-                  else ok = (dF.length >= 4 || dO.length >= 4) && (cd.tO === "" || cd.tF === "");
-                }
-                // ANTI-FALSO "a mais/sumiu": se os dígitos existem na LEITURA DA LINHA
-                // INTEIRA do outro lado (fase A), o texto está lá — só re-diagramado.
-                function win4In(hay, s) {
-                  if (!hay || !s || s.length < 4) return false;
-                  for (var w4 = 0; w4 + 4 <= s.length; w4++) if (hay.indexOf(s.substr(w4, 4)) >= 0) return true;
-                  return false;
-                }
-                if (ok && !dO && win4In(cd.lineDigsO, dF)) ok = false;   // "a mais" mas existe no original
-                if (ok && !dF && win4In(cd.lineDigsF, dO)) ok = false;   // "sumiu" mas existe no arquivo
-                if (ok) {
-                  // troca REAL confirmada — marca no local do token (já em px do compare)
-                  var px = cd.xc, py = cd.yc, pw2 = Math.max(8, cd.wc), ph2 = Math.max(8, cd.hc);
-                  var tp = (!dF) ? "miss" : (!dO) ? "extra" : "diff";
-                  // exibe o token da leitura de LINHA (fase A: "0763"/"0591", limpo);
-                  // a re-leitura confirmou, mas o token da linha é o recorte exato
-                  RESULT.comps.push({ x: px, y: py, w: pw2, h: ph2, cx: px + (pw2 >> 1), cy: py + (ph2 >> 1),
-                                      area: Math.max(1, pw2 * ph2), type: tp, kind: "text",
-                                      textOrig: cd.tO || dO, textFile: cd.tF || dF, region: cd.line.region, ids: [] });
-                  added++;
-                }
-                vstep(i2 + 1);
-              });
-            }).catch(function () { vstep(i2 + 1); });
-          }
-          vstep(0);
-      }
-    }
-
-    function finish(added) {
-      // Se o OCR LEU as linhas: marcador vago (nada confirmado) = re-tom/re-diagramação
-      // legítima -> SOME TUDO (o que é real virou comp preciso "0763→0591").
-      // Se o OCR NÃO leu nada (falha/memória): mantém os marcadores como aviso honesto.
-      if (readOk > 0) {
-        for (var t = RESULT.comps.length - 1; t >= 0; t--) {
-          var pc = RESULT.comps[t];
-          if (pc.kind === "text" && pc.textFile === "" && pc.textOrig === "") RESULT.comps.splice(t, 1);
-        }
+      for (var t = RESULT.comps.length - 1; t >= 0; t--) {   // tira marcadores vagos
+        var pc = RESULT.comps[t];
+        if (pc.kind === "text" && !pc.textFile && !pc.textOrig) RESULT.comps.splice(t, 1);
       }
       var diag = firstErr || OCR_INIT_ERR;
       RESULT._ocrMsg = readOk === 0
-        ? "⚠ OCR não rodou" + (diag ? " [" + diag + "]" : " (motivo desconhecido)") + " — blocos marcados p/ conferir"
-        : (added ? ("texto: " + added + " troca(s) confirmada(s)") : "textos conferidos ✓") +
-          "  [" + readOk + "/" + total + " linhas, " + cands.length + " verificado(s)]";
+        ? "⚠ OCR não rodou" + (diag ? " [" + diag + "]" : "") + " — blocos marcados p/ conferir"
+        : (added ? ("texto: " + added + " diferença(s)") : "textos conferidos ✓") + "  [" + readOk + "/" + total + " linhas]";
       setStatus(""); renderResult();
-      // fim do pipeline: derruba o pdfium — o heap do WASM (pico de ~2GB) NUNCA encolhe
-      // sozinho; o reset devolve a memória e a próxima ação re-inicializa (~1s)
       if (window.ACPdf) ACPdf.reset();
     }
-    step(0);
+    function ocrText(img) {
+      var sec = { id: 0, x: 0, y: 0, w: img.width, h: img.height, numeric: false, psm: "7" };
+      return window.ACOcr.readSections(img, [sec], { upscale: 1 }).then(function (r) { return (r[0] && r[0].text) || ""; });
+    }
+    function norm(s) { return String(s || "").replace(/\s+/g, " ").replace(/^ | $/g, ""); }
+    function alnum(s) { return String(s || "").replace(/[^0-9A-Za-zÀ-ÿ]/g, ""); }
+    // localiza a diferença: prefixo + sufixo comum; o miolo é a troca. Se a maior parte
+    // NÃO casa (matched/total baixo), as duas leituras divergem em tudo = ruído -> ignora.
+    function strDiff(a, b) {
+      var A = norm(a), B = norm(b);
+      if (A === B) return null;
+      var la = A.length, lb = B.length, mn = Math.min(la, lb), p = 0;
+      while (p < mn && A.charAt(p) === B.charAt(p)) p++;
+      var s = 0; while (s < la - p && s < lb - p && A.charAt(la - 1 - s) === B.charAt(lb - 1 - s)) s++;
+      var midA = A.slice(p, la - s), midB = B.slice(p, lb - s);
+      var matched = p + s, tot = Math.max(la, lb);
+      if (tot < 4 || matched < 4) return null;                     // strings curtas/ilegíveis
+      if (matched / tot < 0.55) return null;                       // diferem em tudo = ruído
+      if (Math.max(midA.length, midB.length) > 14) return null;    // miolo grande = bloco, não troca
+      if (alnum(midA) === alnum(midB)) return null;                // só espaço/pontuação = ruído
+      return { O: midA, F: midB, p: p, la: la };
+    }
+    function step() {
+      if (!RESULT || RESULT._ocrReq !== reqId) return;
+      if (k >= total) return finish();
+      var L = lines[k], fR = fT[k], oR = oT[k];
+      if (!fR || !oR) { k++; return respira(step); }
+      setStatus("lendo textos (OCR) — " + (k + 1) + "/" + total, false, true);
+      var pre = (k > 0 && k % 6 === 0 && window.ACOcr.terminate) ? window.ACOcr.terminate() : Promise.resolve();
+      pre.then(function () { return ocrText(fR.img); }).then(function (tF) {
+        return ocrText(oR.img).then(function (tO) {
+          if (!RESULT || RESULT._ocrReq !== reqId) return;
+          readOk++;
+          var d = strDiff(tO, tF);
+          if (d) {
+            var frac = d.la > 0 ? d.p / d.la : 0.4;
+            var px = Math.round(L.x + frac * L.w);
+            var pw2 = Math.max(12, Math.round(L.w * (Math.max(d.O.length, d.F.length) + 1) / Math.max(1, d.la)));
+            var tp = !alnum(d.F) ? "miss" : !alnum(d.O) ? "extra" : "diff";
+            RESULT.comps.push({ x: Math.max(0, px - (pw2 >> 1)), y: L.y, w: pw2, h: L.h,
+                                cx: px, cy: L.y + (L.h >> 1), area: Math.max(1, pw2 * L.h),
+                                type: tp, kind: "text", textOrig: d.O, textFile: d.F, region: L.region, ids: [] });
+            added++;
+          }
+          k++; respira(step);
+        });
+      }).catch(function (e) { if (!RESULT || RESULT._ocrReq !== reqId) return; if (!firstErr) firstErr = String((e && e.message) || e).slice(0, 120); k++; respira(step); });
+    }
+    step();
   }
 
   function applyMode() {
     if (!RESULT) return;
     if (!RESULT.ignored) RESULT.ignored = {};
     var ms = modeSet();
-    RESULT.view = RESULT.comps.filter(function (c) { return ms[c.type] && !RESULT.ignored[keyOf(c)]; });
+    RESULT.view = RESULT.comps.filter(function (c) {
+      // marcador de texto VAGO (sem leitura) nunca entra na lista — ou o OCR confirmou
+      // (tem texto) ou não é divergência. Evita "muitos textos" que não são nada.
+      if (c.kind === "text" && !c.textFile && !c.textOrig) return false;
+      return ms[c.type] && !RESULT.ignored[keyOf(c)];
+    });
     RESULT.view.forEach(function (c) { c.px = Math.round(c.cx / RESULT.W * 100); c.py = Math.round(c.cy / RESULT.H * 100); });
     RESULT.overlayView = window.ACEngine.overlay(RESULT.fileImg, RESULT.lab, RESULT.view, RESULT.W, RESULT.H);
     RESULT.canOverlay = imgToCanvas(RESULT.overlayView);
     // "ok" (barcode/QR confere, verde) é informativo — NÃO conta como divergência
-    $("sumTotal").textContent = RESULT.view.filter(function (c) { return c.type !== "ok"; }).length;
+    $("sumTotal").textContent = RESULT.view.filter(function (c) { return c.type !== "ok" && c.type !== "check"; }).length;
     // contagens = SÓ o que está VISÍVEL (exclui ignorados: faca/cotas/foto/spots)
     var vc = { miss: 0, extra: 0, diff: 0 };
     RESULT.view.forEach(function (c) { if (vc[c.type] != null) vc[c.type]++; });
@@ -1124,7 +1196,7 @@
     $("resultSection").style.display = "block";
     // novo resultado: para o piscar e volta o zoom pro encaixe
     if (BLINK.on) { $("ovBlink").checked = false; setBlink(false); }
-    OVZ = 1; ovApplyZoom();
+    ovReset();
     var r = RESULT;
     r.canOrig = imgToCanvas(r.origImg);
     r.canFile = imgToCanvas(r.fileImg);
@@ -1147,7 +1219,16 @@
     var regTxt = "";
     if (r.align.ang) regTxt += "  ·  ↻ girou " + r.align.ang + "°";
     if (r.align.scl && r.align.scl !== 1) regTxt += "  ·  ⇱ escala " + Math.round(r.align.scl * 1000) / 10 + "%";
-    ai.textContent = "encaixe " + conf + "%" + regTxt + "  ·  " + modoTxt + bcTxt + ocrTxt
+    // diagnóstico na barra: camadas técnicas ocultadas, escala aplicada e versão do
+    // motor (se o v não bater com o do código, o CEP está com cache antigo)
+    var tecTxt = "";
+    if ((F._tec && F._tec.length) || (O._tec && O._tec.length)) {
+      tecTxt = "  ·  ⚗ ocultadas: " + ((F._tec || []).concat(O._tec || []).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(", "));
+    }
+    var sclTxt = (r.align.sx || r.align.sy)
+      ? "  ·  ⇱ escala " + Math.round((r.align.sx || 1) * 1000) / 10 + "% × " + Math.round((r.align.sy || 1) * 1000) / 10 + "%" : "";
+    var vTxt = window.ACEngine && window.ACEngine.v ? "  ·  v" + window.ACEngine.v : "";
+    ai.textContent = "encaixe " + conf + "%" + regTxt + sclTxt + "  ·  " + modoTxt + tecTxt + bcTxt + ocrTxt + vTxt
       + (suggerir ? "  ·  ⚠ encaixe fraco — AJUSTE O RECORTE (▢) nos 2 lados e compare de novo" : "");
     ai.style.color = suggerir ? "var(--miss)" : "";
     applyMode();
@@ -1171,7 +1252,8 @@
                   : c.type === "diff" ? "  ✖ DIVERGE do original (" + (c.codeOrig || "?") + ")"
                                       : "  · aplicado (a mais que o original)");
       } else if (c.kind === "text") {
-        if (!c.textFile && !c.textOrig) titulo = "T Texto diferente (clique p/ ampliar)";   // marcador de local (clicar mostra o zoom)
+        if (c.type === "check") titulo = "⚠ Confira este texto: “" + (c.textOrig || "?") + "”  x  “" + (c.textFile || "?") + "”  (leitura incerta)";
+        else if (!c.textFile && !c.textOrig) titulo = "T Texto diferente (clique p/ ampliar)";   // marcador de local (clicar mostra o zoom)
         else if (c.type === "diff") titulo = "T Texto trocado: " + (c.textOrig || "?") + " → " + (c.textFile || "?");
         else if (c.type === "miss") titulo = "T Texto faltando: " + (c.textOrig || "?");
         else titulo = "T Texto a mais: " + (c.textFile || "?");
@@ -1213,13 +1295,16 @@
     if (i >= 0 && items[i]) items[i].scrollIntoView({ block: "nearest" });
     $("diffPos").textContent = (i + 1) + " / " + RESULT.view.length;
     drawOverlay(i);
-    var cv = $("overlayCanvas"), wrap = cv.parentElement;
+    // leva a divergência escolhida para o CENTRO do viewer. Se a marca é pequena,
+    // aproxima o bastante pra ela aparecer (sem nunca AFASTAR o que o operador ampliou).
     if (i >= 0 && RESULT.view[i]) {
-      var sc = cv.clientWidth / RESULT.W;
-      wrap.scrollTop = RESULT.view[i].cy * sc - wrap.clientHeight / 2;
-      wrap.scrollLeft = RESULT.view[i].cx * sc - wrap.clientWidth / 2;
+      var c9 = RESULT.view[i];
+      var alvo = Math.max(c9.w, c9.h) || 1;
+      var zSug = Math.max(1, Math.min(8, (RESULT.W * 0.16) / alvo));   // marca ~16% da largura
+      ovFocus(c9.cx, c9.cy, zSug);
     }
     drawZoom(i);
+    fsSync();          // barra da tela cheia acompanha a seleção
   }
 
   // zoom do objeto selecionado: Original / Arquivo / Diferença ampliados no ponto
@@ -1285,22 +1370,105 @@
     }
   }
 
-  // ZOOM + PAN na tela de comparação: Ctrl+roda ou botões +/−/⛶; arrastar move
-  var OVZ = 1;
-  function ovApplyZoom(cx, cy) {   // cx/cy: ponto (0..1) a manter sob o cursor
+  // ===== VIEWER (zoom/pan estilo Esko) =====
+  // Tudo por TRANSFORM (translate+scale, origem 0 0): a GPU compõe, não há reflow nem
+  // scroll — é isso que dá a resposta imediata. OVX/OVY = deslocamento em px da janela.
+  // OVZ = 1 é "ajustado à tela" (o canvas tem width:100% do wrap).
+  var OVZ = 1, OVX = 0, OVY = 0, OVZMAX = 40;
+  function ovBase() {   // geometria do fit: escala que faz a arte INTEIRA caber na janela
     var cv = $("overlayCanvas"), wrap = $("ovWrap");
-    if (OVZ <= 1.001) {
-      OVZ = 1; cv.classList.remove("zoomed"); cv.style.width = "";
-    } else {
-      cv.classList.add("zoomed");
-      cv.style.width = Math.round(wrap.clientWidth * OVZ) + "px";
-      if (cx != null) {
-        wrap.scrollLeft = cx * cv.clientWidth - wrap.clientWidth / 2;
-        wrap.scrollTop = cy * cv.clientHeight - wrap.clientHeight / 2;
-      }
-    }
+    var vw = wrap.clientWidth || 1, vh = wrap.clientHeight || 1;
+    var cw = cv.width || 1, ch = cv.height || 1;
+    var fs = Math.min(vw / cw, vh / ch);
+    return { fs: fs, w: cw * fs, h: ch * fs, vw: vw, vh: vh };
   }
-  function ovZoomBy(f, cx, cy) { OVZ = Math.max(1, Math.min(16, OVZ * f)); ovApplyZoom(cx, cy); }
+  function ovClamp() {   // não deixa a arte fugir da janela
+    var b = ovBase(), cw = b.w * OVZ, ch = b.h * OVZ;
+    // Menor que a janela: mantém DENTRO dela, mas NÃO força o centro — forçar o centro
+    // atropelava a âncora do cursor e dava a sensação de "o zoom vai pro lado errado".
+    if (cw <= b.vw) OVX = Math.max(0, Math.min(b.vw - cw, OVX));
+    else OVX = Math.min(0, Math.max(b.vw - cw, OVX));
+    if (ch <= b.vh) OVY = Math.max(0, Math.min(b.vh - ch, OVY));
+    else OVY = Math.min(0, Math.max(b.vh - ch, OVY));
+  }
+  function ovApply() {
+    var cv = $("overlayCanvas"), b = ovBase();
+    ovClamp();
+    // escala TOTAL = fit × zoom do operador (o canvas fica no tamanho natural no DOM)
+    var sc = b.fs * OVZ;
+    cv.style.transform = "translate3d(" + OVX.toFixed(2) + "px," + OVY.toFixed(2) + "px,0) scale(" + sc.toFixed(5) + ")";
+    // ampliado além da resolução da imagem -> mostra o PIXEL (não borra)
+    cv.style.imageRendering = sc > 1.05 ? "pixelated" : "-webkit-optimize-contrast";
+    var pct = Math.round(OVZ * 100) + "%";
+    var zl = $("ovZoomLbl"); if (zl) zl.textContent = pct;
+    var zl2 = $("ovZoomLbl2"); if (zl2) zl2.textContent = pct;
+  }
+  // zoom mantendo o ponto (px da janela) EXATAMENTE sob o cursor
+  function ovZoomAt(f, mx, my) {
+    var b = ovBase(), z0 = OVZ;
+    OVZ = Math.max(1, Math.min(OVZMAX, OVZ * f));
+    if (OVZ === z0) return;
+    if (mx == null) { mx = b.vw / 2; my = b.vh / 2; }
+    OVX = mx - (mx - OVX) * (OVZ / z0);
+    OVY = my - (my - OVY) * (OVZ / z0);
+    ovApply();
+  }
+  function ovReset() {   // ajustar à tela: zoom 1 e arte CENTRADA na janela
+    var b;
+    OVZ = 1; OVX = 0; OVY = 0;
+    b = ovBase();
+    OVX = (b.vw - b.w) / 2; OVY = (b.vh - b.h) / 2;
+    ovApply();
+  }
+  function ovApplyZoom() { ovApply(); }                 // compat: chamadas antigas
+  function ovZoomBy(f) { ovZoomAt(f, null, null); }     // botões +/−
+  // ===== TELA CHEIA de inspeção =====
+  // Move o PRÓPRIO #ovWrap para o container full (não duplica canvas): zoom, marcações
+  // e piscar continuam sendo os mesmos objetos — nada para sincronizar ou re-desenhar.
+  var FS_ON = false, FS_HOME = null;
+  function fsSync() {
+    if (!FS_ON) return;
+    var n = RESULT && RESULT.view ? RESULT.view.length : 0;
+    $("fsPos").textContent = n ? ((ACTIVE >= 0 ? ACTIVE + 1 : 0) + " / " + n) : "—";
+    var d = "";
+    if (RESULT && ACTIVE >= 0 && RESULT.view[ACTIVE]) {
+      var c = RESULT.view[ACTIVE];
+      d = c.kind === "barcode" ? ((c.qr ? "QR: " : "Código: ") + (c.code || ""))
+        : c.kind === "text" ? ("Texto: " + (c.textOrig || "?") + (c.textFile ? " → " + c.textFile : ""))
+        : ({ miss: "Faltando no arquivo", extra: "Sobrando no arquivo", diff: "Diferente", ok: "Confere" }[c.type] || "");
+    }
+    $("fsDesc").textContent = d;
+    $("fsBlink").checked = $("ovBlink").checked;
+    $("fsSwap").checked = $("ovSwap").checked;
+  }
+  function fsOpen() {
+    if (FS_ON || !RESULT) return;
+    var wrap = $("ovWrap"), full = $("ovFull");
+    FS_HOME = { parent: wrap.parentNode, next: wrap.nextSibling };
+    $("ovFullBody").appendChild(wrap);
+    wrap.classList.add("full");
+    full.style.display = "flex";
+    FS_ON = true;
+    setTimeout(function () { ovReset(); fsSync(); }, 20);   // espera o layout medir a janela nova
+  }
+  function fsClose() {
+    if (!FS_ON) return;
+    var wrap = $("ovWrap");
+    wrap.classList.remove("full");
+    if (FS_HOME && FS_HOME.parent) FS_HOME.parent.insertBefore(wrap, FS_HOME.next || null);
+    $("ovFull").style.display = "none";
+    FS_ON = false;
+    setTimeout(function () { ovReset(); }, 20);
+  }
+  // centraliza uma divergência (px da imagem) na janela, no zoom atual (ou no mínimo pedido)
+  function ovFocus(cx, cy, zMin) {
+    if (!RESULT) return;
+    var b = ovBase();
+    if (zMin && OVZ < zMin) OVZ = Math.min(OVZMAX, zMin);
+    OVX = b.vw / 2 - (cx / RESULT.W) * b.w * OVZ;
+    OVY = b.vh / 2 - (cy / RESULT.H) * b.h * OVZ;
+    ovApply();
+  }
 
   // ============ RELATORIO ============
   function getLogoDataURL(cb) {
@@ -1469,7 +1637,7 @@
     RESULT = null; ACTIVE = -1;
     BLINK.on = false; if (BLINK.timer) { clearInterval(BLINK.timer); BLINK.timer = null; }
     var bl = $("ovBlink"); if (bl) bl.checked = false;
-    OVZ = 1; ovApplyZoom();
+    ovReset();
     if (window.ACPdf) ACPdf.reset();   // heap do WASM zerado — recupera de módulo morto/pesado
     resetPane(O, "nenhum arquivo");
     resetPane(F, "solte o PDF do arquivo");
@@ -1501,6 +1669,10 @@
     on($("os"), "keydown", function (e) { if (e.key === "Enter") pullJob(null); });
     on($("os"), "input", updateCompareEnabled);
 
+    on($("sensBaixa"), "click", function () { setSens(0); });
+    on($("sensMedia"), "click", function () { setSens(1); });
+    on($("sensAlta"), "click", function () { setSens(2); });
+
     on($("origPagePrev"), "click", function () { if (O.page > 1) { O.page--; renderPdfPagePane(O); } });
     on($("origPageNext"), "click", function () { if (O.page < O.pages) { O.page++; renderPdfPagePane(O); } });
     on($("filePagePrev"), "click", function () { if (F.page > 1) { F.page--; renderPdfPagePane(F); } });
@@ -1524,47 +1696,77 @@
     on($("ovBlink"), "change", function () { if ($("ovBlink").checked && $("ovSwap").checked) $("ovSwap").checked = false; setBlink($("ovBlink").checked); });
     on($("ovZoomIn"), "click", function () { ovZoomBy(1.4); });
     on($("ovZoomOut"), "click", function () { ovZoomBy(1 / 1.4); });
-    on($("ovZoomFit"), "click", function () { OVZ = 1; ovApplyZoom(); });
-    // ===== ZOOM estilo Esko Viewer =====
-    // roda = zoom no cursor · arrastar = RETÂNGULO de zoom (marquee) ·
-    // botão do meio OU espaço+arrastar = pan · duplo clique = ajustar à tela
+    on($("ovZoomFit"), "click", function () { ovReset(); });
+    // --- tela cheia de inspeção ---
+    on($("ovFullBtn"), "click", fsOpen);
+    on($("fsClose"), "click", fsClose);
+    on($("fsZoomIn"), "click", function () { ovZoomBy(1.4); });
+    on($("fsZoomOut"), "click", function () { ovZoomBy(1 / 1.4); });
+    on($("fsZoomFit"), "click", function () { ovReset(); });
+    on($("fsPrev"), "click", function () { if (RESULT && RESULT.view.length) { selectDiff((ACTIVE <= 0 ? RESULT.view.length : ACTIVE) - 1); fsSync(); } });
+    on($("fsNext"), "click", function () { if (RESULT && RESULT.view.length) { selectDiff((ACTIVE + 1) % RESULT.view.length); fsSync(); } });
+    on($("fsBlink"), "change", function () {
+      $("ovBlink").checked = this.checked;
+      if (this.checked) { $("ovSwap").checked = false; $("fsSwap").checked = false; }
+      setBlink(this.checked);
+    });
+    on($("fsSwap"), "change", function () {
+      $("ovSwap").checked = this.checked;
+      if (this.checked && $("ovBlink").checked) { $("ovBlink").checked = false; $("fsBlink").checked = false; setBlink(false); }
+      drawOverlay(ACTIVE);
+    });
+    // atalhos da inspeção: Esc sai · setas navegam · B pisca · F ajusta
+    on(window, "keydown", function (e) {
+      if (!FS_ON) return;
+      var t = document.activeElement && document.activeElement.tagName;
+      if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA") return;
+      if (e.key === "Escape") { fsClose(); e.preventDefault(); }
+      else if (e.key === "ArrowRight") { $("fsNext").click(); e.preventDefault(); }
+      else if (e.key === "ArrowLeft") { $("fsPrev").click(); e.preventDefault(); }
+      else if (e.key === "b" || e.key === "B") { $("fsBlink").checked = !$("fsBlink").checked; $("fsBlink").dispatchEvent(new Event("change")); e.preventDefault(); }
+      else if (e.key === "f" || e.key === "F") { ovReset(); e.preventDefault(); }
+    });
+    // ===== VIEWER estilo Esko =====
+    // roda = zoom NO CURSOR (o ponto sob o mouse não sai do lugar) · arrastar = pan
+    // Shift+arrastar = retângulo de zoom · botão direito = afastar · 2 cliques = ajustar
     (function () {
       var cv = $("overlayCanvas"), wrap = $("ovWrap");
-      var pan = null, mq = null, mqBox = null, spaceDown = false;
-      on(window, "keydown", function (e) {
-        if (e.code !== "Space") return;
-        var t = document.activeElement && document.activeElement.tagName;
-        if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA") return;
-        spaceDown = true; cv.style.cursor = "grab"; e.preventDefault();
-      });
-      on(window, "keyup", function (e) { if (e.code === "Space") { spaceDown = false; cv.style.cursor = ""; } });
+      var pan = null, mq = null, mqBox = null, raf = 0, pend = null;
+      function local(e) { var r = wrap.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
       on(wrap, "wheel", function (e) {
         e.preventDefault();
-        var r = cv.getBoundingClientRect();
-        var cx = (e.clientX - r.left) / r.width, cy = (e.clientY - r.top) / r.height;
-        ovZoomBy(e.deltaY < 0 ? 1.25 : 0.8, cx, cy);
+        var p = local(e);
+        // passo proporcional ao movimento da roda/trackpad = zoom contínuo, sem "pulo"
+        var d = e.deltaY;
+        if (e.deltaMode === 1) d *= 16; else if (e.deltaMode === 2) d *= 100;
+        var f = Math.exp(-d * 0.0022);
+        if (f > 2) f = 2; if (f < 0.5) f = 0.5;
+        ovZoomAt(f, p.x, p.y);
       });
-      on(cv, "dblclick", function () { OVZ = 1; ovApplyZoom(); });
-      on(cv, "contextmenu", function (e) { e.preventDefault(); });       // botão direito é ferramenta
+      on(cv, "dblclick", function () { ovReset(); });
+      on(cv, "contextmenu", function (e) { e.preventDefault(); });
       on(cv, "mousedown", function (e) {
-        if (e.button === 2) {                                            // DIREITO = afastar (Esko)
-          var r2 = cv.getBoundingClientRect();
-          ovZoomBy(0.75, (e.clientX - r2.left) / r2.width, (e.clientY - r2.top) / r2.height);
-          e.preventDefault(); return;
+        if (e.button === 2) { var p2 = local(e); ovZoomAt(0.7, p2.x, p2.y); e.preventDefault(); return; }
+        if (e.button !== 0) return;
+        if (e.shiftKey) {                                        // MARQUEE (retângulo de zoom)
+          mq = { x0: e.clientX, y0: e.clientY };
+          mqBox = document.createElement("div"); mqBox.className = "ov-marquee";
+          document.body.appendChild(mqBox); e.preventDefault(); return;
         }
-        if (e.button === 1 || (e.button === 0 && spaceDown)) {          // PAN
-          pan = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
-          cv.classList.add("panning"); e.preventDefault(); return;
-        }
-        if (e.button !== 0) return;                                      // MARQUEE zoom
-        mq = { x0: e.clientX, y0: e.clientY };
-        mqBox = document.createElement("div");
-        mqBox.className = "ov-marquee";
-        document.body.appendChild(mqBox);
-        e.preventDefault();
+        var p = local(e);                                        // PAN direto (padrão de viewer)
+        pan = { mx: p.x, my: p.y, ox: OVX, oy: OVY };
+        cv.classList.add("panning"); e.preventDefault();
       });
       on(window, "mousemove", function (e) {
-        if (pan) { wrap.scrollLeft = pan.sl - (e.clientX - pan.x); wrap.scrollTop = pan.st - (e.clientY - pan.y); return; }
+        if (pan) {
+          var p = local(e);
+          pend = { x: pan.ox + (p.x - pan.mx), y: pan.oy + (p.y - pan.my) };
+          if (!raf) raf = requestAnimationFrame(function () {     // 1 update por frame = fluido
+            raf = 0; if (!pend) return;
+            OVX = pend.x; OVY = pend.y; pend = null; ovApply();
+          });
+          return;
+        }
         if (!mq || !mqBox) return;
         var x = Math.min(mq.x0, e.clientX), y = Math.min(mq.y0, e.clientY);
         var w = Math.abs(e.clientX - mq.x0), h = Math.abs(e.clientY - mq.y0);
@@ -1579,13 +1781,18 @@
         var w = Math.abs(e.clientX - mq.x0), h = Math.abs(e.clientY - mq.y0);
         if (mqBox && mqBox.parentNode) mqBox.parentNode.removeChild(mqBox);
         mq = null; mqBox = null;
-        if (w < 12 || h < 12 || !RESULT) return;                         // clique simples: nada
-        var r = cv.getBoundingClientRect();
-        var fx = (x0 + w / 2 - r.left) / r.width, fy = (y0 + h / 2 - r.top) / r.height;   // centro da seleção
-        var fator = Math.min(wrap.clientWidth / w, (wrap.clientHeight || 520) / h);
-        OVZ = Math.max(1, Math.min(16, OVZ * fator));
-        ovApplyZoom(fx, fy);
+        if (w < 12 || h < 12) return;
+        var wr = wrap.getBoundingClientRect();
+        var selCx = x0 + w / 2 - wr.left, selCy = y0 + h / 2 - wr.top;      // centro da seleção (px janela)
+        var b = ovBase();
+        var f = Math.min(b.vw / w, b.vh / h);
+        var z0 = OVZ; OVZ = Math.max(1, Math.min(OVZMAX, OVZ * f));
+        // leva o centro da seleção para o centro da janela
+        OVX = b.vw / 2 - (selCx - OVX) * (OVZ / z0);
+        OVY = b.vh / 2 - (selCy - OVY) * (OVZ / z0);
+        ovApply();
       });
+      on(window, "resize", function () { ovApply(); });
     })();
     on($("modeSel"), "change", function () { MODE = this.value; applyMode(); });
 

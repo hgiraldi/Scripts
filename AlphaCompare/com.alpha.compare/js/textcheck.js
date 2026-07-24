@@ -1175,6 +1175,68 @@
             }
             r.x = c0; r.y = r.y0; r.w = c1 - c0 + 1; r.h = r.y1 - r.y0 + 1;
         }
+        // 5b) RESIDUAL CONCENTRADO: a metrica por linha (rf) DILUI uma troca de poucos
+        //     caracteres numa linha longa — um digito trocado num paragrafo da rf ~0,02
+        //     e a linha nao e flagrada. Aqui olhamos os BLOCOS de residual e montamos
+        //     regioes POR LINHA DE TEXTO (nao por bbox fundido: fundir em cadeia criava
+        //     regioes altas demais e o filtro de altura do OCR as descartava).
+        //     Trapping nao gera residual (a dilatacao cobre) -> nao dispara a toa.
+        (function () {
+            var cel = Math.max(8, Math.round(medH * 0.9));          // celula ~1 caractere
+            var gw = Math.ceil(W / cel), gh = Math.ceil(H / cel);
+            var acc = new Int32Array(gw * gh), gx, gy, i2;
+            for (i2 = 0; i2 < n; i2++) {
+                if (!resid[i2]) continue;
+                gx = ((i2 % W) / cel) | 0; gy = (((i2 / W) | 0) / cel) | 0;
+                acc[gy * gw + gx]++;
+            }
+            var jaTem = function (x0, y0) {                          // ja coberto por regiao?
+                for (var k2 = 0; k2 < regions.length; k2++) {
+                    var rr = regions[k2];
+                    if (rr.x == null) continue;
+                    if (x0 >= rr.x - cel && x0 <= rr.x + rr.w + cel && y0 >= rr.y - cel && y0 <= rr.y + rr.h + cel) return true;
+                }
+                return false;
+            };
+            // celulas quentes (com as vizinhas somadas: a troca de 1 caractere cai entre
+            // 2 ou 4 celulas e o total por celula variava com o alinhamento)
+            var quentes = [];
+            for (gy = 0; gy < gh; gy++) for (gx = 0; gx < gw; gx++) {
+                var soma = acc[gy * gw + gx];
+                if (soma < 25) continue;                             // aglomerado real
+                var cx0 = gx * cel, cy0 = gy * cel;
+                if (jaTem(cx0, cy0)) continue;
+                quentes.push({ x: cx0, y: cy0, s: soma });
+            }
+            // agrupa por BANDA de linha (mesma faixa y) -> uma regiao por linha de texto
+            var bandas = {}, q2, bk;
+            for (q2 = 0; q2 < quentes.length; q2++) {
+                bk = Math.round(quentes[q2].y / Math.max(6, medH));
+                if (!bandas[bk]) bandas[bk] = [];
+                bandas[bk].push(quentes[q2]);
+            }
+            var novas = [], marg = cel * 10;                          // ~10 caracteres de contexto
+            for (bk in bandas) {
+                if (!bandas.hasOwnProperty(bk)) continue;
+                var gs = bandas[bk], mnx = 1e9, mxx = -1, mny = 1e9, mxy = -1, g2, sc = 0;
+                for (g2 = 0; g2 < gs.length; g2++) {
+                    if (gs[g2].x < mnx) mnx = gs[g2].x;
+                    if (gs[g2].x > mxx) mxx = gs[g2].x;
+                    if (gs[g2].y < mny) mny = gs[g2].y;
+                    if (gs[g2].y > mxy) mxy = gs[g2].y;
+                    if (gs[g2].s > sc) sc = gs[g2].s;
+                }
+                var rx0 = Math.max(0, mnx - marg), rx1 = Math.min(W, mxx + cel + marg);
+                var ry0 = Math.max(0, mny - Math.round(medH * 0.7));
+                var ry1 = Math.min(H, mxy + cel + Math.round(medH * 0.7));
+                if (ry1 - ry0 > medH * 4) ry1 = Math.min(H, ry0 + Math.round(medH * 4));   // nunca vira bloco
+                novas.push({ x: rx0, y: ry0, w: rx1 - rx0, h: ry1 - ry0, conc: true, score: sc });
+            }
+            // as com residual MAIS FORTE primeiro (o OCR tem teto de linhas: o alvo nao
+            // pode ficar na fila atras de dezenas de linhas fracas)
+            novas.sort(function (a3, b3) { return b3.score - a3.score; });
+            for (i2 = 0; i2 < novas.length && i2 < 12 && regions.length < 40; i2++) regions.push(novas[i2]);
+        })();
         // 6) MICRO-MARCAS (pontos/vírgulas de pontuação): um ponto removido fica a ~3px
         //    dos dígitos vizinhos e o trapTol normal ENGOLE. Passe fino: tinta de um lado
         //    sem cobertura do outro dilatado por só 1px, mantendo apenas CCs PEQUENOS
@@ -1240,6 +1302,24 @@
                 gi2 = gj;
             }
         })();
+        // VARREDURA TOTAL (rede de segurança): quando o pixel não acusou NADA, o painel
+        // pede todas as bandas de texto como regiao — o OCR entao confere o conteudo
+        // inteiro antes de declarar "sem divergencias". Nao depende de limiar de residual.
+        if (o.varreduraTotal) {
+            var todas = [], bi3, pre3, xs0b, xs1b, x3;
+            for (bi3 = 0; bi3 < bands.length; bi3++) {
+                var b3 = bands[bi3];
+                if (b3.y1 - b3.y0 < 8 || b3.y1 - b3.y0 > 70) continue;    // nao e linha de texto
+                pre3 = prefixoBanda(union, W, b3.y0, b3.y1);
+                xs0b = -1; xs1b = -1;
+                for (x3 = 0; x3 < W; x3++) { if (pre3[x3 + 1] - pre3[x3] > 0) { if (xs0b < 0) xs0b = x3; xs1b = x3; } }
+                if (xs0b < 0 || xs1b - xs0b < 30) continue;
+                var ink3 = pre3[xs1b + 1] - pre3[xs0b];
+                todas.push({ x: xs0b, y: b3.y0, w: xs1b - xs0b + 1, h: b3.y1 - b3.y0, conc: true, score: ink3 });
+            }
+            todas.sort(function (a4, b4) { return b4.score - a4.score; });   // linhas com mais texto primeiro
+            return { regions: todas.slice(0, 30), lines: lines, medH: medH, resid: resid, varredura: true };
+        }
         return { regions: regions, lines: lines, medH: medH, resid: resid };
         // NOTA texto COLORIDO (ex.: vermelho da Coca, invisivel a dark/white): no
         // passo 1 OU-com um canal de contraste local

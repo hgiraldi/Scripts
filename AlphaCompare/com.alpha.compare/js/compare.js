@@ -337,7 +337,7 @@
       else typeOf[cc.id] = cc.type;
     }
     // ERRO (faltando/diferente) = VERMELHO; A MAIS (sobrando, ex.: código de barras) = AZUL
-    var COL = { miss: [220, 38, 38], extra: [37, 99, 235], diff: [220, 38, 38], ok: [34, 165, 91] };
+    var COL = { miss: [220, 38, 38], extra: [37, 99, 235], diff: [220, 38, 38], ok: [34, 165, 91], check: [245, 158, 11] };
     var out = new ImageData(W, H), s = fileImg.data, d = out.data;
     for (var i = 0, j = 0; i < W * H; i++, j += 4) {
       var lg = (s[j] * 0.299 + s[j + 1] * 0.587 + s[j + 2] * 0.114), g = (lg * 0.45 + 255 * 0.55) | 0;
@@ -432,6 +432,8 @@
     var structural = !!opts.structural;   // comparar por FORMA (invariante a cor/tom)
     var trapTol = opts.trapTol != null ? opts.trapTol : 3;   // tolerância de trapping/spread (px) no modo forma
     var prescaled = !!opts.prescaled;
+    // SENSIBILIDADE: 0=Baixa/Precisa, 1=Média, 2=Alta/Sensível (recall-first sob trapping/textura)
+    var sens = opts.sens != null ? opts.sens : 0;
     var MW = opts.maxWork || MAX_WORK;   // resolucao de trabalho (menor = mais rapido)
 
     var W, H, fileImg, origImg, fileRect, origRect;
@@ -492,6 +494,23 @@
       }
       return tot > 20 ? hit / tot : 0;
     }
+    // igual a alignQuality, mas SEM o raio de 1px: usada só para ESCOLHER entre
+    // candidatos de escala. A tolerante empata (94% x 93%) e o painel acabava
+    // escolhendo a escala pior; a estrita separa de verdade.
+    function alignQualityStrict(eFq, eOq, ox, oy) {
+      var tot = 0, hit = 0, y, x, sy, sx;
+      for (y = 2; y < H - 2; y += 2) {
+        var row = y * W;
+        for (x = 2; x < W - 2; x += 2) {
+          if (eOq[row + x] <= 70) continue;
+          sx = x + ox; sy = y + oy;
+          if (sx < 2 || sy < 2 || sx >= W - 2 || sy >= H - 2) continue;
+          tot++;
+          if (eFq[sy * W + sx] > 70) hit++;
+        }
+      }
+      return tot > 20 ? hit / tot : 0;
+    }
     var off, eF = null;
     if (prescaled) {
       eF = edgeMap(fileGray, W, H);
@@ -528,6 +547,105 @@
           if (pk2.q > al.q) { off = pk2.off; al.q = pk2.q; }
         }
       }
+      // ===== AJUSTE DE ESCALA (X e Y independentes) =====
+      // Só quando o encaixe continua ruim: as artes podem ter TAMANHOS diferentes
+      // (sangria/margem técnica distinta, arte remontada) — aí translação nunca fecha
+      // e TUDO vira falso. Procura o par (sx,sy) em MINIATURA (rápido), aplica no
+      // original e só mantém se o encaixe melhorar de verdade. Um objeto realmente
+      // redimensionado continua acusando: o ajuste é global, não por objeto.
+      // itera: medir -> corrigir -> medir de novo (a 1a correção revela o resíduo)
+      for (var itSc = 0; itSc < 2 && al.q < 0.95 && opts.autoScale !== false; itSc++) {
+        // MEDE a escala em vez de procurar às cegas: quando as artes têm TAMANHOS
+        // diferentes (sangria/margem técnica distinta, arte remontada), o deslocamento
+        // local CRESCE LINEARMENTE ao longo do eixo — a inclinação dessa reta É o fator
+        // de escala. Medido em miniatura por NCC de bandas; aplicado só se o encaixe
+        // em resolução plena melhorar. Ajuste GLOBAL: objeto redimensionado continua acusando.
+        var SS = 700, ks = Math.min(1, SS / Math.max(W, H));
+        var Ws = Math.max(60, Math.round(W * ks)), Hs = Math.max(60, Math.round(H * ks));
+        var fS = toGray(drawSizedOnWhite(fileCanvas, Ws, Hs, fileRect.w * ks, fileRect.h * ks));
+        var oS = toGray(drawSizedOnWhite(origCanvas, Ws, Hs, origRect.w * ks, origRect.h * ks));
+        var bx0 = off.ox * ks, by0 = off.oy * ks;
+        function nccB(x0, x1, y0, y1, dx, dy) {
+          var s2 = 0, sa = 0, sb = 0, n2 = 0, yb, xb;
+          for (yb = y0; yb < y1; yb++) {
+            var fyb = yb + dy; if (fyb < 0 || fyb >= Hs) continue;
+            for (xb = x0; xb < x1; xb++) {
+              var fxb = xb + dx; if (fxb < 0 || fxb >= Ws) continue;
+              var va = 255 - oS[yb * Ws + xb], vb = 255 - fS[fyb * Ws + fxb];
+              s2 += va * vb; sa += va * va; sb += vb * vb; n2++;
+            }
+          }
+          if (n2 < 200) return -1;
+          var den2 = Math.sqrt(sa * sb); return den2 > 0 ? s2 / den2 : -1;
+        }
+        function deslocB(x0, x1, y0, y1) {
+          var best2 = -1, bdx = Math.round(bx0), bdy = Math.round(by0), rr, dxb, dyb, R0 = 14;
+          for (dyb = Math.round(by0) - R0; dyb <= Math.round(by0) + R0; dyb += 2)
+            for (dxb = Math.round(bx0) - R0; dxb <= Math.round(bx0) + R0; dxb += 2) {
+              rr = nccB(x0, x1, y0, y1, dxb, dyb);
+              if (rr > best2) { best2 = rr; bdx = dxb; bdy = dyb; }
+            }
+          for (dyb = bdy - 2; dyb <= bdy + 2; dyb++) for (dxb = bdx - 2; dxb <= bdx + 2; dxb++) {
+            rr = nccB(x0, x1, y0, y1, dxb, dyb);
+            if (rr > best2) { best2 = rr; bdx = dxb; bdy = dyb; }
+          }
+          return { dx: bdx, dy: bdy, ncc: best2 };
+        }
+        function inclina(cs, ds) {
+          var n3 = cs.length, i3, mc = 0, md = 0;
+          if (n3 < 4) return 0;
+          for (i3 = 0; i3 < n3; i3++) { mc += cs[i3]; md += ds[i3]; }
+          mc /= n3; md /= n3;
+          var num = 0, den3 = 0;
+          for (i3 = 0; i3 < n3; i3++) { num += (cs[i3] - mc) * (ds[i3] - md); den3 += (cs[i3] - mc) * (cs[i3] - mc); }
+          return den3 > 0 ? num / den3 : 0;
+        }
+        var NB = 6, cX = [], dX = [], cY = [], dY = [], bi3, r4, xa, xb2, ya, yb2;
+        for (bi3 = 0; bi3 < NB; bi3++) {
+          xa = Math.round(bi3 * Ws / NB); xb2 = Math.round((bi3 + 1) * Ws / NB);
+          r4 = deslocB(xa, xb2, 0, Hs);
+          if (r4.ncc > 0.45) { cX.push((xa + xb2) / 2); dX.push(r4.dx); }
+        }
+        for (bi3 = 0; bi3 < NB - 1; bi3++) {
+          ya = Math.round(bi3 * Hs / (NB - 1)); yb2 = Math.round((bi3 + 1) * Hs / (NB - 1));
+          r4 = deslocB(0, Ws, ya, yb2);
+          if (r4.ncc > 0.45) { cY.push((ya + yb2) / 2); dY.push(r4.dy); }
+        }
+        var sxE = 1 + inclina(cX, dX), syE = 1 + inclina(cY, dY);
+        if (sxE < 0.85 || sxE > 1.18) sxE = 1;      // fora disso não é a mesma arte
+        if (syE < 0.85 || syE > 1.18) syE = 1;
+        al.scaleDbg = { sx: Math.round(sxE * 10000) / 10000, sy: Math.round(syE * 10000) / 10000, nx: cX.length, ny: cY.length };
+        // A medição em Y costuma ser mais ruidosa (bandas finas, texto pequeno).
+        // Testa em resolução plena: (sx,sy), só sx e só sy — fica com o melhor encaixe.
+        var cands4 = [], q4best = al.q, ap4 = null;
+        var stBest = alignQualityStrict(eF, eO0, off.ox, off.oy);   // base a bater
+        if (Math.abs(sxE - 1) >= 0.003 && Math.abs(syE - 1) >= 0.003) cands4.push([sxE, syE]);
+        if (Math.abs(sxE - 1) >= 0.003) cands4.push([sxE, 1]);
+        if (Math.abs(syE - 1) >= 0.003) cands4.push([1, syE]);
+        for (var ci4 = 0; ci4 < cands4.length; ci4++) {
+          var nw = origRect.w * cands4[ci4][0], nh = origRect.h * cands4[ci4][1];
+          if (nw > W * 1.5 || nh > H * 1.5) continue;
+          var oImg4 = drawSizedOnWhite(origCanvas, W, H, nw, nh);
+          var oGray4 = toGray(oImg4), eO4 = edgeMap(oGray4, W, H);
+          var al4 = autoAlign(fileGray, oGray4, W, H);
+          var o04 = fineEdgeAlign(eF, eO4, W, H, al4.ox, al4.oy);
+          var bq4 = alignQuality(eF, eO4, o04.ox, o04.oy), bo4 = o04, dq4;
+          for (dq4 = 0; dq4 < 9; dq4++) {
+            var ddx4 = (dq4 % 3) - 1, ddy4 = ((dq4 / 3) | 0) - 1;
+            if (!ddx4 && !ddy4) continue;
+            var qq4 = alignQuality(eF, eO4, o04.ox + ddx4, o04.oy + ddy4);
+            if (qq4 > bq4 + 0.005) { bq4 = qq4; bo4 = { ox: o04.ox + ddx4, oy: o04.oy + ddy4 }; }
+          }
+          var st4 = alignQualityStrict(eF, eO4, bo4.ox, bo4.oy);
+          if (bq4 > al.q + 0.005 && st4 > stBest) { stBest = st4; q4best = bq4; ap4 = { img: oImg4, g: oGray4, e: eO4, w: nw, h: nh, off: bo4, sx: cands4[ci4][0], sy: cands4[ci4][1] }; }
+        }
+        al.scaleDbg.qOrig = Math.round(al.q * 1000) / 1000;
+        al.scaleDbg.qBest = Math.round(q4best * 1000) / 1000;
+        if (!ap4) break;                       // nada melhorou -> para
+        origImg = ap4.img; origGray = ap4.g; eO0 = ap4.e; origRect = { w: ap4.w, h: ap4.h };
+        off = ap4.off; al.q = q4best;
+        al.sx = (al.sx || 1) * ap4.sx; al.sy = (al.sy || 1) * ap4.sy;   // escala ACUMULADA
+      }
     } else {
       off = fineAlign(fileGray, origGray, W, H, al.ox, al.oy);
     }
@@ -546,9 +664,16 @@
     var photoBoth = null;
     if (opts.photoF && opts.photoO && opts.photoF.length && opts.photoO.length) {
       var mF = new Uint8Array(W * H), mO = new Uint8Array(W * H), pr2, px0, py0, px1, py1, yy2, xx2, rw2;
+      // NOTA (23/07): a "correção" de desmascarar fundo texturizado (Perdigão) inundava o
+      // modo forma com a trama re-amostrada (215MB×130MB) — 230+ falsos. Revertido até o
+      // R&D do Perdigão (registro local + supressão de textura). Aqui volta a mascarar toda
+      // imagem∩imagem. Não afeta Coca (=3) nem DUX (=0). Ver ARQUITETURA "muro do Perdigão".
       function fillRects(dst, rects, sw, shh, dx, dy) {
         for (var rj = 0; rj < rects.length; rj++) {
           pr2 = rects[rj];
+          // Alta sens: NÃO mascara imagem de PÁGINA INTEIRA (fundo/trama) — senão o texto por
+          // cima (o registro 0763 do Perdigão) some. O FORÇA+CLUSTER corta o flood da textura.
+          if (sens >= 2 && pr2.w > 0.8 && pr2.h > 0.8) continue;
           px0 = Math.max(0, Math.round(pr2.x * sw) + dx); py0 = Math.max(0, Math.round(pr2.y * shh) + dy);
           px1 = Math.min(W, Math.round((pr2.x + pr2.w) * sw) + dx); py1 = Math.min(H, Math.round((pr2.y + pr2.h) * shh) + dy);
           for (yy2 = py0; yy2 < py1; yy2++) { rw2 = yy2 * W; for (xx2 = px0; xx2 < px1; xx2++) dst[rw2 + xx2] = 1; }
@@ -590,6 +715,39 @@
       }
       var toneShift = tn > 0 ? tsum / tn : 0;   // ~0 = mesmo render; >15 = tom diferente
       if (toneShift > (opts.toneAutoTh != null ? opts.toneAutoTh : 15)) { structural = true; modeAuto = true; }
+    }
+    // TRAPPING DE TEXTO / RE-TRAÇO: as chapadas podem ter o MESMO tom (toneShift ~0)
+    // e ainda assim o arquivo tratado ter o texto ENGORDADO pelo spread do trapping
+    // (borda técnica de compensação de registro — não é conteúdo). A assinatura é:
+    // muita diferença COLADA em borda dos DOIS lados (a casca do glifo respirando),
+    // em vez de conteúdo presente num lado e ausente no outro.
+    if (!structural && opts.autoMode !== false) {
+      var nEdge = 0, nBr = 0, bx2, by2, bi2;
+      for (var yB = 3; yB < H - 3; yB++) {
+        var rwB = yB * W;
+        for (var xB = 3; xB < W - 3; xB++) {
+          bi2 = rwB + xB;
+          if (!valid[bi2]) continue;
+          var dGB = fileGray[bi2] - origGray[bi2]; if (dGB < 0) dGB = -dGB;
+          if (dGB <= 60) continue;
+          var okF = false, okO = false;
+          for (by2 = -3; by2 <= 3 && !(okF && okO); by2++) {
+            var rB2 = bi2 + by2 * W;
+            for (bx2 = -3; bx2 <= 3; bx2++) {
+              var eIdx = rB2 + bx2;
+              if (eFile[eIdx] > 60) okF = true;
+              if (eOrig[eIdx] > 60) okO = true;
+              if (okF && okO) break;
+            }
+          }
+          if (okF || okO) nEdge++;
+          if (okF && okO) nBr++;
+        }
+      }
+      al.breathe = nEdge ? Math.round(nBr / nEdge * 1000) / 1000 : 0;
+      al.nEdge = nEdge;
+      // limiar ABSOLUTO (margem branca não dilui) + fração alta = casca, não conteúdo
+      if (nEdge >= 1200 && nBr / nEdge > 0.55) { structural = true; modeAuto = true; }
     }
 
     // ===== MODO FORMA (estrutural, invariante a cor/tom) =====
@@ -705,13 +863,15 @@
         for (var j9 = 0; j9 < ids9.length; j9++) idIdx[ids9[j9]] = ci9;
       }
       var acc9 = [];
-      for (ci9 = 0; ci9 < comps.length; ci9++) acc9.push({ f: 0, o: 0, n: 0 });
+      for (ci9 = 0; ci9 < comps.length; ci9++) acc9.push({ f: 0, o: 0, n: 0, wf: 0 });
       var lab9 = res.lab, fd9 = fileImg.data, od9 = origImg.data;
       for (var p9 = 0; p9 < W * H; p9++) {
         var l9 = lab9[p9]; if (!l9 || idIdx[l9] == null) continue;
         var a9 = acc9[idIdx[l9]], q9 = p9 * 4;
-        a9.f += 0.299 * fd9[q9] + 0.587 * fd9[q9 + 1] + 0.114 * fd9[q9 + 2];
+        var lf9 = 0.299 * fd9[q9] + 0.587 * fd9[q9 + 1] + 0.114 * fd9[q9 + 2];
+        a9.f += lf9;
         a9.o += 0.299 * od9[q9] + 0.587 * od9[q9 + 1] + 0.114 * od9[q9 + 2];
+        if (lf9 >= 240) a9.wf++;
         a9.n++;
       }
       // caixa de tinta do ARQUIVO (limite da arte) p/ a regra do elemento fora da arte
@@ -735,10 +895,15 @@
         // trapping): filete ≥40px com tinta e cor da MESMA família nos 2 lados.
         // Linha realmente removida tem o outro lado como FUNDO (dLum grande).
         if (minD9 <= 3 && Math.max(c9.w, c9.h) >= 40 && dLum9 <= 40 && lumF9 < 220 && lumO9 < 220) { comps.splice(ci9, 1); continue; }
+        // D) ruído sub-pixel do modo forma: fragmento minúsculo E fraco. Pontuação
+        //    real (ponto/vírgula deletados) é pequena mas FORTE (>=120) — sobrevive.
+        if (c9.area <= 12 && c9.strength < 120) { comps.splice(ci9, 1); continue; }
         // C) elemento técnico do ORIGINAL fora da arte do arquivo (barra de dobra/corte):
         //    faltando com o F BRANCO ali e o comp além/na borda da caixa de tinta do F
-        if (c9.type === "miss" && lumF9 >= 240 &&
-            (c9.y >= fy1 - 6 || (c9.y + c9.h) <= fy0 + 6 || c9.x >= fx1 - 6 || (c9.x + c9.w) <= fx0 + 6)) { comps.splice(ci9, 1); continue; }
+        var fracBr9 = a9b.n ? a9b.wf / a9b.n : 0;
+        if (c9.type === "miss" && (lumF9 >= 240 || fracBr9 >= 0.6) &&
+            (c9.y >= fy1 - 6 || (c9.y + c9.h) <= fy0 + 6 || c9.x >= fx1 - 6 || (c9.x + c9.w) <= fx0 + 6 ||
+             (c9.y + c9.h) >= fileRect.h - 6 || (c9.x + c9.w) >= fileRect.w - 6)) { comps.splice(ci9, 1); continue; }
       }
     }
 
@@ -824,9 +989,62 @@
     // engole quando há um irmão a <=3px. Passe extra por COR (slack 1): CCs compactos,
     // pequenos e de cor bem diferente = deleção real. Fica FORA: casca fina de
     // re-peso (min dim <3), tom-sobre-tom (dLum<40) e tudo dentro de textRegion.
-    if (structural) {
+    // DESLIGADO quando o arquivo tem SPREAD GLOBAL de trapping (breathe alto): ali o
+    // engorde do texto gera centenas de fragmentos de cor e o passe vira ruído — nesse
+    // cenário quem acha a troca é o OCR das regiões de texto, não o pixel.
+    // ===== REGISTRO LOCAL (elástico por blocos) — só no modo forma =====
+    // O alinhamento global deixa desalinho LOCAL variável (páginas de tamanhos diferentes,
+    // distorção de render). Medido: ~85% dos blocos precisam de shift, e isso põe a borda do
+    // trapping "fora do lugar" gerando falsos. Alinhar bloco a bloco (96px, ±6) ANTES do passe
+    // corpo-por-cor crava o 28→29 do DUX (some sem isso) e limpa muito ruído. Recall-first.
+    // (sens já definido no topo) — 0=Baixa/Precisa, 1=Média, 2=Alta/Sensível
+    var odcW = origImg.data;
+    if (structural && sens >= 2) {   // registro local só na Alta (é caro e adiciona ruído no limpo)
+      odcW = new Uint8ClampedArray(origImg.data.length);
+      var oDat = origImg.data, BLKr = 96, RCr = 6, bxr, byr, ddx, ddy, xs, ys;
+      // 1) grade de deslocamentos: melhor shift por bloco (SAD do luma)
+      var nbx = Math.ceil(W / BLKr), nby = Math.ceil(H / BLKr);
+      var gdx = new Float32Array(nbx * nby), gdy = new Float32Array(nbx * nby), bxi, byi;
+      for (byi = 0; byi < nby; byi++) { for (bxi = 0; bxi < nbx; bxi++) {
+        bxr = bxi * BLKr; byr = byi * BLKr;
+        var bwr = Math.min(BLKr, W - bxr), bhr = Math.min(BLKr, H - byr), bsad = 1e18, bdx = 0, bdy = 0, sad00 = 0;
+        for (ddy = -RCr; ddy <= RCr; ddy++) { for (ddx = -RCr; ddx <= RCr; ddx++) {
+          var sd = 0, nnr = 0;
+          for (ys = byr; ys < byr + bhr; ys += 3) { for (xs = bxr; xs < bxr + bwr; xs += 3) {
+            var xt = xs + ddx, yt = ys + ddy, dv;
+            if (xt < 0 || yt < 0 || xt >= W || yt >= H) dv = 80; else { dv = fileGray[ys * W + xs] - origGray[yt * W + xt]; if (dv < 0) dv = -dv; }
+            sd += dv; nnr++;
+          } }
+          sd /= nnr; if (ddx === 0 && ddy === 0) sad00 = sd; if (sd < bsad) { bsad = sd; bdx = ddx; bdy = ddy; }
+        } }
+        // só warpa se o shift MELHORA CLARO (>=4 de SAD) e o bloco tem conteúdo (sad00>=8).
+        // Bloco liso/escuro/bem-alinhado fica em (0,0) — evita reamostrar e criar falso.
+        if (!(sad00 >= 8 && (sad00 - bsad) >= 4)) { bdx = 0; bdy = 0; }
+        gdx[byi * nbx + bxi] = bdx; gdy[byi * nbx + bxi] = bdy;
+      } }
+      // 2) warp SUAVE: interpola o shift bilinearmente entre centros de bloco (sem emenda)
+      var xr2, yr2;
+      for (yr2 = 0; yr2 < H; yr2++) { for (xr2 = 0; xr2 < W; xr2++) {
+        var fxg = (xr2 - BLKr / 2) / BLKr, fyg = (yr2 - BLKr / 2) / BLKr;
+        var gx0 = Math.floor(fxg), gy0 = Math.floor(fyg), wxg = fxg - gx0, wyg = fyg - gy0;
+        if (gx0 < 0) { gx0 = 0; wxg = 0; } if (gy0 < 0) { gy0 = 0; wyg = 0; }
+        var gx1 = gx0 + 1 < nbx ? gx0 + 1 : nbx - 1, gy1 = gy0 + 1 < nby ? gy0 + 1 : nby - 1;
+        if (gx0 > nbx - 1) gx0 = nbx - 1; if (gy0 > nby - 1) gy0 = nby - 1;
+        var i00 = gy0 * nbx + gx0, i10 = gy0 * nbx + gx1, i01 = gy1 * nbx + gx0, i11 = gy1 * nbx + gx1;
+        var dxv = gdx[i00] * (1 - wxg) * (1 - wyg) + gdx[i10] * wxg * (1 - wyg) + gdx[i01] * (1 - wxg) * wyg + gdx[i11] * wxg * wyg;
+        var dyv = gdy[i00] * (1 - wxg) * (1 - wyg) + gdy[i10] * wxg * (1 - wyg) + gdy[i01] * (1 - wxg) * wyg + gdy[i11] * wxg * wyg;
+        var sx2 = Math.round(xr2 + dxv); if (sx2 < 0) sx2 = 0; else if (sx2 >= W) sx2 = W - 1;
+        var sy2 = Math.round(yr2 + dyv); if (sy2 < 0) sy2 = 0; else if (sy2 >= H) sy2 = H - 1;
+        var so2 = (sy2 * W + sx2) * 4, dor2 = (yr2 * W + xr2) * 4;
+        odcW[dor2] = oDat[so2]; odcW[dor2 + 1] = oDat[so2 + 1]; odcW[dor2 + 2] = oDat[so2 + 2]; odcW[dor2 + 3] = 255;
+      } }
+    }
+    // Baixa: passe corpo-por-cor só com trapping BAIXO (senão flooda). Média/Alta: roda
+    // sempre (sobre o original localmente alinhado na Alta) — o FORÇA+CLUSTER lá embaixo
+    // tira o flood. É o que faz o 28→29 do DUX (breathe 0.82) aparecer.
+    if (structural && (sens >= 1 || !(al.breathe > (opts.breatheGate != null ? opts.breatheGate : 0.65)))) {
       try {
-        var mask2 = new Uint8Array(W * H), fdc = fileImg.data, odc = origImg.data;
+        var mask2 = new Uint8Array(W * H), fdc = fileImg.data, odc = odcW;
         var y5, x5, i5, f5;
         function pdiff(ai, bx, by, other) {   // maxdiff canal pixel ai (do lado A) vs (bx,by) do lado B
           if (bx < 0 || by < 0 || bx >= W || by >= H) return 999;
@@ -844,17 +1062,24 @@
             if (!valid[i5]) continue;
             if (photoBoth && photoBoth[i5]) continue;
             f5 = i5 * 4;
-            // pixel do F sem par de cor no O (raio slack) OU do O sem par no F
+            // RAIO ASSIMÉTRICO — a chave para conviver com trapping:
+            // o spread só ADICIONA tinta ao redor do objeto, nunca remove. Então:
+            //  · cor do ARQUIVO procurada no ORIGINAL: raio LARGO (trapTol+1) — o
+            //    engorde acha o glifo original ali do lado e não vira "a mais";
+            //  · cor do ORIGINAL procurada no ARQUIVO: raio 1 — o que sumiu de verdade
+            //    (o laço do 8 que virou 9) não tem para onde correr e é acusado.
             var mF5 = false, mO5 = false, dx5, dy5;
             for (dy5 = -1; dy5 <= 1 && !mF5; dy5++) for (dx5 = -1; dx5 <= 1; dx5++) if (pdiff(f5, x5 + dx5, y5 + dy5, 1) <= colorTol) { mF5 = true; break; }
             for (dy5 = -1; dy5 <= 1 && !mO5; dy5++) for (dx5 = -1; dx5 <= 1; dx5++) if (pdiff(f5, x5 + dx5, y5 + dy5, 0) <= colorTol) { mO5 = true; break; }
             if (!mF5 || !mO5) mask2[i5] = 1;
           }
         }
-        // FAIXA TÉCNICA (barra de acabamento preta na base): banda y escura nos DOIS
-        // lados em >50% da largura = zona de marcas de impressão (bolinhas de controle
-        // que o tratado remove) -> candidatos ali não são arte, ficam fora.
-        var bandaTec = new Uint8Array(H);
+        // FAIXA TÉCNICA (barra de acabamento na borda da arte): banda escura e
+        // atravessada (>50% da largura). CUIDADO: rótulo de FUNDO PRETO tem a arte
+        // inteira assim — por isso a faixa só vale se for FINA (<=10% da altura) e
+        // ENCOSTAR no topo ou na base. Sem isso, a arte toda virava zona morta e
+        // escondia o erro real (caso DUX: 28→29 em bloco preto).
+        var linhaEsc = new Uint8Array(H), bandaTec = new Uint8Array(H);
         for (y5 = 0; y5 < H; y5++) {
           var rw6 = y5 * W, dark6 = 0;
           for (x5 = 0; x5 < W; x5 += 2) {
@@ -863,8 +1088,21 @@
             var lo6 = 0.299 * odc[q6] + 0.587 * odc[q6 + 1] + 0.114 * odc[q6 + 2];
             if (lf6 < 80 || lo6 < 80) dark6++;
           }
-          if (dark6 > (W / 2) * 0.5) bandaTec[y5] = 1;
+          if (dark6 > (W / 2) * 0.5) linhaEsc[y5] = 1;
         }
+        // agrupa as linhas escuras em faixas; só as FINAS e coladas na borda contam
+        (function () {
+          var yb = 0, lim = Math.max(6, Math.round(H * 0.10));
+          while (yb < H) {
+            if (!linhaEsc[yb]) { yb++; continue; }
+            var y0b = yb;
+            while (yb < H && linhaEsc[yb]) yb++;
+            var alt = yb - y0b;
+            if (alt <= lim && (y0b <= 3 || yb >= H - 3)) {
+              for (var yy6 = y0b; yy6 < yb; yy6++) bandaTec[yy6] = 1;
+            }
+          }
+        })();
         var res5 = labelBlobs(mask2, W, H, Math.max(4, minArea));
         // lum média por LABEL numa passada só (centenas de CCs candidatos; varrer por CC não escala)
         var lumAcc = {}, p5, l5;
@@ -876,30 +1114,39 @@
           a5.o += 0.299 * odc[q5] + 0.587 * odc[q5 + 1] + 0.114 * odc[q5 + 2];
           a5.n++;
         }
+        var _dbg = root.__ACDBG;   // {x0,y0,x1,y1} p/ rastrear por que um comp morre
+        function _d(c, why) { if (_dbg && c.cx >= _dbg.x0 && c.cx <= _dbg.x1 && c.cy >= _dbg.y0 && c.cy <= _dbg.y1) { (root.__ACDBGOUT = root.__ACDBGOUT || []).push(c.cx + "," + c.cy + " " + c.w + "x" + c.h + " a" + c.area + " s" + (c.strength | 0) + " -> " + why); } }
         for (var k5 = 0; k5 < res5.comps.length; k5++) {
           var c5 = res5.comps[k5];
-          if (c5.area < 6 || c5.area > 400) continue;
-          if (Math.min(c5.w, c5.h) < 3 || Math.max(c5.w, c5.h) > 40) continue;              // casca fina/risco fora
-          if (c5.area / Math.max(1, c5.w * c5.h) < 0.5) continue;                            // corpo cheio, não anel
-          if (bandaTec[Math.max(0, Math.min(H - 1, c5.cy))]) continue;   // marca de controle na faixa técnica
+          if (c5.area < 6 || c5.area > 400) { _d(c5, "area " + c5.area); continue; }
+          if (Math.min(c5.w, c5.h) < 3 || Math.max(c5.w, c5.h) > 40) { _d(c5, "dim " + c5.w + "x" + c5.h); continue; }   // casca fina/risco fora
+          if (c5.area / Math.max(1, c5.w * c5.h) < 0.5) { _d(c5, "fill"); continue; }                            // corpo cheio, não anel
+          if (bandaTec[Math.max(0, Math.min(H - 1, c5.cy))]) { _d(c5, "bandaTec"); continue; }   // marca de controle na faixa técnica
           var ac5 = lumAcc[c5.id];
           if (!ac5 || !ac5.n) continue;
           var dl5 = ac5.f / ac5.n - ac5.o / ac5.n; if (dl5 < 0) dl5 = -dl5;
-          if (dl5 < 40) continue;
+          if (dl5 < 40) { _d(c5, "dLum " + dl5.toFixed(0)); continue; }
           c5.type = classifyComp(c5, fileImg, origImg, fileGray, origGray, W, H, tol);
-          if (c5.strength < 120) continue;
-          // dedup: já coberto por comp existente ou dentro de textRegion -> pula
+          // PISO DE FORÇA por sensibilidade. 120 mata a troca em TEXTO CLARO PEQUENO SOBRE
+          // FUNDO ESCURO: medido no DUX, o "(28 g)"→"(29 g)" tem força só 85-102 (letra
+          // anti-aliased, a diferença fica em tom intermediário). Na Alta baixa p/ 80 e o
+          // FORÇA+CLUSTER/mescla lá embaixo é quem segura o ruído extra. Recall-first.
+          if (c5.strength < (sens >= 2 ? 80 : 120)) { _d(c5, "forca " + (c5.strength|0)); continue; }
+          // dedup contra comp já existente (evita marcar 2×). Marcador de texto (kind:text,
+          // vago e escondido sem OCR) NÃO bloqueia — senão engolia a deleção real dentro dele.
           var dup5 = false, e5;
           for (e5 = 0; e5 < comps.length && !dup5; e5++) {
-            var ce5 = comps[e5];
+            var ce5 = comps[e5]; if (ce5.kind === "text") continue;
             if (c5.cx >= ce5.x - 8 && c5.cx <= ce5.x + ce5.w + 8 && c5.cy >= ce5.y - 8 && c5.cy <= ce5.y + ce5.h + 8) dup5 = true;
           }
-          if (!dup5 && textRegions) for (e5 = 0; e5 < textRegions.length && !dup5; e5++) {
-            var tr5 = textRegions[e5];
-            if (c5.cx >= tr5.x && c5.cx <= tr5.x + tr5.w && c5.cy >= tr5.y && c5.cy <= tr5.y + tr5.h) dup5 = true;
-          }
-          if (dup5) continue;
+          // NÃO excluir por estar dentro de textRegion (23/07): com o OCR desligado, uma
+          // deleção REAL de letra/pontuação (l do "200 ml", R do "INGR") cai numa região de
+          // texto re-estilizada e sumia (virava marcador vago escondido). Os critérios acima
+          // (dLum≥40, força≥120, fill≥0.5, corpo cheio) já garantem que é deleção real e NÃO
+          // trapping (trapping estende o pixel, não muda a cor) — então pode marcar aqui.
+          if (dup5) { _d(c5, "dup"); continue; }
           c5.ids = [c5.id];
+          _d(c5, "ACEITO");
           comps.push(c5);
         }
       } catch (eK) {}
@@ -950,6 +1197,134 @@
       } catch (eQ) {}
     }
 
+    // ===== LIMPEZA FORMA (validado na bancada: Coca 13→3 reais, DUX limpa, 0 falso) =====
+    // Roda no FINAL, sobre o conjunto já montado (texto/corpo-por-cor/barcode/QR). No modo
+    // forma (original×tratado) sobram 3 FALSOS que a assinatura por BBOX separa da edição
+    // real (ink% dos 2 lados no retângulo do comp): edição real = fill ASSIMÉTRICO (tinta
+    // num lado só); objeto grande re-tonalizado (logo/texto engordado) = fill SIMÉTRICO e
+    // CHEIO nos 2. kind (texto/barcode/QR) é ISENTO. Casa com "edição real ≥147 de força".
+    if (structural && comps.length) {
+      var fdC = fileImg.data, odC = origImg.data;
+      var bboxSig = function (c) {
+        var xe = Math.min(W, c.x + c.w), ye = Math.min(H, c.y + c.h), xb, yb, inkF = 0, inkO = 0, ds = 0, nb = 0;
+        for (yb = c.y; yb < ye; yb++) { var rwb = yb * W; for (xb = c.x; xb < xe; xb++) { var qb = (rwb + xb) * 4;
+          var lfb = 0.299 * fdC[qb] + 0.587 * fdC[qb + 1] + 0.114 * fdC[qb + 2], lob = 0.299 * odC[qb] + 0.587 * odC[qb + 1] + 0.114 * odC[qb + 2];
+          var db = lfb - lob; if (db < 0) db = -db; ds += db; if (lfb < 200) inkF++; if (lob < 200) inkO++; nb++; } }
+        if (!nb) nb = 1; return { fillF: inkF / nb * 100, fillO: inkO / nb * 100, dLum: ds / nb };
+      };
+      for (var cf = comps.length - 1; cf >= 0; cf--) {
+        var cc = comps[cf]; if (cc.kind) continue;
+        var areaC = cc.area || (cc.w * cc.h);
+        // TESTES BARATOS PRIMEIRO (só área/força/geometria). O bboxSig varre o retângulo do
+        // comp e, com os pisos baixos da Alta, são centenas de comps — calcular antes custava
+        // ~10s. Só quem sobrevive aos baratos paga a assinatura.
+        if (areaC < 30 && (cc.strength || 0) < (sens >= 2 ? 85 : 140)) { comps.splice(cf, 1); continue; }
+        if (Math.min(cc.w, cc.h) <= 1 && areaC < 20) { comps.splice(cf, 1); continue; }
+        var bs = bboxSig(cc), dFill = bs.fillF - bs.fillO; if (dFill < 0) dFill = -dFill;
+        // R1: objeto grande RE-TONALIZADO — tinta cheia e simétrica nos 2 lados (não é add/del)
+        if (areaC > 500 && bs.fillF > 90 && bs.fillO > 90 && dFill < 10) { comps.splice(cf, 1); continue; }
+        // R3: tira de sangria/borda do canvas, diferença SUTIL (não é conteúdo)
+        if ((cc.x <= 2 || (cc.x + cc.w) >= W - 2) && bs.dLum < 25) { comps.splice(cf, 1); continue; }
+      }
+    }
+
+    // ===== FORÇA + CLUSTER (Média/Alta sens) — recall-first sob trapping/textura =====
+    // Com o passe ligado sob trapping, sobra flood de comps FRACOS (o engorde) e SPECKLES
+    // da textura re-amostrada. A troca REAL é FORTE (≥ limiar) e AGRUPADA (dígito/palavra);
+    // trapping é fraco, textura é speckle espalhado. Filtra por força e agrupa: cluster
+    // denso vira 1 marcador; se há poucos comps fortes (arte limpa), mostra todos.
+    var nKind0 = 0, iK; for (iK = 0; iK < comps.length; iK++) if (!comps[iK].kind) nKind0++;
+    // Age quando há acúmulo de comps (trapping/textura). Arte quase limpa (Coca, ≤15) passa
+    // DIRETO — a Alta nunca perde o que a Baixa acha. No flood, filtra por força e MESCLA.
+    if (structural && sens >= 1 && nKind0 > 15) {
+      // 85 no Alta: MEDIDO no DUX, a troca "(28 g)"→"(29 g)" (texto claro pequeno em fundo
+      // escuro, anti-aliased) tem força só 85-102. Cortar em 130/147 a fazia sumir. Quem
+      // segura o ruído extra é o CLUSTER+MESCLA abaixo, não o limiar de força.
+      var THs = sens >= 2 ? 85 : 170;
+      var strongC = [], otherC = [], iC;
+      for (iC = 0; iC < comps.length; iC++) {
+        var cC = comps[iC];
+        if (cC.kind) { otherC.push(cC); continue; }          // barcode/QR/texto-marcador: intocado
+        if ((cC.strength || 0) >= THs) strongC.push(cC);     // fraco (trapping) descartado
+      }
+      root.__ACNSTRONG = strongC.length;
+      var parC = [], gC; for (gC = 0; gC < strongC.length; gC++) parC[gC] = gC;
+      var findC = function (a) { while (parC[a] !== a) { parC[a] = parC[parC[a]]; a = parC[a]; } return a; };
+      // CLUSTER ANISOTRÓPICO — a chave p/ apontar o LOCAL EXATO do texto errado.
+      // Raio circular grande junta linhas vizinhas (as linhas ficam a ~37px) e a marca vira o
+      // parágrafo inteiro, sem indicar nada. Texto se organiza em LINHAS: junta bastante na
+      // HORIZONTAL (palavra/número: gaps até ~40px) e pouquíssimo na VERTICAL (não pula de
+      // linha). Assim o "(29 g)" do DUX vira uma caixa de ~80×20 em cima dele, e não o bloco.
+      var RCLx = sens >= 2 ? (opts.rclX || 55) : 55, RCLy = sens >= 2 ? (opts.rclY || 6) : 55, aC, bC;
+      for (aC = 0; aC < strongC.length; aC++) for (bC = aC + 1; bC < strongC.length; bC++) {
+        var dcx = strongC[aC].cx - strongC[bC].cx; if (dcx < 0) dcx = -dcx;
+        var dcy = strongC[aC].cy - strongC[bC].cy; if (dcy < 0) dcy = -dcy;
+        if (dcx <= RCLx && dcy <= RCLy) parC[findC(aC)] = findC(bC);
+      }
+      var grpC = {}; for (gC = 0; gC < strongC.length; gC++) { var rC = findC(gC); (grpC[rC] = grpC[rC] || []).push(strongC[gC]); }
+      // quanto mais flood, mais denso o cluster tem que ser p/ passar (textura re-amostrada
+      // vira MUITO speckle; a troca real AGRUPA num dígito/palavra). Poucos comps (arte quase
+      // limpa) = mostra tudo. O par SOLTO (n=2) da borda do DUX cai; o "(29 g)" (n≥3) fica.
+      // Alta: minN FIXO em 3. O formula-por-volume subia p/ 4 e matava o cluster da troca real
+      // (o "(29 g)" do DUX tem exatamente 3 comps) — a marca precisa APONTAR o texto errado.
+      var minN = opts.minN || (sens >= 2 ? 3 : (strongC.length > 60 ? 4 : strongC.length > 12 ? 3 : 1)), kk, markers = [];
+      for (kk in grpC) {
+        var gg = grpC[kk];
+        var mx0 = 1e9, my0 = 1e9, mx1 = -1, my1 = -1, msC = 0, tp = "diff", qc;
+        for (qc = 0; qc < gg.length; qc++) { var cg = gg[qc];
+          if (cg.x < mx0) mx0 = cg.x; if (cg.y < my0) my0 = cg.y;
+          if (cg.x + cg.w > mx1) mx1 = cg.x + cg.w; if (cg.y + cg.h > my1) my1 = cg.y + cg.h;
+          if ((cg.strength || 0) > msC) { msC = cg.strength || 0; tp = cg.type; }
+        }
+        // SOBREVIVE se for AGRUPADO (≥minN: troca fraca mas concentrada — o "(29 g)" do DUX
+        // é 3 comps de força 91-113) OU FORTE SOZINHO (≥120 — o R/l/ponto da Coca é 1 comp de
+        // 120-173). A isenção do "forte sozinho" só vale em arte POUCO ruidosa (≤40 comps):
+        // no trapping pesado (DUX) o ruído isolado também chega a 165 e inundaria. Exigir só
+        // densidade matava a Coca; só força matava o DUX; o volume decide (medido: Coca 48 comps
+        // fortes, DUX 235, Perdigão 491 -> corte em 100 separa arte limpa de trapping pesado).
+        // Limiar do "forte sozinho" GRADUADO pelo volume (medido: Coca 48 comps fortes, DUX
+        // 235, Perdigão 491): arte limpa aceita 120 (o R=134/l=120 da Coca); com trapping
+        // pesado sobe p/ 170, porque ali o ruído isolado chega a 165 — e o 0763 do Perdigão,
+        // que fica em texto INCLINADO (o cluster por linha não o pega), tem 173-201 e passa.
+        var soloTh = strongC.length <= 100 ? 120 : 170;
+        if (gg.length < minN && msC < soloTh) continue;
+        // PISO DO MARCADOR: mesmo agrupado, uma marca precisa de pelo menos um comp com
+        // força razoável. Corta a cauda fraca do trapping sem tocar nas trocas reais
+        // (medido: DUX "(29 g)"=113, Coca l=120/R=134/ponto=173, Perdigão 0763=173-201).
+        if (msC < (opts.markTh != null ? opts.markTh : (sens >= 2 ? 108 : 0))) continue;
+        var mwC = mx1 - mx0, mhC = my1 - my0;
+        if (Math.min(mwC, mhC) <= 3 && Math.max(mwC, mhC) > 120) continue;   // fio de dobra/faca
+        markers.push({ x: mx0, y: my0, w: mwC, h: mhC, cx: (mx0 + mx1) >> 1, cy: (my0 + my1) >> 1,
+                       area: mwC * mhC, type: tp, strength: msC, ids: [] });
+      }
+      // MESCLA FINAL de marcas FORTES adjacentes: texto INCLINADO (o bloco do registro do
+      // Perdigão) não forma cluster por linha, então cada dígito vira uma marca solta — 9
+      // caixas para UM erro. Junta só as fortes (>=170) e vizinhas; as fracas (trapping do
+      // DUX, <=148) ficam intactas, senão as linhas voltariam a virar bloco.
+      var MG = 1;
+      while (MG) {
+        MG = 0;
+        for (var m1 = 0; m1 < markers.length && !MG; m1++) {
+          if ((markers[m1].strength || 0) < 170) continue;
+          for (var m2 = m1 + 1; m2 < markers.length; m2++) {
+            if ((markers[m2].strength || 0) < 170) continue;
+            var A = markers[m1], B = markers[m2];
+            var gx = Math.max(A.x, B.x) - Math.min(A.x + A.w, B.x + B.w);
+            var gy = Math.max(A.y, B.y) - Math.min(A.y + A.h, B.y + B.h);
+            if (gx <= 50 && gy <= 25) {
+              var nx0 = Math.min(A.x, B.x), ny0 = Math.min(A.y, B.y);
+              var nx1 = Math.max(A.x + A.w, B.x + B.w), ny1 = Math.max(A.y + A.h, B.y + B.h);
+              A.x = nx0; A.y = ny0; A.w = nx1 - nx0; A.h = ny1 - ny0;
+              A.cx = (nx0 + nx1) >> 1; A.cy = (ny0 + ny1) >> 1; A.area = A.w * A.h;
+              if ((B.strength || 0) > (A.strength || 0)) { A.strength = B.strength; A.type = B.type; }
+              markers.splice(m2, 1); MG = 1; break;
+            }
+          }
+        }
+      }
+      comps = otherC.concat(markers);
+    }
+
     // itens especiais primeiro (barcode > texto), depois por área
     comps.sort(function (a, b) {
       var ka = a.kind === "barcode" ? 2 : a.kind === "text" ? 1 : 0;
@@ -957,15 +1332,108 @@
       if (ka !== kb) return kb - ka;
       return b.area - a.area;
     });
-    var counts = { miss: 0, extra: 0, diff: 0, ok: 0 };
+    var counts = { miss: 0, extra: 0, diff: 0, ok: 0, check: 0 };
     for (var m2 = 0; m2 < comps.length; m2++) if (counts[comps[m2].type] != null) counts[comps[m2].type]++;
 
     return { W: W, H: H, lab: res.lab, fileImg: fileImg, origImg: origImg,
              comps: comps, counts: counts, align: al, prescaled: prescaled, fileRect: fileRect,
+             origRect: origRect,   // tamanho do render do ORIGINAL na tela comum (páginas
+                                   // de tamanhos diferentes) — a fase B mapeia o crop por ele
              mode: structural ? "forma" : "cor", modeAuto: modeAuto, barcode: barcode,
              textRegions: textRegions, textResid: textResid };
   }
 
-  root.ACEngine = { compare: compare, overlay: buildOverlay };
+  // v aparece na barra do painel: se não bater com esta, o CEP está com o motor
+  // ANTIGO em cache (fechar e reabrir o painel/Illustrator resolve).
+  // ===== CONFIRMAÇÃO DE TROCA DE TEXTO POR IMAGEM =====
+  // Dados os DOIS recortes em alta resolução (F e O) de um candidato, decide se a troca é
+  // REAL olhando os PIXELS — não a leitura do OCR (que erra em rótulo denso/trapado).
+  // Alinha os recortes, mede a tinta de um lado SEM correspondente no outro (com folga de
+  // trapping) e agrupa esse resíduo. Troca real de caractere = 1 aglomerado CONCENTRADO.
+  // Trapping (mesma forma, borda gorda) e ruído de OCR (mesma imagem) = resíduo ~0.
+  // Recorte que caiu em conteúdo diferente/desalinhado = resíduo ESPALHADO. Serve p/
+  // texto E número igual. Retorna { real, bx, by, frac, big, spread }.
+  function confirmTextChange(fImg, oImg, opts) {
+    opts = opts || {};
+    if (!fImg || !oImg || !fImg.data || !oImg.data) return { real: false };
+    function inkMask(img) {
+      var W = img.width, H = img.height, n = W * H, d = img.data, g = new Float32Array(n), soma = 0, i, j = 0;
+      for (i = 0; i < n; i++) { g[i] = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114; soma += g[i]; j += 4; }
+      var escuro = soma / n < 118, m = new Uint8Array(n);   // fundo escuro -> tinta clara
+      for (i = 0; i < n; i++) { var v = escuro ? 255 - g[i] : g[i]; if (v < 120) m[i] = 1; }
+      return { m: m, W: W, H: H };
+    }
+    var A = inkMask(fImg), B = inkMask(oImg);
+    var W = Math.min(A.W, B.W), H = Math.min(A.H, B.H);
+    if (W < 10 || H < 10) return { real: false };
+    // alinhamento fino: offset (±R) que MAXIMIZA a sobreposição de tinta
+    function ov(ox, oy) {
+      var s = 0, x, y;
+      for (y = 1; y < H - 1; y += 2) { var by = y + oy; if (by < 1 || by >= B.H - 1) continue;
+        for (x = 1; x < W - 1; x += 2) { var bx = x + ox; if (bx < 1 || bx >= B.W - 1) continue; if (A.m[y * A.W + x] && B.m[by * B.W + bx]) s++; } }
+      return s;
+    }
+    var R = 7, best = -1, BX = 0, BY = 0, ox, oy;
+    for (oy = -R; oy <= R; oy++) for (ox = -R; ox <= R; ox++) { var s2 = ov(ox, oy); if (s2 > best) { best = s2; BX = ox; BY = oy; } }
+    var tol = opts.tol != null ? opts.tol : 2;
+    function near(mask, MW, MH, x, y) {
+      for (var dy = -tol; dy <= tol; dy++) { var yy = y + dy; if (yy < 0 || yy >= MH) continue; var row = yy * MW;
+        for (var dx = -tol; dx <= tol; dx++) { var xx = x + dx; if (xx < 0 || xx >= MW) continue; if (mask[row + xx]) return true; } }
+      return false;
+    }
+    var resid = new Uint8Array(W * H), inkA = 0, inkB = 0, x, y;
+    for (y = 1; y < H - 1; y++) for (x = 1; x < W - 1; x++) {
+      var a = A.m[y * A.W + x], bx2 = x + BX, by2 = y + BY;
+      var inB = bx2 >= 0 && by2 >= 0 && bx2 < B.W && by2 < B.H, b = inB ? B.m[by2 * B.W + bx2] : 0;
+      if (a) inkA++; if (b) inkB++;
+      if (a && !(inB && near(B.m, B.W, B.H, bx2, by2))) resid[y * W + x] = 1;
+      else if (b && !near(A.m, A.W, A.H, x, y)) resid[y * W + x] = 1;
+    }
+    var totalInk = Math.min(inkA, inkB);
+    if (totalInk < 40) return { real: false, frac: 0 };
+    // despeckle (tira pixel solto de anti-alias)
+    var p;
+    for (p = 0; p < W * H; p++) if (resid[p]) {
+      var viz = 0, px = p % W, py = (p / W) | 0;
+      if (px > 0 && resid[p - 1]) viz++; if (px < W - 1 && resid[p + 1]) viz++;
+      if (py > 0 && resid[p - W]) viz++; if (py < H - 1 && resid[p + W]) viz++;
+      if (viz === 0) resid[p] = 0;
+    }
+    // ===== PERFIL POR COLUNA (diferencial) =====
+    // O trapping engorda TODAS as letras -> resíduo uniforme (o "tapete"). A troca de
+    // caractere é resíduo EXTRA concentrado numas colunas. Comparo resíduo/tinta de cada
+    // coluna com a MEDIANA (a base do trapping): coluna muito acima = a troca.
+    var colR = new Float32Array(W), colI = new Float32Array(W), ratios = [];
+    for (x = 0; x < W; x++) {
+      var rr = 0, ii = 0;
+      for (y = 1; y < H - 1; y++) { var idx = y * W + x; if (resid[idx]) rr++; if (A.m[y * A.W + x] || (x + BX >= 0 && y + BY >= 0 && x + BX < B.W && y + BY < B.H && B.m[(y + BY) * B.W + (x + BX)])) ii++; }
+      colR[x] = rr; colI[x] = ii;
+      if (ii >= 3) ratios.push(rr / ii);
+    }
+    if (ratios.length < 4) return { real: false, frac: 0 };
+    ratios.sort(function (a, b) { return a - b; });
+    var base = ratios[(ratios.length / 2) | 0];                 // mediana = nível do trapping
+    var lim = Math.max(0.35, base + 0.22, base * 1.7);          // pico = troca
+    // maior RUN de colunas acima do limite (a mudança é contígua: um ou mais chars)
+    var run = 0, bestRun = 0, runX0 = 0, bestX0 = 0, bestX1 = 0, runSum = 0, bestSum = 0;
+    for (x = 0; x < W; x++) {
+      var alto = colI[x] >= 3 && (colR[x] / Math.max(1, colI[x])) > lim && colR[x] >= 3;
+      if (alto) { if (run === 0) { runX0 = x; runSum = 0; } run++; runSum += colR[x]; }
+      else { if (run > bestRun) { bestRun = run; bestX0 = runX0; bestX1 = x - 1; bestSum = runSum; } run = 0; }
+    }
+    if (run > bestRun) { bestRun = run; bestX0 = runX0; bestX1 = W - 1; bestSum = runSum; }
+    // altura típica do texto (linhas com tinta) -> largura mínima de ~meio caractere
+    var linhasInk = 0;
+    for (y = 0; y < H; y++) { var ci = 0; for (x = 0; x < W; x++) if (A.m[y * A.W + x]) ci++; if (ci > W * 0.03) linhasInk++; }
+    var charH = Math.max(8, linhasInk), minRun = Math.max(4, Math.round(charH * 0.35));
+    var real = bestRun >= minRun && bestSum >= charH * 4 && base < 0.9;   // base~1 = conteúdo totalmente diferente
+    return { real: real, bx: (bestX0 + bestX1) >> 1, by: H >> 1,
+             bw: bestX1 - bestX0 + 1, bh: charH, frac: base, big: bestRun, spread: bestSum, clusters: ratios.length,
+             base: Math.round(base * 100) / 100, lim: Math.round(lim * 100) / 100, minRun: minRun, minBig: minRun };
+  }
+
+  // v27 = piso do marcador + mescla de marcas fortes (menos falso). v26 = cluster ANISOTROPICO (aponta o texto errado) + solo graduado. v25 = pisos de força sensíveis ao nível (o 28→29 do DUX tem força 91-113). v24 = sensibilidade (Baixa/Média/Alta) + registro local suave + força/cluster/mescla.
+  // Se a barra do painel NÃO mostrar v24, o CEP está com o motor em CACHE (fechar/reabrir).
+  root.ACEngine = { compare: compare, overlay: buildOverlay, confirmTextChange: confirmTextChange, v: 27 };
 
 })(window);
