@@ -49,16 +49,32 @@
     addcut:   '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.5"/></svg>',
     remap:    '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.2"/><circle cx="16" cy="16" r="3.2"/><path d="M13 6h5v5M11 18H6v-5"/></svg>',
     maleta:   '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="1.5"/><path d="M9 8V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18"/></svg>',
-    pics:     '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="M4 17l5-4 3 2 4-3 4 3"/></svg>'
+    pics:     '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="M4 17l5-4 3 2 4-3 4 3"/></svg>',
+    codigos:  '<svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="1.6"><path d="M4 6v12M7 6v12M10 6v12M13 6v9"/></g><rect x="15" y="13" width="5" height="5" rx="0.6"/><path d="M16.2 14.2h1.2v1.2h-1.2zM4 6h9M4 18h9" stroke="none" fill="currentColor"/></svg>'
   };
   var CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
-  var OPS_PADRAO = [
-    { tipo: "label",    nome: "Label Alpha",             desc: "Aplica a etiqueta/label padrão Alpha.", arq: "2_Label_Alpha.jsx" },
-    { tipo: "regua",    nome: "Medição Ondulado",        desc: "Gera as medidas das placas.",           arq: "10_Medicao_Ondulado.jsx" },
-    { tipo: "header",   nome: "Preenchimento Cabeçalho", desc: "Preenche os campos do cabeçalho.",      arq: "13_Preenchimento_Penha.jsx" },
-    { tipo: "faca",     nome: "Risco Poliéster",         desc: "Gera o risco/faca em poliéster.",        arq: "14_Risco_Faca.jsx" },
-    { tipo: "etiqueta", nome: "Gerar Etiquetas",         desc: "Gera as etiquetas empilhadas.",          arq: "12_Gerar_Etiquetas.jsx" }
+  // Fallback EMBUTIDO (ultimo recurso, sem rede e sem operacoes.json bundlado).
+  // Tem que ser COMPLETO (Ondulado + Geral): numa maquina onde o operacoes.json
+  // da rede nao carrega e o XHR do bundlado estoura o timeout, e ISTO que aparece.
+  // Se faltar a secao Geral aqui, "os scripts gerais somem" nessa maquina (bug real).
+  var SECOES_PADRAO = [
+    { titulo: "Ondulado", operacoes: [
+      { tipo: "label",    nome: "Label Alpha",             desc: "Aplica a etiqueta/label padrão Alpha.", arq: "2_Label_Alpha.jsx" },
+      { tipo: "regua",    nome: "Medição Ondulado",        desc: "Gera as medidas das placas.",           arq: "10_Medicao_Ondulado.jsx" },
+      { tipo: "header",   nome: "Preenchimento Cabeçalho", desc: "Preenche os campos do cabeçalho.",      arq: "13_Preenchimento_Penha.jsx" },
+      { tipo: "faca",     nome: "Risco Poliéster",         desc: "Gera o risco/faca em poliéster.",        arq: "14_Risco_Faca.jsx" },
+      { tipo: "etiqueta", nome: "Gerar Etiquetas",         desc: "Gera as etiquetas empilhadas.",          arq: "12_Gerar_Etiquetas.jsx" },
+      { tipo: "codigos",  nome: "Relatório de Códigos",    desc: "Lê os códigos selecionados e gera o laudo PDF.", arq: "15_Relatorio_Codigos.jsx" }
+    ] },
+    { titulo: "Geral", operacoes: [
+      { tipo: "addcut",    nome: "Add Cut",         desc: "Cria as margens de corte (cut).",                 arq: "AddCut.jsx",          pasta: "modulo", semOS: true },
+      { tipo: "remap",     nome: "Remapear Cores",  desc: "Remapeia/normaliza as cores do documento.",       arq: "RemapCores.jsx",      pasta: "modulo", semOS: true },
+      { tipo: "checklist", nome: "CheckList",       desc: "Validação + XML do job (usa a O.S. do painel).",  arq: "CheckList.jsx",       pasta: "raiz" },
+      { tipo: "cotas",     nome: "Cotas Alpha",     desc: "Gera as cotas do documento. Não precisa de O.S.", arq: "Cotas_Alpha.jsx",     pasta: "raiz",   semOS: true },
+      { tipo: "maleta",    nome: "Ondulado Maleta", desc: "Faca de maleta a partir das entradas (mm).",      arq: "Ondulado_Maleta.jsx", pasta: "modulo", semOS: true },
+      { tipo: "pics",      nome: "PICS",            desc: "Gera os PICS (usa a O.S. do painel).",            arq: "PICS.jsx",            pasta: "modulo" }
+    ] }
   ];
 
   var osInput, statusEl, dotEl, connLblEl, opsEl, execBtn;
@@ -176,12 +192,45 @@
         var msg = ret.substring(3), bar = msg.indexOf("|");
         var tipo = bar > -1 ? msg.substring(0, bar) : "info";
         var texto = bar > -1 ? msg.substring(bar + 1) : msg;
+        // O 15_Relatorio_Codigos.jsx devolve "__CODIGOS__<manifest.json>": o JSX
+        // ja capturou os codigos em PNG; agora o PAINEL decodifica e gera o PDF.
+        if (texto && texto.indexOf("__CODIGOS__") === 0) {
+          gerarRelatorioCodigos(texto.substring("__CODIGOS__".length));
+          return;
+        }
         if (tipo === "erro") { mostrarBanner("erro|" + texto); setStatus(texto, "err"); return; }
         if (texto) { mostrarBanner("info|" + texto); setStatus(texto, "ok"); return; }
       }
       mostrarBanner("info|" + selecionada.nome + " concluído.");
       setStatus(selecionada.nome + " — concluído.", "ok");
     });
+  }
+
+  // Relatorio de Codigos: o JSX capturou os codigos em PNG e escreveu o manifest;
+  // aqui decodificamos (ZXing/jsQR) e geramos o PDF na pasta _pdf do job. Toda a
+  // parte pesada roda no processo do PAINEL (nao trava o Illustrator). Sem modal.
+  function gerarRelatorioCodigos(manifestPath) {
+    if (typeof AlphaCodigos === "undefined" || !AlphaCodigos.gerar) {
+      mostrarBanner("erro|Módulo de leitura de códigos não carregou (reinstale o painel).");
+      setStatus("Módulo de códigos ausente.", "err");
+      return;
+    }
+    setStatus("Lendo os códigos…");
+    mostrarBanner("info|Lendo os códigos e gerando o relatório…");
+    AlphaCodigos.gerar(manifestPath, function (txt) { setStatus(txt); })
+      .then(function (res) {
+        var resumo = res.lidos + "/" + res.total + " lido(s) · " + (res.aprovado ? "APROVADO" : "REPROVADO");
+        var onde = res.arquivo.replace(/^.*[\\\/]/, "");
+        var tudoOk = res.aprovado && !res.aviso;
+        var texto = "Relatório gerado: " + onde + " — " + resumo + (res.aviso ? " (" + res.aviso + ")" : "");
+        mostrarBanner((tudoOk ? "info|" : "erro|") + texto);
+        setStatus(texto, tudoOk ? "ok" : "err");
+      })
+      .catch(function (e) {
+        var m = (e && e.message) ? e.message : String(e);
+        mostrarBanner("erro|Falha ao gerar o relatório de códigos: " + m);
+        setStatus("Falha: " + m, "err");
+      });
   }
 
   // aceita JSON com "secoes" [{titulo,operacoes}] OU "operacoes" (vira 1 secao).
@@ -223,12 +272,14 @@
       xhr.open("GET", "./operacoes.json", true);
       xhr.onreadystatechange = function () {
         if (xhr.readyState !== 4) return;
-        usar(parseConfig(xhr.responseText) || [{ operacoes: OPS_PADRAO }]);
+        usar(parseConfig(xhr.responseText) || SECOES_PADRAO);
       };
-      xhr.onerror = function () { usar([{ operacoes: OPS_PADRAO }]); };
+      xhr.onerror = function () { usar(SECOES_PADRAO); };
       xhr.send();
-      setTimeout(function () { usar([{ operacoes: OPS_PADRAO }]); }, 1500);
-    } catch (e) { usar([{ operacoes: OPS_PADRAO }]); }
+      // teto so pra nao ficar em branco se o XHR local travar. Folga maior (4s) pra
+      // maquina lenta nao commitar o embutido antes do operacoes.json bundlado chegar.
+      setTimeout(function () { usar(SECOES_PADRAO); }, 4000);
+    } catch (e) { usar(SECOES_PADRAO); }
   }
 
   // IPs das redes que precisam estar conectadas (ajuste aqui se mudar).

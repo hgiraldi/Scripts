@@ -59,7 +59,8 @@ Scripts/  (raiz)
         ├── 10_Medicao_Ondulado.jsx   # mede por grupo/cor predominante, exporta XML de medições
         ├── 12_Gerar_Etiqueta_Penha.jsx   # etiqueta Penha (tokens [[...]]) — DESATIVADO: fundido em 14_Risco_Faca; fora do menu Scripts.jsx; será deletado
         ├── 13_Preenchimento_Penha.jsx    # preenchimento cabeçalho Penha
-        └── 14_Risco_Faca.jsx         # risco/traço de faca (cores de corte)
+        ├── 14_Risco_Faca.jsx         # risco/traço de faca (cores de corte)
+        └── 15_Relatorio_Codigos.jsx  # LAUDO de verificação de códigos de barras/QR. Captura os itens SELECIONADOS em PNG (imageCapture) + manifest.json; a DECODIFICAÇÃO (ZXing/jsQR) e o PDF são feitos no PAINEL (cep/js/codigos.js). PDF vai na _pdf do job
 ```
 
 ---
@@ -81,7 +82,7 @@ Scripts/  (raiz)
 
 > Montagem/Distorção/Box exigem `selection.length > 0`.
 
-### Ondulado/Scripts.jsx — 5 opções (seleção exclusiva, O.S. 7 dígitos)
+### Ondulado/Scripts.jsx — 6 opções (seleção exclusiva, O.S. 7 dígitos)
 | Opção | Inclui |
 |---|---|
 | Label Alpha | `2_Label_Alpha.jsx` |
@@ -89,6 +90,7 @@ Scripts/  (raiz)
 | Preenchimento Cabeçalho | `13_Preenchimento_Penha.jsx` |
 | Risco Poliester | `14_Risco_Faca.jsx` |
 | Gerar Etiquetas | `12_Gerar_Etiquetas.jsx` |
+| Relatório de Códigos | `15_Relatorio_Codigos.jsx` (exige seleção; PDF gerado no painel) |
 
 ---
 

@@ -56,6 +56,22 @@ cep/
   com.alpha.ondulado/
     CSXS/manifest.xml
     index.html  css/  js/  host/  img/
+    js/codigos.js         # Relatório de Códigos: decodifica (ZXing/jsQR) + gera o PDF
+    lib/                  # zxing.min.js, jsQR.js, jspdf.umd.min.js (usados só pelo Relatório de Códigos)
     operacoes.json        # default bundlado (fallback)
 Ondulado/operacoes.json   # LIVE na rede (edita sem reinstalar)
 ```
+
+## Relatório de Verificação de Códigos (barras + QR)
+Operação **Relatório de Códigos** (`15_Relatorio_Codigos.jsx`). O operador
+**seleciona** no documento os códigos (barras e/ou QR) e roda a operação:
+- o **JSX** (na rede) captura cada item selecionado em **PNG de alta resolução**
+  (`imageCapture`) e grava um `manifest.json`; devolve `__CODIGOS__<manifest>` ao painel;
+- o **painel** (`js/codigos.js`, Node/Chromium) **decodifica** com **ZXing**
+  (EAN-13/8, UPC, ITF-14, Code 128/39, Codabar, Data Matrix) e **jsQR** (QR),
+  tentando as 4 rotações e o negativo; confere o **dígito verificador GS1 (mod 10)**;
+- gera o **laudo PDF** (jsPDF, identidade Alpha) em
+  `\\aeserver16\Engine\_Jobfolder\<O.S.>\_pdf\` (irmã da pasta `reference`), nome
+  `Relatorio_Verificacao_Codigos_<OS>_<AAAAMMDD-HHMM>.pdf`. Sem rede → cai no Desktop.
+- **Adicionar/mudar esta operação exigiu mexer no código do painel → REINSTALAR** nas
+  máquinas (as libs em `lib/` vêm bundladas, não da rede).
