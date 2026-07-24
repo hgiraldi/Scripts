@@ -433,6 +433,22 @@ async function convert(inPath, outPath, plan, onProgress) {
         else obj.set(1, PDFName.of(encPdfName(renameTo[color])));
         renamed++; mark(ref);
       }
+    } else if (obj instanceof PDFArray && obj.get(0) === PDFName.of("DeviceN")) {
+      // IMPORTANTE: o ## tambem pode estar num DeviceN. Se nao renomear aqui, o
+      // colorante ## continua existindo -> "Ink <##X> missing in the XMP inklist".
+      const names = obj.get(1);
+      if (names instanceof PDFArray) {
+        let hit = false;
+        for (let i = 0; i < names.size(); i++) {
+          const c = decodeName(nameOf(names.get(i)));
+          if (renameTo[c]) {
+            const b = baseCsArr[normKeyInk(renameTo[c])];
+            names.set(i, b ? b.get(1) : PDFName.of(encPdfName(renameTo[c])));
+            renamed++; hit = true;
+          }
+        }
+        if (hit) mark(ref);
+      }
     }
   }
 
