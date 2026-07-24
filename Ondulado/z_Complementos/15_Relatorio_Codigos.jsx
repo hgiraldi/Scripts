@@ -16,9 +16,16 @@
 // SO roda pelo painel (sem painel nao ha decodificador).
 // ============================================================
 
-// O.S.: pelo painel ja vem em $.global.serviceOrderNumber.
+// O.S.: pelo painel ja vem em $.global.serviceOrderNumber (input do painel).
+// NAO declarar "var serviceOrderNumber" aqui: o hoisting do var criaria um local
+// undefined que SOMBREIA a global setada pelo painel -> o typeof daria "undefined"
+// e pediria a O.S. DE NOVO num prompt (bug). Sem var, "serviceOrderNumber" le a global.
 if (typeof serviceOrderNumber === "undefined" || !serviceOrderNumber) {
-    var serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+    if (typeof $.global !== "undefined" && $.global.serviceOrderNumber) {
+        serviceOrderNumber = String($.global.serviceOrderNumber);
+    } else {
+        serviceOrderNumber = prompt("Digite o número da Ordem de Serviço (7 dígitos):", "");
+    }
 }
 
 #include "Xml_upload.jsx"
