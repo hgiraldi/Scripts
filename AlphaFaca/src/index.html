@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alpha Faca</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-panel"><img src="assets/logo_alpha_branco.png" alt="Alpha Clicheria" /></div>
+        <div class="brand-sub">Facaria</div>
+      </div>
+
+      <nav class="nav">
+        <a class="nav-item active" data-screen="novo">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 17 L9 11 L13 15 L21 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="7" r="1.6" fill="currentColor"/></svg>
+          <span>Novo orçamento</span>
+        </a>
+        <a class="nav-item" data-screen="salvos">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 5 a1 1 0 0 1 1-1 h9 l6 6 v9 a1 1 0 0 1 -1 1 H5 a1 1 0 0 1 -1 -1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 13 h8 M8 17 h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Orçamentos salvos</span>
+        </a>
+        <a class="nav-item" data-screen="config">
+          <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3 v3 M12 18 v3 M3 12 h3 M18 12 h3 M5.6 5.6 l2.1 2.1 M16.3 16.3 l2.1 2.1 M18.4 5.6 l-2.1 2.1 M7.7 16.3 l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Configuração</span>
+        </a>
+      </nav>
+      <div class="sidebar-foot"><span>v0.2 &middot; uso interno Alpha</span></div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb">
+          <span id="crumbScreen">Novo orçamento</span>
+          <span class="crumb-file" id="crumbFile"></span>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn ghost" id="btnNova" hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 5 v14 M5 12 h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Nova faca
+          </button>
+          <button class="btn ghost" id="btnAbrir">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 6 h5 l2 2 h9 v10 a1 1 0 0 1 -1 1 H4 a1 1 0 0 1 -1 -1 V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            Abrir faca
+          </button>
+          <button class="icon-btn" id="themeToggle" title="Alternar tema">
+            <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18"><path d="M21 13 A9 9 0 1 1 11 3 a7 7 0 0 0 10 10z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- ---------- TELA: NOVO ORÇAMENTO ---------- -->
+      <section class="screen active" id="screen-novo">
+        <div class="dropzone" id="dropzone">
+          <div class="dz-inner">
+            <svg viewBox="0 0 48 48" width="54" height="54"><path d="M24 32 V14 M17 21 l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30 v6 a2 2 0 0 0 2 2 h28 a2 2 0 0 0 2-2 v-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            <h2>Arraste um <b>DXF</b> aqui</h2>
+            <p>ou clique para escolher a faca. O Alpha Faca separa <span class="chip c-corte">corte</span> de <span class="chip c-vinco">vinco</span>, mede tudo e monta o orçamento.</p>
+            <button class="btn primary" id="btnAbrir2">Escolher arquivo</button>
+            <small class="dz-note">Formato aceito: <b>.DXF</b></small>
+          </div>
+        </div>
+
+        <div id="novoConteudo" hidden>
+          <div class="novo-grid">
+            <!-- ESQUERDA: preview + medições -->
+            <div class="novo-left">
+              <div class="card preview-card">
+                <div class="card-head">
+                  <h3>Pré-visualização da faca</h3>
+                  <button type="button" class="btn ghost mini" id="celAbrirEditor" title="Abrir editor de celastro em tela cheia">
+                    <svg viewBox="0 0 24 24" width="15" height="15"><path d="M4 20 l4-1 10-10 -3-3 -10 10z M14 6 l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Informar celastro
+                  </button>
+                  <div class="legend" id="legend"></div>
+                </div>
+                <div class="canvas-wrap"><canvas id="preview"></canvas></div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <h3>Medições</h3>
+                  <div class="unit-select">
+                    <label>Unidade do desenho</label>
+                    <select id="unidade">
+                      <option value="mm">milímetros (mm)</option>
+                      <option value="cm">centímetros (cm)</option>
+                      <option value="m">metros (m)</option>
+                      <option value="pol">polegadas (pol)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="stats" id="stats"></div>
+                <div class="faca-size" id="facaSize"></div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3>Mapa de cores</h3><span class="hint">o que é cada cor</span></div>
+                <div class="colormap" id="colormap"></div>
+              </div>
+            </div>
+
+            <!-- DIREITA: formulário + demonstrativo -->
+            <div class="novo-right">
+              <div class="card">
+                <div class="card-head"><h3>Orçamento</h3></div>
+                <div class="form-col">
+                  <label class="fld"><span>Cliente</span>
+                    <input type="text" id="jCliente" list="clientesList" placeholder="buscar empresa cadastrada…" autocomplete="off">
+                    <datalist id="clientesList"></datalist>
+                  </label>
+
+                  <div class="fld"><span>Tipo de faca</span>
+                    <div class="segm" id="tipoFaca">
+                      <button type="button" class="seg active" data-tipo="plana">Plana</button>
+                      <button type="button" class="seg" data-tipo="rotativa">Rotativa</button>
+                    </div>
+                  </div>
+
+                  <div id="camposPlana">
+                    <label class="fld"><span>Espessura da madeira</span>
+                      <select id="jEspessura"><option value="">—</option></select>
+                    </label>
+                  </div>
+                  <div id="camposRotativa" hidden>
+                    <label class="fld"><span>Diâmetro do cilindro</span>
+                      <select id="jDiametro"><option value="">—</option></select>
+                    </label>
+                    <div class="form-grid">
+                      <label class="fld"><span>Comprimento da calha (m)</span><input type="number" step="0.01" id="jComprCalha" placeholder="0,00"></label>
+                      <label class="fld"><span>Qtd. de calhas</span><input type="number" step="1" id="jQtdCalhas" placeholder="0"></label>
+                    </div>
+                  </div>
+
+                  <label class="fld"><span>Lâmina de corte</span>
+                    <select id="jLaminaCorte"><option value="">—</option></select>
+                  </label>
+                  <label class="fld"><span>Lâmina de vinco</span>
+                    <select id="jLaminaVinco"><option value="">—</option></select>
+                  </label>
+
+                  <div class="fld"><span>Celastro <em>(opcional — área)</em></span>
+                    <div class="cel-info">
+                      <b id="celMetros">0,000 m²</b>
+                      <span class="muted small" id="celQtd">nenhuma região</span>
+                      <button type="button" class="btn ghost mini" id="celLimpar" style="margin-left:auto">Limpar</button>
+                    </div>
+                    <small class="muted" style="font-size:11px">Clique em <b>Informar celastro</b> (no preview) para desenhar em tela cheia.</small>
+                  </div>
+
+                  <label class="fld"><span>% de ganho sobre o custo</span>
+                    <input type="number" step="0.5" id="jPercentual" placeholder="0">
+                  </label>
+                </div>
+              </div>
+
+              <div class="card demo-card">
+                <div class="card-head"><h3>Demonstrativo (custo)</h3></div>
+                <table class="orc-tbl" id="demoTbl"></table>
+                <div class="demo-tot">
+                  <div class="dt-row"><span>Custo</span><b id="demoCusto">R$ 0,00</b></div>
+                  <div class="dt-row"><span>Ganho <i id="demoPct">(0%)</i></span><b id="demoGanho">R$ 0,00</b></div>
+                  <div class="dt-grand"><span>PREÇO CLIENTE</span><b id="demoPreco">R$ 0,00</b></div>
+                </div>
+                <div class="faltando" id="faltando"></div>
+                <button class="btn primary full" id="btnSalvar">Salvar orçamento</button>
+                <div class="pdf-msg" id="salvarMsg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- TELA: ORÇAMENTOS SALVOS ---------- -->
+      <section class="screen" id="screen-salvos">
+        <!-- lista -->
+        <div id="salvosLista">
+          <div class="salvos-head">
+            <div><h3 class="salvos-titulo">Orçamentos salvos</h3>
+              <p class="muted small">Clique em um para ver os detalhes, ajustar o % e gerar o PDF do cliente.</p></div>
+            <span class="salvos-count" id="salvosCount"></span>
+          </div>
+          <div id="listaSalvos"></div>
+          <div class="placeholder salvos-vazio" id="salvosVazio" hidden>
+            <svg viewBox="0 0 24 24" width="48" height="48"><path d="M4 5 a1 1 0 0 1 1-1 h9 l6 6 v9 a1 1 0 0 1 -1 1 H5 a1 1 0 0 1 -1 -1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 13 h8 M8 17 h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <h2>Nenhum orçamento salvo</h2>
+            <p>Crie um em <b>Novo orçamento</b> — ele aparece aqui.</p>
+          </div>
+        </div>
+        <!-- detalhe -->
+        <div id="salvosDetalhe" hidden></div>
+      </section>
+
+      <!-- ---------- TELA: CONFIGURAÇÃO (cadastros) ---------- -->
+      <section class="screen" id="screen-config">
+        <div class="cfg">
+          <div class="card">
+            <div class="card-head"><h3>Compartilhamento (rede)</h3><span class="rede-status" id="cadRedeStatus">conectando…</span></div>
+            <p class="muted small">Os cadastros (clientes, lâminas, preços) são <b>compartilhados automaticamente</b> entre todas as máquinas — gravados numa pasta fixa na rede, sem configuração. Os orçamentos ficam locais em cada PC.</p>
+            <div class="rede-linha"><span class="muted small">Pasta na rede:</span> <b id="cadRedePath" class="rede-path">—</b></div>
+            <p class="muted small">Se a rede cair, o app usa a última cópia local e volta a sincronizar quando reconectar.</p>
+          </div>
+          <p class="muted small" style="margin-bottom:16px">Cadastros de matéria-prima (custo real de compra). Alimentam todos os orçamentos. Salvo automaticamente.</p>
+
+          <div class="card">
+            <div class="card-head"><h3>Clientes</h3></div>
+            <div class="cad-add"><input type="text" id="cliNome" placeholder="Nome da empresa"><button class="btn ghost mini" id="cliAdd">+ Adicionar</button></div>
+            <div class="cad-list" id="cliList"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Lâminas de corte</h3><span class="hint">R$/m</span></div>
+            <div class="cad-add cad-4">
+              <input type="text" id="lcNome" placeholder="Nome/ref">
+              <input type="text" id="lcDentes" placeholder="Dentes (ex.: 2/1)">
+              <input type="text" id="lcAltura" placeholder="Altura">
+              <input type="number" step="0.01" id="lcPreco" placeholder="R$/m">
+              <button class="btn ghost mini" id="lcAdd">+</button>
+            </div>
+            <div class="cad-list" id="lcList"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Lâminas de vinco</h3><span class="hint">R$/m</span></div>
+            <div class="cad-add cad-2">
+              <input type="text" id="lvAltura" placeholder="Altura">
+              <input type="number" step="0.01" id="lvPreco" placeholder="R$/m">
+              <button class="btn ghost mini" id="lvAdd">+</button>
+            </div>
+            <div class="cad-list" id="lvList"></div>
+          </div>
+
+          <div class="dois">
+            <div class="card">
+              <div class="card-head"><h3>Picote</h3></div>
+              <label class="fld"><span>Valor médio (R$/m)</span><input type="number" step="0.01" id="cPicote" placeholder="0,00"></label>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Celastro</h3><span class="hint">área · R$/m²</span></div>
+              <label class="fld"><span>Preço (R$/m²)</span><input type="number" step="0.01" id="cCelastro" placeholder="0,00"></label>
+              <p class="muted small" style="margin-top:8px">Cobrado por área das regiões desenhadas no preview.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Madeira — faca plana</h3><span class="hint">R$/m²</span></div>
+            <div class="cad-add cad-2">
+              <input type="text" id="mpEsp" placeholder="Espessura (ex.: 18mm)">
+              <input type="number" step="0.01" id="mpPreco" placeholder="R$/m²">
+              <button class="btn ghost mini" id="mpAdd">+</button>
+            </div>
+            <div class="cad-list" id="mpList"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Madeira — faca rotativa</h3><span class="hint">coeficiente por diâmetro</span></div>
+            <div class="cad-add cad-2">
+              <input type="text" id="mrDia" placeholder="Diâmetro (ex.: 300)">
+              <input type="number" step="0.01" id="mrCoef" placeholder="Coeficiente">
+              <button class="btn ghost mini" id="mrAdd">+</button>
+            </div>
+            <div class="cad-list" id="mrList"></div>
+            <p class="muted small" style="margin-top:10px">Custo rotativa = (coeficiente × comprimento da calha) × qtd de calhas.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ EDITOR DE CELASTRO (tela cheia) ============ -->
+  <div class="cel-editor" id="celEditor" hidden>
+    <div class="ed-top">
+      <div class="ed-title"><b>Informar celastro</b> <span id="edFile"></span></div>
+      <div class="ed-tools" id="edTools">
+        <button class="edtool active" data-edtool="select" title="Selecionar / mover / redimensionar">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3 L19 11 L12 12.5 L10.5 19 Z" fill="currentColor"/></svg>
+        </button>
+        <button class="edtool" data-edtool="circle" title="Círculo">
+          <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="edtool" data-edtool="rect" title="Retângulo">
+          <svg viewBox="0 0 24 24" width="16" height="16"><rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="edtool" data-edtool="poly" title="Polígono (por pontos · Shift trava 45°)">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 3 L20 9 L17 20 L7 20 L4 9 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        </button>
+        <span class="ed-sep"></span>
+        <button class="edtool tool-txt" id="edLimpar">Limpar tudo</button>
+      </div>
+      <div class="ed-right">
+        <div class="ed-zoom">
+          <button id="edZoomOut" title="Menos zoom">−</button>
+          <span id="edZoomLabel">100%</span>
+          <button id="edZoomIn" title="Mais zoom">+</button>
+          <button id="edFit" class="tool-txt" title="Ajustar à tela (Ctrl+0)">Ajustar</button>
+        </div>
+        <div class="ed-area">Celastro: <b id="edArea">0,000 m²</b></div>
+        <button class="btn primary" id="edFechar">Concluir</button>
+      </div>
+    </div>
+    <div class="ed-hint" id="edHint" data-default="Selecionar vários: arraste um retângulo no vazio (Shift+clique adiciona · Ctrl+A tudo) · arraste move o grupo · Ctrl+D duplica repetindo a última movimentação · canto estica, logo fora gira (Shift 45°) · Ctrl+C/Ctrl+V copia e cola · Delete apaga · Zoom: roda · Espaço+arraste move a tela · Ctrl+0 ajusta.">Selecionar vários: arraste um retângulo no vazio (Shift+clique adiciona · Ctrl+A tudo) · arraste move o grupo · Ctrl+D duplica repetindo a última movimentação · canto estica, logo fora gira (Shift 45°) · Ctrl+C/Ctrl+V copia e cola · Delete apaga · Zoom: roda · Espaço+arraste move a tela · Ctrl+0 ajusta.</div>
+    <div class="ed-canvas-wrap" id="edCanvasWrap"><canvas id="edCanvas"></canvas></div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
