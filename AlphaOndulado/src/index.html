@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: 'unsafe-inline';">
+  <title>Alpha Ondulado</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="side">
+      <img class="logo" src="assets/logo_alpha.png" alt="Alpha Clicheria">
+      <div class="setor">Ondulado</div>
+      <nav class="nav">
+        <div class="navitem active" data-tela="novo">Novo orçamento</div>
+        <div class="navitem" data-tela="salvos">Orçamentos</div>
+      </nav>
+      <div class="sidefoot"><span id="ver">v0.2</span></div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- ================= TELA: NOVO ORÇAMENTO ================= -->
+      <div id="telaNovo" class="tela">
+        <header class="topo">
+          <h1>Novo orçamento</h1>
+          <p class="sub">PDF → grupos por cor → área (cm²) × fator × arranjo</p>
+        </header>
+
+        <section class="card up">
+          <button id="btnPdf" class="btn primary">Abrir PDF…</button>
+          <span id="pdfNome" class="pdfnome">Nenhum arquivo carregado</span>
+          <span id="statusExtr" class="status"></span>
+        </section>
+
+        <div class="grid2">
+          <div class="colL">
+            <section class="card">
+              <h2>Dados do orçamento</h2>
+              <div class="form">
+                <label class="fld">
+                  <span>Cliente</span>
+                  <input id="cliente" type="text" placeholder="Nome do cliente">
+                </label>
+                <label class="fld">
+                  <span>Espessura</span>
+                  <select id="espessura">
+                    <option value="">—</option>
+                    <option value="2.84">2,84 mm</option>
+                    <option value="3.96">3,96 mm</option>
+                    <option value="5.00">5,00 mm</option>
+                    <option value="6.35">6,35 mm</option>
+                  </select>
+                </label>
+                <div class="fld">
+                  <span>Tipo</span>
+                  <div class="radios" id="tipoWrap">
+                    <label><input type="radio" name="tipo" value="repremontagem"><i></i>Repremontagem</label>
+                    <label><input type="radio" name="tipo" value="cliche"><i></i>Clichê</label>
+                    <label><input type="radio" name="tipo" value="alteracao"><i></i>Alteração</label>
+                  </div>
+                </div>
+                <label class="fld">
+                  <span>Arranjo <small>(colunas × linhas)</small></span>
+                  <input id="arranjo" type="text" inputmode="numeric" placeholder="ex.: 2 x 2">
+                </label>
+                <label class="fld">
+                  <span>Fator (R$/cm²)</span>
+                  <input id="fator" type="text" inputmode="decimal" placeholder="ex.: 0,85">
+                </label>
+              </div>
+            </section>
+
+            <section class="card resumo">
+              <div class="linha"><span>Área total</span><b id="rArea">— cm²</b></div>
+              <div class="linha"><span>Grupos · cores</span><b id="rGrupos">—</b></div>
+              <div class="linha"><span>Arranjo</span><b id="rArranjo">—</b></div>
+              <div class="totbox">
+                <span>Valor do orçamento</span>
+                <div class="tot" id="rTotal">R$ 0,00</div>
+              </div>
+              <div id="faltando" class="faltando"></div>
+              <div class="botoes">
+                <button id="btnSalvar" class="btn ghost" disabled>Salvar orçamento</button>
+                <button id="btnLaudo" class="btn primary" disabled>Gerar orçamento PDF</button>
+              </div>
+            </section>
+          </div>
+
+          <div class="colR">
+            <section class="card preview">
+              <div class="previewhead">
+                <span id="fonteBadge" class="badge hide"></span>
+              </div>
+              <div id="previewWrap" class="previewwrap vazio">
+                <span class="ph">Pré-visualização do PDF</span>
+              </div>
+            </section>
+            <section class="card">
+              <h2>Cores e grupos <small id="dicaNome">(clique no nome para editar)</small></h2>
+              <div id="tabelaCores" class="tabcores">
+                <div class="vazio2">Carregue um PDF para ver os grupos por cor.</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TELA: ORÇAMENTOS ================= -->
+      <div id="telaSalvos" class="tela hide">
+
+        <!-- LISTA + BUSCA -->
+        <div id="salvosLista">
+          <header class="topo">
+            <h1>Orçamentos</h1>
+            <p class="sub">Banco local nesta máquina — buscar, editar o fator/arranjo, gerar de novo ou excluir.</p>
+          </header>
+          <section class="card buscacard">
+            <input id="busca" type="text" placeholder="Buscar por cliente ou nome de arquivo…" autocomplete="off">
+            <span id="buscaInfo" class="status"></span>
+          </section>
+          <section class="card">
+            <div id="listaSalvos" class="listasalvos">
+              <div class="vazio2">Nenhum orçamento salvo ainda.</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- EDITOR (mesma tela) -->
+        <div id="salvosEditor" class="hide">
+          <header class="topo">
+            <button id="edVoltar" class="btn ghost btnvoltar">← Voltar aos orçamentos</button>
+            <h1 id="edTitulo">Editar orçamento</h1>
+          </header>
+          <div class="grid2">
+            <div class="colL">
+              <section class="card">
+                <h2>Dados do orçamento</h2>
+                <div class="form">
+                  <label class="fld"><span>Cliente</span><input id="edCliente" type="text"></label>
+                  <label class="fld">
+                    <span>Espessura</span>
+                    <select id="edEspessura">
+                      <option value="">—</option>
+                      <option value="2.84">2,84 mm</option>
+                      <option value="3.96">3,96 mm</option>
+                      <option value="5.00">5,00 mm</option>
+                      <option value="6.35">6,35 mm</option>
+                    </select>
+                  </label>
+                  <div class="fld">
+                    <span>Tipo</span>
+                    <div class="radios" id="edTipoWrap">
+                      <label><input type="radio" name="edtipo" value="repremontagem"><i></i>Repremontagem</label>
+                      <label><input type="radio" name="edtipo" value="cliche"><i></i>Clichê</label>
+                      <label><input type="radio" name="edtipo" value="alteracao"><i></i>Alteração</label>
+                    </div>
+                  </div>
+                  <label class="fld"><span>Arranjo <small>(colunas × linhas)</small></span><input id="edArranjo" type="text" placeholder="ex.: 2 x 2"></label>
+                  <label class="fld"><span>Fator (R$/cm²)</span><input id="edFator" type="text" inputmode="decimal" placeholder="ex.: 0,85"></label>
+                </div>
+              </section>
+              <section class="card resumo">
+                <div class="linha"><span>Área total</span><b id="edArea">— cm²</b></div>
+                <div class="linha"><span>Arranjo</span><b id="edArranjoR">—</b></div>
+                <div class="totbox"><span>Valor do orçamento</span><div class="tot" id="edTotal">R$ 0,00</div></div>
+                <div id="edFalta" class="faltando"></div>
+                <div class="botoes">
+                  <button id="edExcluir" class="btn danger">Excluir</button>
+                  <button id="edSalvar" class="btn ghost">Salvar alterações</button>
+                  <button id="edGerar" class="btn primary" disabled>Gerar orçamento PDF</button>
+                </div>
+              </section>
+            </div>
+            <div class="colR">
+              <section class="card preview">
+                <div class="previewhead"><span id="edBadge" class="badge hide"></span></div>
+                <div id="edPreview" class="previewwrap vazio"><span class="ph">Sem preview</span></div>
+              </section>
+              <section class="card">
+                <h2>Cores</h2>
+                <div id="edCores" class="tabcores"></div>
+              </section>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script>require("./renderer.js");</script>
+</body>
+</html>
