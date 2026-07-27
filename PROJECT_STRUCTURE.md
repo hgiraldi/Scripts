@@ -15,6 +15,12 @@ Dois fluxos principais, cada um com seu menu orquestrador:
 * **Ondulado/** — fluxo papelão ondulado
 * **Raiz/** — scripts avulsos (cotas, checklist, testes)
 
+Além dos dois fluxos JSX, há **apps Electron internos** (`Alpha*`, só commit, nunca
+produção): **AlphaFaca/** (orçamento de faca via DXF, ver `AlphaFaca/ARQUITETURA.md`) e
+**AlphaOndulado/** (PDF ripado → grupos por cor → laudo de orçamento de clichê, ver
+`AlphaOndulado/ARQUITETURA.md`; reproduz a lógica de `10_Medicao_Ondulado.jsx` **fora** do
+Illustrator via pdf.js — área cm² × fator do operador).
+
 Padrão geral: `Scripts.jsx` (menu ScriptUI) pede o número da O.S. (7 dígitos) e inclui condicionalmente os complementos via `#include`. Quase todo complemento inclui `Xml_upload.jsx`, que carrega o XML da O.S. e publica ~70 variáveis globais consumidas pelos demais.
 
 ---
@@ -44,6 +50,7 @@ Scripts/  (raiz)
 │       ├── 8_Micropontos.jsx         # micropontos (layer "registros")
 │       ├── 9_Box_Valfilm.jsx         # box Valfilm (redimensiona)
 │       ├── montagens.jsx (359 KB)    # lib geométrica grande (shapes/trapézios)
+│       │     └── montagemNovatack() blindada (fonte com fallback, sem alert) — ver §5.1
 │       └── micropontos.jsx           # lib de linhas/texto/pontos de registro
 │
 └── Ondulado/
@@ -111,6 +118,27 @@ Scripts/  (raiz)
 * **`Xml_upload.jsx`** — duas versões **estruturalmente iguais**, mas a do Ondulado é ~1.3 KB maior. Confirmar diffs antes de propagar mudanças.
 * **`AddCantoneira.jsx`** deriva de `AddCut.jsx` (código base adaptado).
 * **Registros+label (`PICS.jsx` ⇄ `14_Risco_Faca.jsx`)** — o `PICS.jsx` tem as 36 funções de registros+label como **CÓPIA VERBATIM** do `14_Risco_Faca.jsx` (corEhBrancoNome…clearanceLado + normalizarNomeCor, incl. `escolherLayerArteDialog` e `showMarginDialogRiscos`) — verificado por diff: **0 diferenças**. A orquestração `criarRegistrosLabel(doc)` é o `criarRiscosArte` PASSO 1-4 (layer "arte" com dialog de fallback), rodando no doc ATIVO, em TODOS os grupos da arte (sem seleção). Diferenças do Risco_Faca: **NÃO cria o cut (PASSO 5) nem separações**, e **SEM diálogo de margem** — usa `margensCut` fixo de **6mm** (faixa do refB onde o label pode ficar; a lógica tenta sempre dentro do bounds perto do "+", a folga só é usada quando não cabe colado). `showMarginDialogRiscos` foi removida do PICS. **Corrigir bug numa = replicar na outra** (decisão do usuário: PICS independente p/ não mexer no Risco_Faca recém-arrumado; manter byte a byte iguais).
+
+### 5.1 `montagemNovatack()` — blindagem (só esta montagem)
+
+Operador estava travando na montagem do cliente **Novatack**. Corrigido **apenas dentro de `montagemNovatack()`**, com helpers de sufixo `Novatack` logo acima da função (nenhuma outra montagem foi tocada):
+
+| Problema | Fix |
+|---|---|
+| `app.textFonts.getByName("Geneva")` (fonte **de Mac**) e `("Arial-BoldMT")` derrubavam o script na máquina sem a fonte | `acharFonteNovatack()` + `aplicarFonteNovatack()`: lista de candidatas (Arial Bold → ArialMT → Helvetica → Myriad → Verdana → Tahoma → Segoe), match por nome PostScript/família+estilo, fallback p/ 1ª fonte instalada, e se nada existir mantém a fonte padrão **sem erro** |
+| `aplicarCorTexto()` chama `alert()` quando a cor não está na paleta → **modal trava o painel CEP** | `aplicarCorTextoNovatack()`: mesma busca de swatch, sem modal; entra na lista de avisos da mensagem final |
+| `for (i < coresComuns.length) aplicarCorTexto(coresTexto[i], …)` estourava índice quando `coresComuns` > `cores` | loop limitado ao menor dos dois |
+| `cores` com item vazio → `TextFrame` vazio → `characterAttributes` dá "no such element" | itens vazios são pulados |
+| `registrationColor` vem **null** em doc sem swatch `[Registration]`/`[Registro]` → "Illegal argument" no `fillColor` | `corRegistroNovatack()`: registration → spot `PassarRegistration` → CMYK 100/100/100/100 |
+| Helpers desenham em `doc.layers[0]`; se o arquivo já tinha layer "registros", `layers[0]` virava a layer **"arte" (oculta)** e a montagem saía vazia | `prepararLayerNovatack()`: acha/cria "registros", normaliza o nome, destrava, torna visível, traz p/ o topo e vira `activeLayer` |
+| `executeMenuCommand('group')` herdava a seleção anterior e `app.selection[0]` podia ser `undefined` | limpa a seleção antes, `selected = true` em try/catch e checa a seleção antes de agrupar |
+| Posição dos camerons + `msgUsuario` ficavam **dentro** do `if (registrosLayer …)`: sem a layer, a montagem parava no meio **sem aviso** | movidos para fora — sempre rodam |
+| `pos` do XML com espaço/minúscula não batia em nenhum `if` (cameron a mais, silencioso) | `posNovatack` = trim + upper, com aviso se vier vazio/desconhecido |
+| `.remove()` em item já removido quebrava | `removerNovatack()` (try/catch) |
+| `grupoCores` vazio (O.S. sem cores) → `.height`/`geometricBounds` quebravam o retângulo do label | `alturaSeguraNovatack()` / `boundsSegurosNovatack()` |
+| `textFrames.add()` sem uso deixava um **texto vazio** solto na layer "registros" | removido |
+
+A mensagem final agora sai como `"Montagem e Label feitos — avisos: …"` (linha única, compatível com o banner do painel).
 
 ### Funções utilitárias copiadas (não há lib central)
 | Função | Onde aparece |

@@ -1710,7 +1710,303 @@ function montagemRalprint() {
     }
 }
 //Novatack
+// ============================================================================
+// Helpers EXCLUSIVOS da montagem Novatack (sufixo Novatack para nao afetar as
+// outras montagens). Motivo: o operador estava travando por causa de fonte que
+// nao existe na maquina (getByName quebra o script inteiro) e por outros
+// pontos que abortavam a montagem no meio, sem aviso.
+// ============================================================================
+
+// Fontes candidatas, na ordem de preferencia. A primeira instalada na maquina
+// e usada; se nenhuma existir, o texto fica com a fonte padrao (sem erro).
+var FONTES_TITULO_NOVATACK = ["Arial-BoldMT", "Arial Bold", "ArialMT", "Arial", "Helvetica-Bold", "Helvetica", "MyriadPro-Bold", "MyriadPro-Regular", "Verdana-Bold", "Verdana", "Tahoma-Bold", "Tahoma", "SegoeUI-Bold", "SegoeUI"];
+// "Geneva" e fonte de Mac: no PC ela NAO existe e o getByName original quebrava
+// a montagem exatamente aqui.
+var FONTES_CORES_NOVATACK = ["Geneva", "ArialMT", "Arial", "Arial-BoldMT", "Helvetica", "MyriadPro-Regular", "Verdana", "Tahoma", "SegoeUI"];
+
+var fonteTituloNovatack = null;
+var fonteCoresNovatack = null;
+var fontesResolvidasNovatack = false;
+var avisosNovatack = [];
+
+function normalizarNomeFonteNovatack(nome) {
+    return String(nome).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function acharFonteNovatack(candidatos) {
+    var i, j, fonte, alvo, nomeFonte, familiaEstilo, familia;
+
+    if (app.textFonts.length === 0) {
+        return null;
+    }
+
+    for (i = 0; i < candidatos.length; i++) {
+        alvo = normalizarNomeFonteNovatack(candidatos[i]);
+        for (j = 0; j < app.textFonts.length; j++) {
+            fonte = app.textFonts[j];
+            nomeFonte = normalizarNomeFonteNovatack(fonte.name);
+            familiaEstilo = "";
+            familia = "";
+            try {
+                familia = normalizarNomeFonteNovatack(fonte.family);
+                familiaEstilo = normalizarNomeFonteNovatack(String(fonte.family) + String(fonte.style));
+            } catch (e) {
+            }
+            if (nomeFonte === alvo || familiaEstilo === alvo || familia === alvo) {
+                return fonte;
+            }
+        }
+    }
+
+    // Nao achou nenhuma da lista: pega qualquer fonte de familia parecida
+    var familiasSeguras = ["arial", "helvetica", "verdana", "tahoma", "myriad", "segoe", "calibri"];
+    for (i = 0; i < familiasSeguras.length; i++) {
+        for (j = 0; j < app.textFonts.length; j++) {
+            fonte = app.textFonts[j];
+            if (normalizarNomeFonteNovatack(fonte.name).indexOf(familiasSeguras[i]) === 0) {
+                return fonte;
+            }
+        }
+    }
+
+    // Ultimo recurso: a primeira fonte instalada (melhor do que quebrar)
+    return app.textFonts[0];
+}
+
+function resolverFontesNovatack() {
+    if (fontesResolvidasNovatack) {
+        return;
+    }
+    fontesResolvidasNovatack = true;
+
+    try {
+        fonteTituloNovatack = acharFonteNovatack(FONTES_TITULO_NOVATACK);
+    } catch (e) {
+        fonteTituloNovatack = null;
+    }
+    try {
+        fonteCoresNovatack = acharFonteNovatack(FONTES_CORES_NOVATACK);
+    } catch (e) {
+        fonteCoresNovatack = null;
+    }
+
+    if (fonteTituloNovatack && normalizarNomeFonteNovatack(fonteTituloNovatack.name) !== normalizarNomeFonteNovatack(FONTES_TITULO_NOVATACK[0])) {
+        avisosNovatack.push("Fonte Arial Bold nao encontrada; usei \"" + fonteTituloNovatack.name + "\" no label.");
+    }
+    if (!fonteTituloNovatack) {
+        avisosNovatack.push("Nenhuma fonte compativel encontrada; o label ficou com a fonte padrao.");
+    }
+}
+
+// Aplica a fonte sem nunca derrubar a montagem
+function aplicarFonteNovatack(quadroTexto, fonte) {
+    if (!fonte) {
+        return;
+    }
+    try {
+        quadroTexto.textRange.characterAttributes.textFont = fonte;
+    } catch (e) {
+    }
+}
+
+// registrationColor pode vir null (documento sem swatch [Registration]/[Registro],
+// ex.: arquivo de Illustrator em outro idioma). Atribuir null em fillColor da erro.
+function corRegistroNovatack() {
+    if (typeof registrationColor !== "undefined" && registrationColor) {
+        return registrationColor;
+    }
+
+    var i;
+    for (i = 0; i < doc.spots.length; i++) {
+        if (doc.spots[i].name === "PassarRegistration") {
+            var spotFill = new SpotColor();
+            spotFill.spot = doc.spots[i];
+            spotFill.tint = 100;
+            return spotFill;
+        }
+    }
+
+    var cmyk = new CMYKColor();
+    cmyk.cyan = 100;
+    cmyk.magenta = 100;
+    cmyk.yellow = 100;
+    cmyk.black = 100;
+    return cmyk;
+}
+
+// Os helpers de desenho (createBlackRectangle/createWhiteCircle...) desenham
+// SEMPRE em doc.layers[0]. Se o arquivo do cliente ja tinha uma layer
+// "registros", layers[0] acaba sendo a layer "arte" (que fica OCULTA) e a
+// montagem sai vazia / trava na hora de agrupar.
+function prepararLayerNovatack() {
+    var documento = app.activeDocument;
+    var layerRegistros = null;
+    var i;
+
+    for (i = 0; i < documento.layers.length; i++) {
+        if (String(documento.layers[i].name).toLowerCase() === "registros") {
+            layerRegistros = documento.layers[i];
+            break;
+        }
+    }
+
+    if (!layerRegistros) {
+        layerRegistros = documento.layers.add();
+        layerRegistros.name = "registros";
+    } else if (layerRegistros.name !== "registros") {
+        // o resto do fluxo procura o nome exato "registros" (case sensitive)
+        try {
+            layerRegistros.name = "registros";
+        } catch (e) {
+        }
+    }
+
+    try {
+        layerRegistros.locked = false;
+    } catch (e) {
+    }
+    try {
+        layerRegistros.visible = true;
+    } catch (e) {
+    }
+
+    if (documento.layers[0] !== layerRegistros) {
+        try {
+            layerRegistros.zOrder(ZOrderMethod.BRINGTOFRONT);
+        } catch (e) {
+            try {
+                layerRegistros.move(documento, ElementPlacement.PLACEATBEGINNING);
+            } catch (e2) {
+            }
+        }
+    }
+
+    // Se mesmo assim layers[0] nao for a "registros", pelo menos destrava para
+    // nao dar erro na criacao dos objetos (visibilidade nao e alterada: a layer
+    // "arte" tem que continuar oculta).
+    if (documento.layers[0] !== layerRegistros) {
+        try {
+            documento.layers[0].locked = false;
+        } catch (e) {
+        }
+        avisosNovatack.push("A layer \"registros\" nao ficou no topo; confira a ordem das layers.");
+    }
+
+    try {
+        documento.activeLayer = layerRegistros;
+    } catch (e) {
+    }
+
+    return layerRegistros;
+}
+
+// Versao local de aplicarCorTexto SEM alert(): o alert original trava o painel
+// CEP (modal dentro de script) quando a cor nao esta na paleta.
+function aplicarCorTextoNovatack(quadroTexto, cor) {
+    if (!quadroTexto || cor === null || cor === undefined) {
+        return;
+    }
+
+    var corNormalizada = String(cor).toLowerCase();
+    var k, swatch, nomeCorOriginal, nomeCorNormalizado;
+
+    for (k = 0; k < doc.swatches.length; k++) {
+        swatch = doc.swatches[k];
+        if (String(swatch.name).toLowerCase() === corNormalizada) {
+            try {
+                quadroTexto.textRange.characterAttributes.fillColor = swatch.color;
+            } catch (e) {
+            }
+            return;
+        }
+    }
+
+    for (k = 0; k < doc.swatches.length; k++) {
+        swatch = doc.swatches[k];
+        nomeCorOriginal = String(swatch.name).toLowerCase();
+        nomeCorNormalizado = nomeCorOriginal
+            .replace(/process /g, '')
+            .replace(/pantone /g, '')
+            .replace(/ c/g, '');
+
+        if (nomeCorNormalizado === corNormalizada) {
+            try {
+                quadroTexto.textRange.characterAttributes.fillColor = swatch.color;
+            } catch (e) {
+            }
+            return;
+        }
+    }
+
+    avisosNovatack.push("Cor nao encontrada na paleta: " + cor);
+}
+
+// remove() em item ja removido / dentro de grupo apagado quebra o script
+function removerNovatack(item) {
+    try {
+        if (item) {
+            item.remove();
+        }
+    } catch (e) {
+    }
+}
+
+function boundsSegurosNovatack(item) {
+    try {
+        var b = item.geometricBounds;
+        if (b && b.length === 4 && isFinite(b[0]) && isFinite(b[1]) && isFinite(b[2]) && isFinite(b[3])) {
+            return b;
+        }
+    } catch (e) {
+    }
+    return [0, 0, 0, 0];
+}
+
+function alturaSeguraNovatack(item, padrao) {
+    try {
+        if (item && item.pageItems && item.pageItems.length === 0) {
+            return padrao;
+        }
+        var h = item.height;
+        if (!isFinite(h) || h <= 0) {
+            return padrao;
+        }
+        return h;
+    } catch (e) {
+        return padrao;
+    }
+}
+
 function montagemNovatack() {
+    // ===== Checagens antes de tocar no documento =====
+    if (app.documents.length === 0) {
+        throw "Montagem Novatack: nenhum documento aberto.";
+    }
+    if (!isFinite(sizeCameron) || sizeCameron <= 0) {
+        throw "Montagem Novatack: a O.S. nao tem a largura do cameron (Cameron Width no XML).";
+    }
+    if (!isFinite(cylinderSize) || cylinderSize <= 0) {
+        throw "Montagem Novatack: a O.S. nao tem o tamanho do cilindro.";
+    }
+    if (!isFinite(distanceBetweenRectangles) || distanceBetweenRectangles <= 0) {
+        throw "Montagem Novatack: dados de pacote/pistas invalidos no XML da O.S.";
+    }
+
+    avisosNovatack = [];
+    resolverFontesNovatack();
+    prepararLayerNovatack();
+
+    var corRegistro = corRegistroNovatack();
+
+    // Pos vem do XML e as vezes chega com espaco/minuscula: normalizado aqui para
+    // o if/else de posicao nao cair sempre no else (montagem com cameron a mais).
+    var posNovatack = (typeof pos === "undefined" || pos === null) ? "" : String(pos).replace(/^\s+|\s+$/g, "").toUpperCase();
+    if (posNovatack === "") {
+        avisosNovatack.push("Posicao dos camerons (Pos) vazia no XML: os camerons ficaram todos na montagem.");
+    } else if (posNovatack !== "E" && posNovatack !== "D" && posNovatack !== "C" && posNovatack !== "EC" && posNovatack !== "CD" && posNovatack !== "ED" && posNovatack !== "ECD") {
+        avisosNovatack.push("Posicao dos camerons desconhecida no XML: \"" + posNovatack + "\".");
+    }
+
     // Largura dos retângulos (0,12mm em pontos)
     var rectangleDiameter = sizeCameron;
     var rectangleWidth = 0.16 / 0.35277777777782;
@@ -1855,21 +2151,30 @@ function montagemNovatack() {
     texto.contents = cliente + " - " + produto + " - " + formatarData(new Date());
     texto.textRange.characterAttributes.size = tamanhoLabel; // Tamanho de 1,7 mm
     texto.textRange.fillColor = whiteCMYK;
-    texto.textRange.characterAttributes.textFont = app.textFonts.getByName("Arial-BoldMT");
+    aplicarFonteNovatack(texto, fonteTituloNovatack);
     texto.position = [0, 0]
 
     // Crie um objeto de texto para cada parte de cores
     var coresTexto = [];
+    var listaCoresNovatack = (typeof cores !== "undefined" && cores) ? cores : [];
 
-    for (var i = 0; i < cores.length; i++) {
+    for (var i = 0; i < listaCoresNovatack.length; i++) {
+        var nomeCorNovatack = (listaCoresNovatack[i] === null || listaCoresNovatack[i] === undefined) ? "" : String(listaCoresNovatack[i]);
+        // TextFrame vazio nao aceita characterAttributes (erro "no such element")
+        if (nomeCorNovatack.replace(/^\s+|\s+$/g, "") === "") {
+            continue;
+        }
         var corTexto = doc.textFrames.add();
-        corTexto.contents = cores[i];
+        corTexto.contents = nomeCorNovatack;
         coresTexto.push(corTexto);
     }
 
-    // Aplique a cor a cada parte do texto com base na sequência de coresComuns
-    for (var i = 0; i < coresComuns.length; i++) {
-        aplicarCorTexto(coresTexto[i], coresComuns[i]);
+    // Aplique a cor a cada parte do texto com base na sequência de coresComuns.
+    // Limitado ao numero de textos criados: coresComuns podia ser maior que
+    // coresTexto e o script quebrava em coresTexto[i] indefinido.
+    var listaComunsNovatack = (typeof coresComuns !== "undefined" && coresComuns) ? coresComuns : [];
+    for (var i = 0; i < listaComunsNovatack.length && i < coresTexto.length; i++) {
+        aplicarCorTextoNovatack(coresTexto[i], listaComunsNovatack[i]);
     }
 
     var grupoLabel = app.activeDocument.groupItems.add();
@@ -1877,7 +2182,8 @@ function montagemNovatack() {
     var grupoCores = app.activeDocument.groupItems.add();
 
     // Combine todas as partes do texto em um único objeto de texto
-    var textoCores = doc.textFrames.add();
+    // (o textFrames.add() que existia aqui nunca era usado e deixava um texto
+    //  VAZIO solto na layer "registros" — entrava no group e no PDF)
     var xPosition = texto.width + 20;
     var tamanhoLabelCores = 5
     if (tamanhoLabelCores >= sizeCameron) {
@@ -1889,7 +2195,9 @@ function montagemNovatack() {
     for (var i = 0; i < coresTexto.length; i++) {
         var corTexto = coresTexto[i];
         corTexto.textRange.size = tamanhoLabelCores;
-        corTexto.textRange.characterAttributes.textFont = app.textFonts.getByName("Geneva");
+        // Era getByName("Geneva") — fonte de Mac, inexistente no PC do operador:
+        // quebrava a montagem aqui. Agora usa a primeira fonte disponivel.
+        aplicarFonteNovatack(corTexto, fonteCoresNovatack);
         corTexto.position = [xPosition, 0];
         xPosition += corTexto.width + 1; // Ajuste a posição horizontal para a próxima parte
         corTexto.move(grupoCores, ElementPlacement.PLACEATEND);
@@ -1903,11 +2211,11 @@ function montagemNovatack() {
     grupoLabel.left = distanciaLabel;
 
     // Posicione o texto conforme necessário baseado nas posições
-    if (pos == "ECD" || pos == "EC" || pos == "E" || pos == "ED") {
+    if (posNovatack == "ECD" || posNovatack == "EC" || posNovatack == "E" || posNovatack == "ED") {
 
-    } else if (pos == "CD" || pos == "D") {
+    } else if (posNovatack == "CD" || posNovatack == "D") {
         grupoLabel.left = distanceBetweenRectangles + 0.1;
-    } else if (pos == "C") {
+    } else if (posNovatack == "C") {
         grupoLabel.left = distanciaLabel + distanceCameron + objectWidth + sizeCameron + ((distanceBetweenLanes - sizeCameron) / 2)
     } else {
 
@@ -1916,26 +2224,30 @@ function montagemNovatack() {
 
     //criando o retangulo branco abaixo do label
     var white = new CMYKColor();
-    var textoHeightPorcent = grupoCores.height * 1.03;
+    // grupoCores fica VAZIO quando a O.S. nao traz cores: .height quebra/da 0 e o
+    // rectangle() com altura 0 aborta a montagem
+    var alturaGrupoCores = alturaSeguraNovatack(grupoCores, tamanhoLabel);
+    var textoHeightPorcent = alturaGrupoCores * 1.03;
     var tamanhoLabel90 = tamanhoLabel * 0.9;
     if (tamanhoLabel90 >= sizeCameron) {
         tamanhoLabel90 = sizeCameron
     } else {
         var tamanhoLabel90 = tamanhoLabel * 0.9;
     }
-    var retangulo = doc.pathItems.rectangle(grupoCores.geometricBounds[2], grupoCores.geometricBounds[1], textoHeightPorcent, tamanhoLabel90);
+    var boundsCores = boundsSegurosNovatack(grupoCores); // grupo vazio nao tem bounds
+    var retangulo = doc.pathItems.rectangle(boundsCores[2], boundsCores[1], textoHeightPorcent, tamanhoLabel90);
     retangulo.rotate(90);
     retangulo.stroked = false;
     retangulo.filled = true;
     retangulo.fillColor = whiteCMYK;
 
-    retangulo.position = [((sizeCameron - tamanhoLabel90) / 2), ((-20) - ((grupoCores.height - retangulo.height) / 2))];
+    retangulo.position = [((sizeCameron - tamanhoLabel90) / 2), ((-20) - ((alturaGrupoCores - retangulo.height) / 2))];
     // Posicione o retangulo conforme necessário baseado nas posições
-    if (pos == "ECD" || pos == "EC" || pos == "E" || pos == "ED") {
+    if (posNovatack == "ECD" || posNovatack == "EC" || posNovatack == "E" || posNovatack == "ED") {
 
-    } else if (pos == "CD" || pos == "D") {
+    } else if (posNovatack == "CD" || posNovatack == "D") {
         retangulo.left = distanceBetweenRectangles + ((sizeCameron - tamanhoLabel90) / 2);
-    } else if (pos == "C") {
+    } else if (posNovatack == "C") {
         retangulo.left = ((sizeCameron - tamanhoLabel90) / 2) + distanceCameron + objectWidth + sizeCameron + ((distanceBetweenLanes - sizeCameron) / 2)
 
     }
@@ -1953,15 +2265,17 @@ function montagemNovatack() {
     retanguloRegistration.rotate(90);
     retanguloRegistration.stroked = false;
     retanguloRegistration.filled = true;
-    retanguloRegistration.fillColor = registrationColor;
+    // era registrationColor direto: vem null em documento sem swatch
+    // [Registration]/[Registro] e da "Illegal argument"
+    retanguloRegistration.fillColor = corRegistro;
 
-    retanguloRegistration.position = [((sizeCameron - tamanhoLabel90) / 2), ((-40) - ((grupoCores.height - retangulo.height) / 2)) - grupoCores.height];
+    retanguloRegistration.position = [((sizeCameron - tamanhoLabel90) / 2), ((-40) - ((alturaGrupoCores - retangulo.height) / 2)) - alturaGrupoCores];
     // Posicione o retangulo conforme necessário baseado nas posições
-    if (pos == "ECD" || pos == "EC" || pos == "E" || pos == "ED") {
+    if (posNovatack == "ECD" || posNovatack == "EC" || posNovatack == "E" || posNovatack == "ED") {
 
-    } else if (pos == "CD" || pos == "D") {
+    } else if (posNovatack == "CD" || posNovatack == "D") {
         retanguloRegistration.left = distanceBetweenRectangles + ((sizeCameron - tamanhoLabel90) / 2);
-    } else if (pos == "C") {
+    } else if (posNovatack == "C") {
         retanguloRegistration.left = ((sizeCameron - tamanhoLabel90) / 2) + distanceCameron + objectWidth + sizeCameron + ((distanceBetweenLanes - sizeCameron) / 2)
 
     }
@@ -1979,15 +2293,15 @@ function montagemNovatack() {
     textoCac.contents = "Cliente: " + cac + " - " + nomeArte + " - " + "Cod = " + cpc;
     textoCac.textRange.characterAttributes.size = tamanhoLabel; // Tamanho de 1,7 mm
     textoCac.textRange.fillColor = whiteCMYK;
-    textoCac.textRange.characterAttributes.textFont = app.textFonts.getByName("Arial-BoldMT");
+    aplicarFonteNovatack(textoCac, fonteTituloNovatack);
 
 
     // Posicione o texto conforme necessário baseado nas posições
-    if (pos == "ECD" || pos == "EC" || pos == "E" || pos == "ED") {
+    if (posNovatack == "ECD" || posNovatack == "EC" || posNovatack == "E" || posNovatack == "ED") {
         textoCac.position = [distanciaLabel, 20 + textoCac.height];
-    } else if (pos == "CD" || pos == "D") {
+    } else if (posNovatack == "CD" || posNovatack == "D") {
         textoCac.position = [distanciaLabel + distanceBetweenRectangles, 20 + textoCac.height];
-    } else if (pos == "C") {
+    } else if (posNovatack == "C") {
         textoCac.position = [distanciaLabel + distanceCameron + objectWidth + sizeCameron + ((distanceBetweenLanes - sizeCameron) / 2), 20 + textoCac.height];
     } else {
 
@@ -2006,15 +2320,15 @@ function montagemNovatack() {
     retangulo.rotate(90);
     retangulo.stroked = false;
     retangulo.filled = true;
-    retangulo.fillColor = registrationColor;
+    retangulo.fillColor = corRegistro;
     retangulo.zOrder(ZOrderMethod.SENDBACKWARD);
 
     // Posicione o retangulo conforme necessário baseado nas posições
-    if (pos == "ECD" || pos == "EC" || pos == "E" || pos == "ED") {
+    if (posNovatack == "ECD" || posNovatack == "EC" || posNovatack == "E" || posNovatack == "ED") {
         retangulo.position = [((sizeCameron - tamanhoLabel90) / 2), (20 + retangulo.height) - ((retangulo.height - textoCac.height) / 2)];
-    } else if (pos == "CD" || pos == "D") {
+    } else if (posNovatack == "CD" || posNovatack == "D") {
         retangulo.position = [((sizeCameron - tamanhoLabel90) / 2) + distanceBetweenRectangles, (20 + retangulo.height) - ((retangulo.height - textoCac.height) / 2)];
-    } else if (pos == "C") {
+    } else if (posNovatack == "C") {
         retangulo.position = [((sizeCameron - tamanhoLabel90) / 2) + distanceCameron + objectWidth + sizeCameron + ((distanceBetweenLanes - sizeCameron) / 2), (20 + retangulo.height) - ((retangulo.height - textoCac.height) / 2)];
     } else {
 
@@ -2056,7 +2370,10 @@ function montagemNovatack() {
         }
     }
 
-    // Verificar se a layer "registros" foi encontrada e se há objetos nela
+    // Verificar se a layer "registros" foi encontrada e se há objetos nela.
+    // ATENCAO: o ajuste de posicao dos camerons e o aviso final ficavam DENTRO
+    // deste if — quando a layer nao existia (ou estava vazia) a montagem parava
+    // no meio, com os camerons todos, e o operador nao recebia nenhuma mensagem.
     if (registrosLayer && registrosLayer.pageItems.length > 0) {
         var objectsToGroup = [];
         // Adicionar todos os objetos na layer "registros" à seleção, exceto o grupo "cameronCentralGroup"
@@ -2068,62 +2385,84 @@ function montagemNovatack() {
 
         // Verificar se há objetos para agrupar
         if (objectsToGroup.length > 0) {
-            // Selecionar todos os objetos, exceto o grupo "cameronCentralGroup"
-            for (var k = 0; k < objectsToGroup.length; k++) {
-                objectsToGroup[k].selected = true;
+            // Limpar a selecao antes: o que ja estivesse selecionado entrava no
+            // group e ia junto para o centro do artboard
+            try {
+                app.activeDocument.selection = null;
+            } catch (e) {
             }
 
+            // Selecionar todos os objetos, exceto o grupo "cameronCentralGroup"
+            for (var k = 0; k < objectsToGroup.length; k++) {
+                try {
+                    objectsToGroup[k].selected = true;
+                } catch (e) {
+                    // item travado/oculto: ignora em vez de derrubar a montagem
+                }
+            }
 
+            if (app.activeDocument.selection && app.activeDocument.selection.length > 0) {
+                // Agrupar a seleção ativa (todos os objetos na layer "registros" exceto o grupo "cameronCentralGroup")
+                app.executeMenuCommand('group');
+
+                // Centralizar o grupo no artboard ativo
+                var group = (app.selection && app.selection.length > 0) ? app.selection[0] : null; // Obtém o grupo resultante da seleção
+                if (group) {
+                    var artboard = app.activeDocument.artboards[app.activeDocument.artboards.getActiveArtboardIndex()]; // Obtém o artboard ativo
+
+                    // Obtém as coordenadas do centro do artboard
+                    var centerX = artboard.artboardRect[0] + (artboard.artboardRect[2] - artboard.artboardRect[0]) / 2;
+                    var centerY = artboard.artboardRect[1] + (artboard.artboardRect[3] - artboard.artboardRect[1]) / 2;
+
+                    // Centralizar o grupo no artboard usando a função "translate"
+                    group.left = centerX - group.width / 2;
+                    group.top = centerY + group.height / 2 + displacementBetweenLanes / 2;
+                } else {
+                    avisosNovatack.push("Nao foi possivel agrupar os registros; confira a centralizacao.");
+                }
+            } else {
+                avisosNovatack.push("Nenhum registro pode ser selecionado (layer travada?); confira a centralizacao.");
+            }
         }
+    } else {
+        avisosNovatack.push("Layer \"registros\" vazia ou inexistente; os registros nao foram agrupados/centralizados.");
+    }
 
-        // Agrupar a seleção ativa (todos os objetos na layer "registros" exceto o grupo "cameronCentralGroup")
-        app.executeMenuCommand('group');
-
-        // Centralizar o grupo no artboard ativo
-        var group = app.selection[0]; // Obtém o grupo resultante da seleção
-        var artboard = app.activeDocument.artboards[app.activeDocument.artboards.getActiveArtboardIndex()]; // Obtém o artboard ativo
-
-        // Obtém as coordenadas do centro do artboard
-        var centerX = artboard.artboardRect[0] + (artboard.artboardRect[2] - artboard.artboardRect[0]) / 2;
-        var centerY = artboard.artboardRect[1] + (artboard.artboardRect[3] - artboard.artboardRect[1]) / 2;
-
-        // Centralizar o grupo no artboard usando a função "translate"
-        group.left = centerX - group.width / 2;
-        group.top = centerY + group.height / 2 + displacementBetweenLanes / 2;
-
-        //Camerons Position
-        if (pos == "E") {
-            groupDuplicateRight.remove();
-            cameronCentralGroup.remove();
-            grupoDuplicadoDireita.remove();
-        } else if (pos == "D") {
-            mainGroup.remove()
-            cameronCentralGroup.remove();
-            grupoDeRetangulos.remove();
-        } else if (pos == "C") {
-            mainGroup.remove()
-            groupDuplicateRight.remove();
-            grupoDeRetangulos.remove();
-            grupoDuplicadoDireita.remove();
-        } else if (pos == "EC") {
-            groupDuplicateRight.remove();
-            grupoDuplicadoDireita.remove();
-        } else if (pos == "CD") {
-            grupoDeRetangulos.remove();
-            mainGroup.remove();
-        } else if (pos == "ED") {
-            cameronCentralGroup.remove();
-        } else {
-
-        }
-
-        var alertMessage = "Montagem e Label feitos";
-
-
-        msgUsuario(alertMessage, "info");
-
+    //Camerons Position (sempre executado, mesmo sem a layer "registros")
+    if (posNovatack == "E") {
+        removerNovatack(groupDuplicateRight);
+        removerNovatack(cameronCentralGroup);
+        removerNovatack(grupoDuplicadoDireita);
+    } else if (posNovatack == "D") {
+        removerNovatack(mainGroup);
+        removerNovatack(cameronCentralGroup);
+        removerNovatack(grupoDeRetangulos);
+    } else if (posNovatack == "C") {
+        removerNovatack(mainGroup);
+        removerNovatack(groupDuplicateRight);
+        removerNovatack(grupoDeRetangulos);
+        removerNovatack(grupoDuplicadoDireita);
+    } else if (posNovatack == "EC") {
+        removerNovatack(groupDuplicateRight);
+        removerNovatack(grupoDuplicadoDireita);
+    } else if (posNovatack == "CD") {
+        removerNovatack(grupoDeRetangulos);
+        removerNovatack(mainGroup);
+    } else if (posNovatack == "ED") {
+        removerNovatack(cameronCentralGroup);
+    } else {
 
     }
+
+    var alertMessage = "Montagem e Label feitos";
+
+    // Avisos vao junto na mesma mensagem (o painel CEP nao aceita modal e o
+    // banner mostra so uma linha)
+    if (avisosNovatack.length > 0) {
+        alertMessage = alertMessage + " — avisos: " + avisosNovatack.join(" | ");
+    }
+
+    msgUsuario(alertMessage, "info");
 }
 //Ediprint
 function montagemEdiprint() {
