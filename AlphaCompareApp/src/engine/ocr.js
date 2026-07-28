@@ -46,7 +46,7 @@ function spawnWorker(rc) {
       if (msg.ready === false) { reject(new Error(msg.error || "OCR nao inicializou")); return; }
       if (msg.id != null && w.pending[msg.id]) {
         var d = w.pending[msg.id]; delete w.pending[msg.id]; w.busy--;
-        if (msg.ok) d.resolve(msg.lines || []); else d.reject(new Error(msg.error || "OCR falhou"));
+        if (msg.ok) d.resolve(msg.lines || []); else { if (process.env.ALPHA_OCR_DEBUG) console.error("[ocr.js] read FALHOU id=" + msg.id + " msg=" + JSON.stringify(msg) + " errbuf=" + errbuf.slice(-400)); d.reject(new Error(msg.error || "OCR falhou")); }
       }
     });
   });

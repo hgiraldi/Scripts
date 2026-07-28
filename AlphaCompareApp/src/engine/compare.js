@@ -42,19 +42,63 @@ function run(arq, ori, opts) {
     var tR = Date.now();
     return render.openDoc(arq.file, { hideTec: arq.hideTec, rot: arq.rot }).then(function (dA) {
       docA = dA; fullA = render.renderFullImg(docA, alvo);
-      return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: ori.rot });
-    }).then(function (dO) {
-      docO = dO; fullO = render.renderFullImg(docO, alvo);
       timing.render = (Date.now() - tR) / 1000;
-      var pA = tmpPng("arq"), pO = tmpPng("ori");
-      render.writePNG(pA, fullA.img); render.writePNG(pO, fullO.img);
+      var pA = tmpPng("arq"); render.writePNG(pA, fullA.img);
       prog("Lendo textos (OCR nativo)…");
       var tO = Date.now();
+      // Carrega o ORIGINAL na rotação dada em resolução CHEIA -> { O, mp } (fixa docO/fullO).
+      function loadOriFull(rotDeg, F) {
+        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg }).then(function (d) {
+          docO = d; fullO = render.renderFullImg(d, alvo);
+          var pO = tmpPng("ori"); render.writePNG(pO, fullO.img);
+          return ocr.read(pO).then(function (O) {
+            try { fs.unlinkSync(pO); } catch (e) {}
+            return { O: O, mp: textdiff.matchPairs(F, O, { seed: opts.seed }) };
+          });
+        });
+      }
+      // Conta palavras de ALTA confiança do original numa rotação, em BAIXA resolução (pouca
+      // memória): texto de cabeça-pra-baixo sai garbled/baixa-conf -> separa +90 de +270 barato.
+      function ocrConf(rotDeg) {
+        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg }).then(function (d) {
+          var full = render.renderFullImg(d, 1500);
+          var p = tmpPng("det"); render.writePNG(p, full.img);
+          return ocr.read(p).then(function (O) {
+            render.closeDoc(d); try { fs.unlinkSync(p); } catch (e) {}
+            var n = 0; for (var i = 0; i < O.length; i++) if (O[i].c > 0.85 && String(O[i].t).trim().length >= 2) n++;
+            return { rot: rotDeg, conf: n };
+          });
+        });
+      }
+      // proporção da página do original numa rotação (barato: abre e mede, SEM OCR/render)
+      function oriPortrait(rotDeg) {
+        return render.openDoc(ori.file, { hideTec: false, rot: rotDeg }).then(function (d) {
+          var sw = (d.rot === 90 || d.rot === 270), ow = sw ? d.h.ph : d.h.pw, oh = sw ? d.h.pw : d.h.ph;
+          render.closeDoc(d); return oh > ow;
+        });
+      }
       return ocr.read(pA).then(function (F) {
-        return ocr.read(pO).then(function (O) {
+        // AUTO-ORIENTAÇÃO: o app só passa a rotação MANUAL do operador (O.rot). Mede a PROPORÇÃO
+        // do original; se diverge da do arquivo (um retrato, outro paisagem), ele está girado 90°
+        // -> decide +90 vs +270 por confiança de texto em BAIXA res (barato) e OCR a vencedora em
+        // cheia. Corrige o DUX (original paisagem × arquivo retrato) que comparava desalinhado -> 0
+        // diffs. Faz no MÁX. 2 OCRs de página cheia (evita o "bad allocation"/OOM do OCR nativo).
+        try { fs.unlinkSync(pA); } catch (e) {}
+        var portA = fullA.rotH > fullA.rotW, baseRot = ori.rot || 0;
+        return oriPortrait(baseRot).then(function (portO) {
+          if (portA === portO) return loadOriFull(baseRot, F);   // orientação ok -> 1 OCR cheio
+          prog("verificando orientação do original…");
+          return ocrConf((baseRot + 90) % 360).then(function (a) {
+            return ocrConf((baseRot + 270) % 360).then(function (b) {
+              var chosen = (a.conf >= b.conf) ? a.rot : b.rot;
+              prog("orientação do original ajustada: " + chosen + "° (" + Math.max(a.conf, b.conf) + " palavras)");
+              return loadOriFull(chosen, F);
+            });
+          });
+        }).then(function (best) {
           timing.ocr = (Date.now() - tO) / 1000;
-          try { fs.unlinkSync(pA); fs.unlinkSync(pO); } catch (e) {}
-          var mpAll = textdiff.matchPairs(F, O, { seed: opts.seed });
+          var O = best.O;
+          var mpAll = best.mp;
           // PRE-FILTRO: só re-le pares onde o full-page JÁ mostra diferença de conteúdo real
           // (wordDiffs não-confusável/não-fragmento). Reduz ~50 candidatos -> ~10 (rápido) sem perder o alvo.
           if (process.env.APDEBUG) {
@@ -125,7 +169,7 @@ function run(arq, ori, opts) {
             render.closeDoc(docA); render.closeDoc(docO);
             return out;
           }
-          return passo();
+          return finish();
         });
       });
     }).catch(function (e) { render.closeDoc(docA); render.closeDoc(docO); throw e; });

@@ -42,6 +42,19 @@
             rawSrc: null, src: null, rot: 0, crop: null, fit: null, doc: null, bytes: null, page: 1, pages: 1,
             name: "", _onLoaded: null, hideL: {}, hideC: {} };
   var RESULT = null, MANUAL = false, DESKTOP = "";
+  // LOG de diagnóstico do painel (em %TEMP%): captura exceção que antes deixava a barra "montando
+  // resultado" infinita. Sempre ligado — arquivo pequeno, ajuda a diagnosticar no campo.
+  var _plogPath = null;
+  function plog(msg) {
+    try {
+      if (_plogPath === null) { var os = require("os"), path = require("path"); _plogPath = path.join(os.tmpdir(), "alphacompare_panel.log"); }
+      require("fs").appendFileSync(_plogPath, new Date().toISOString() + "  " + msg + "\n");
+    } catch (e) {}
+  }
+  try {
+    window.addEventListener("error", function (e) { plog("window.onerror: " + ((e.error && e.error.stack) || e.message) + "  @" + (e.filename || "") + ":" + e.lineno); });
+    window.addEventListener("unhandledrejection", function (e) { plog("unhandledrejection: " + ((e.reason && e.reason.stack) || e.reason)); });
+  } catch (e) {}
   var _runSeq = 0;       // invalida OCR nativo de uma comparação ANTERIOR (corrida ao re-comparar)
   var REPORT_MAX = 30;   // acima disso o relatorio fica travado (ruido/desalinhamento)
   var WORKRES = 3400;    // resolucao de trabalho (Alta=3400, Media=2800, Rapida=2200)
@@ -565,7 +578,16 @@
   // técnicas ocultas = o mesmo render limpo da comparação) e decodificar cada célula com o
   // ZXing 1D. É isento (kind:'barcode'), como o do ACBarcode. Só roda quando o ACBarcode
   // falhou (Coca/Perdigão já leram no pré-render e nem entram aqui).
-  function zxHints() { var h = new Map(); h.set(ZXing.DecodeHintType.TRY_HARDER, true); return h; }
+  // SÓ EAN-13 e UPC-A (13/12 dígitos + verificador): são os códigos de embalagem. Formatos CURTOS
+  // (EAN-8, UPC-E, ITF) dão FALSO-POSITIVO em linhas de tabela/arte — ex.: no DUX o EAN-8 "lia"
+  // 20212322 numa célula antes do EAN-13 real (7898641074404). 13/12 dígitos quase não colidem.
+  function zxHints() {
+    var h = new Map();
+    h.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    var F = ZXing.BarcodeFormat;
+    h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.UPC_A]);
+    return h;
+  }
   function zxReadCanvas1D(cv) {
     if (!window.ZXing || !cv) return null;
     try {
@@ -722,7 +744,7 @@
               // NÃO há OCR nativo é que mostra o resultado do pixel e fecha a barra agora.
               // ensureBarcode: se o ACBarcode não leu, tenta o ZXing (grade em alta) antes de exibir.
               ensureBarcode(function () {
-                if (!applyOcrTextCheck()) { renderResult(); progEnd("pronto"); }
+                if (!applyOcrTextCheck()) { try { renderResult(); progEnd("pronto"); } catch (eR) { plog("renderResult(pixel) ERRO: " + ((eR && eR.stack) || eR)); progEnd("erro"); setStatus("⚠ erro ao montar: " + ((eR && eR.message) || eR), true); } }
               });
             } catch (e) { progEnd("erro"); setStatus("Erro na comparação: " + e, true); }
           }, 20);
@@ -738,7 +760,7 @@
         RESULT = window.ACEngine.compare(cropCanvas(F), cropCanvas(O), opt);
         MANUAL = false;
         ensureBarcode(function () {
-          if (!applyOcrTextCheck()) { renderResult(); setStatus(""); progEnd("pronto"); }
+          if (!applyOcrTextCheck()) { try { renderResult(); setStatus(""); progEnd("pronto"); } catch (eR) { plog("renderResult(img) ERRO: " + ((eR && eR.stack) || eR)); progEnd("erro"); setStatus("⚠ erro ao montar: " + ((eR && eR.message) || eR), true); } }
         });
       } catch (e) { setStatus("Erro na comparação: " + e, true); progEnd("erro"); }
     }, 30);
@@ -1139,24 +1161,39 @@
       " Fcrop=" + JSON.stringify(F.crop) + " Ocrop=" + JSON.stringify(O.crop) + " Frot=" + F.rot + " Orot=" + O.rot + " mode=" + (RESULT && RESULT.mode));
     if (RESULT && window.AlphaNativeOCR && _arqPath && _oriPath && !isCropped(F) && !isCropped(O)) {
       var mySeq = _runSeq;   // esta comparação; se o usuário re-comparar, _runSeq muda e isto aborta
+      // WATCHDOG: se o OCR nativo travar de vez (nunca chamar onDone), a barra NÃO fica infinita —
+      // após 8 min fecha com aviso. Cancelado no onDone. (rede de segurança do "montando… ∞")
+      var _ocrWatchdog = setTimeout(function () {
+        if (mySeq !== _runSeq) return;
+        plog("WATCHDOG: OCR nativo passou de 8min sem terminar");
+        try { progEnd("erro"); } catch (e) {}
+        setStatus("⚠ OCR nativo demorou demais — tente de novo (ou reduza a Qualidade)", true);
+        if (window.ACPdf) ACPdf.reset();
+      }, 8 * 60 * 1000);
       progSet(30, "lendo textos (OCR nativo)…");
       window.AlphaNativeOCR.run({
         arqPath: _arqPath, arqRot: F.rot || 0,
         oriPath: _oriPath, oriRot: O.rot || 0,
         onProgress: function (p, m) { if (mySeq === _runSeq) progSet(p, m); },
         onDone: function (err, diffs, arqW) {
+          clearTimeout(_ocrWatchdog);      // OCR terminou -> cancela o watchdog
           if (mySeq !== _runSeq) return;   // comparação nova começou -> ignora este resultado velho
-          if (!err && diffs && diffs.length) mergeNativeDiffs(diffs, arqW);
+          try { if (!err && diffs && diffs.length) mergeNativeDiffs(diffs, arqW); }
+          catch (eM) { plog("mergeNativeDiffs ERRO: " + ((eM && eM.stack) || eM)); }
           // barra em "montando resultado…" -> pinta -> monta (trava ~1-2s) -> pinta o resultado ->
           // SÓ ENTÃO some a barra. Sem "barra some, espera, aparece".
           progSet(100, "montando resultado…");
           requestAnimationFrame(function () {
             if (mySeq !== _runSeq) return;
-            renderResult();
+            // BLINDAGEM: se renderResult lançar, a barra NÃO pode ficar infinita — captura,
+            // loga e mesmo assim fecha a barra com "erro" (antes: exceção -> progEnd nunca rodava).
+            var erro = err;
+            try { renderResult(); }
+            catch (eR) { erro = "montagem: " + ((eR && eR.message) || eR); plog("renderResult ERRO: " + ((eR && eR.stack) || eR)); }
             requestAnimationFrame(function () {
               if (mySeq !== _runSeq) return;
-              progEnd(err ? "erro" : "pronto");
-              setStatus(err ? ("OCR nativo: " + err) : ("OCR nativo: " + ((diffs && diffs.length) || 0) + " diferença(s) de texto"));
+              progEnd(erro ? "erro" : "pronto");
+              setStatus(erro ? ("⚠ " + erro) : ("OCR nativo: " + ((diffs && diffs.length) || 0) + " diferença(s) de texto"), !!erro);
               if (window.ACPdf) ACPdf.reset();
             });
           });

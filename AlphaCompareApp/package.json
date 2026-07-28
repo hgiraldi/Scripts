@@ -39,13 +39,9 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "build/icon.png"
-    },
-    "portable": {
-      "artifactName": "AlphaCompare-Portable-${version}.exe"
     },
     "nsis": {
       "oneClick": false,
@@ -57,7 +53,8 @@
     "mac": {
       "target": "dmg",
       "icon": "build/icon.png",
-      "category": "public.app-category.graphics-design"
+      "category": "public.app-category.graphics-design",
+      "artifactName": "AlphaCompare-${arch}-${version}.dmg"
     }
   }
 }
