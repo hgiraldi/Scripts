@@ -16,8 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14  # Apple Silicon (M1/M2/M3/M4) — cobre os Macs novos
-            arch: arm64
+          # x64 (Intel): roda NATIVO nos Macs Intel (2014/2018) E nos Apple Silicon via Rosetta.
+          # Um .dmg só que funciona em TODOS os Macs.
+          - runner: macos-13
+            arch: x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     defaults:

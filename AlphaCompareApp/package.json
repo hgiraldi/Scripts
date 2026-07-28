@@ -54,7 +54,7 @@
       "target": "dmg",
       "icon": "build/icon.png",
       "category": "public.app-category.graphics-design",
-      "artifactName": "AlphaCompare-${arch}-${version}.dmg"
+      "artifactName": "AlphaCompare-mac-${version}.dmg"
     }
   }
 }
