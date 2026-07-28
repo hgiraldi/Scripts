@@ -13,13 +13,11 @@ jobs:
   build:
     name: DMG (${{ matrix.arch }})
     strategy:
-      fail-fast: false        # se um chip falhar, o outro ainda entrega
+      fail-fast: false
       matrix:
         include:
-          - runner: macos-14  # Apple Silicon (M1/M2/M3/M4)
+          - runner: macos-14  # Apple Silicon (M1/M2/M3/M4) — cobre os Macs novos
             arch: arm64
-          - runner: macos-13  # Intel
-            arch: x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     defaults:
