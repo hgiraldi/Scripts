@@ -1,32 +1,26 @@
-# Gera o instalável .dmg do Alpha Compare NA NUVEM (runners macOS do GitHub) — sem precisar de
-# um Mac físico. Cada arquitetura (Apple Silicon arm64 + Intel x64) congela o próprio OCR e
-# empacota seu .dmg. Dispara: manual (botão "Run workflow") OU push de uma tag "mac-v*".
+# Gera o instalável .dmg do Alpha Compare NA NUVEM, em x64 (Intel) — que roda em TODOS os Macs
+# (Intel 2014/2018 nativo + Apple Silicon via Rosetta). Os runners macOS Intel (macos-13) foram
+# aposentados pelo GitHub, então compilamos x64 NO runner arm64 (macos-14) usando Rosetta:
+# congelamos o OCR com um Python x86_64 (Miniforge) e empacotamos com electron-builder --x64.
+# Dispara: manual ("Run workflow") OU push de uma tag "mac-v*".
 name: Build Mac DMG
 
 on:
-  workflow_dispatch:          # botão manual (aparece quando o workflow está na branch padrão)
+  workflow_dispatch:
   push:
     tags:
-      - 'mac-v*'              # ex.: git tag mac-v1 && git push origin mac-v1
+      - 'mac-v*'
 
 jobs:
   build:
-    name: DMG (${{ matrix.arch }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # x64 (Intel): roda NATIVO nos Macs Intel (2014/2018) E nos Apple Silicon via Rosetta.
-          # Um .dmg só que funciona em TODOS os Macs.
-          - runner: macos-13
-            arch: x64
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+    name: DMG x64 (todos os Macs)
+    runs-on: macos-14
+    timeout-minutes: 55
     defaults:
       run:
         working-directory: AlphaCompareApp
     steps:
-      - name: Checkout do repositório
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Node 20
@@ -34,17 +28,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Garantir Rosetta 2
+        run: sudo softwareupdate --install-rosetta --agree-to-license || true
 
-      - name: Dependências do OCR (PyInstaller + RapidOCR)
-        run: pip3 install --upgrade pip pyinstaller rapidocr-onnxruntime
-
-      - name: Congelar o OCR (binário do Mac)
+      - name: Python x86_64 (Miniforge, p/ congelar o OCR em x64)
         run: |
-          python3 -m PyInstaller --noconfirm --onedir --console --name ocr_server \
+          curl -L -o /tmp/mf.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-x86_64.sh
+          bash /tmp/mf.sh -b -p "$HOME/mf-x64"
+
+      - name: Congelar o OCR em x64 (via Rosetta)
+        run: |
+          PY="$HOME/mf-x64/bin/python"
+          arch -x86_64 "$PY" -m pip install --upgrade pip pyinstaller rapidocr-onnxruntime
+          arch -x86_64 "$PY" -m PyInstaller --noconfirm --onedir --console --name ocr_server \
             --collect-data rapidocr_onnxruntime \
             --collect-all onnxruntime \
             --collect-all cv2 \
@@ -54,23 +50,25 @@ jobs:
             --distpath build/ocr_dist --workpath build/pyi_work --specpath build/pyi_spec \
             src/ocr/ocr_server.py
 
+      - name: Conferir arquitetura do OCR (tem que ser x86_64)
+        run: file build/ocr_dist/ocr_server/ocr_server
+
       - name: Dependências do app (Electron)
         run: npm install
 
-      - name: Empacotar o .dmg (sem assinatura Apple)
+      - name: Empacotar o .dmg x64 (sem assinatura Apple)
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # sem certificado Apple -> .dmg não assinado
-        run: npm run dist:mac
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --mac --x64
 
       - name: Publicar o .dmg como artefato
         uses: actions/upload-artifact@v4
         with:
-          name: AlphaCompare-mac-${{ matrix.arch }}
+          name: AlphaCompare-mac
           path: AlphaCompareApp/dist/*.dmg
           if-no-files-found: error
 
   release:
-    # Junta os 2 .dmg numa Release do GitHub (link de download direto). Só quando dispara por tag.
     name: Publicar Release
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
@@ -78,12 +76,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Baixar os artefatos (arm64 + x64)
+      - name: Baixar o artefato
         uses: actions/download-artifact@v4
         with:
           path: dmgs
 
-      - name: Criar/atualizar a Release com os .dmg
+      - name: Criar/atualizar a Release com o .dmg
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -92,5 +90,5 @@ jobs:
           gh release create "${{ github.ref_name }}" $FILES \
             --repo "${{ github.repository }}" \
             --title "Alpha Compare Mac ${{ github.ref_name }}" \
-            --notes "Instaladores .dmg do Alpha Compare para macOS (Apple Silicon arm64 e Intel x64). Não assinado pela Apple: na 1ª abertura, clique com o botão direito no app > Abrir." \
+            --notes "Instalador .dmg (x64) do Alpha Compare para macOS — roda em todos os Macs (Intel nativo + Apple Silicon via Rosetta). Não assinado pela Apple: na 1ª abertura, clique com o botão direito no app > Abrir." \
           || gh release upload "${{ github.ref_name }}" $FILES --repo "${{ github.repository }}" --clobber
