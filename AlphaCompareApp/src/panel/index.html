@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alpha Compare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- HERO -->
+    <header class="hero">
+      <img class="logo" src="./img/logo_alphacompare.png" alt="Alpha Compare"
+           onerror="this.style.display='none';">
+      <div class="hero-txt">
+        <h1 class="titulo">ALPHA COMPARE</h1>
+        <p class="subtitle">Conferência visual · original × arquivo</p>
+      </div>
+      <div class="conn">
+        <span id="dot" class="dot"></span>
+        <span id="connLbl" class="lbl">verificando…</span>
+      </div>
+    </header>
+
+    <!-- O.S. -->
+    <section class="card os-card">
+      <div class="os-row">
+        <label class="field-label" for="os">O.S.</label>
+        <input id="os" type="text" inputmode="numeric" maxlength="7" placeholder="0000000" autocomplete="off">
+        <button id="btnPullJob" class="btn accent sm" title="Puxa o original (normal) do job no Engine">⤵ Puxar do Job</button>
+        <span id="jobName" class="job-name">—</span>
+        <button id="btnReset" class="btn ghost sm" style="margin-left:auto" title="Limpar tudo e começar outro job">↺ Novo job</button>
+      </div>
+    </section>
+
+    <!-- PAINEIS: ORIGINAL x ARQUIVO -->
+    <section class="panes">
+      <!-- ORIGINAL -->
+      <div class="pane card">
+        <div class="pane-head">
+          <span class="pane-title">1 · ORIGINAL</span>
+          <span class="pane-sub" id="origInfo">nenhum arquivo</span>
+        </div>
+        <div id="origDrop" class="stage droparea">
+          <div class="drop-hint">
+            <div class="drop-ic">⇪</div>
+            <div>Arraste o <b>PDF / imagem</b> do cliente<br>ou clique para escolher</div>
+          </div>
+          <canvas id="origCanvas" class="stage-canvas" style="display:none"></canvas>
+          <div id="origCropBox" class="crop-box" style="display:none"></div>
+        </div>
+        <div class="pane-tools">
+          <button id="btnOrigPickFile" class="btn ghost sm">Escolher…</button>
+          <button id="btnOrigRotL" class="btn ghost sm" title="Girar 90° anti-horário">⟲</button>
+          <button id="btnOrigRotR" class="btn ghost sm" title="Girar 90° horário">⟳</button>
+          <button id="btnOrigReset" class="btn ghost sm" title="Recorte inteiro">▢ tudo</button>
+          <button id="btnOrigPrep" class="btn ghost sm" title="Limpar cores/camadas antes de comparar" style="display:none">⚗ Limpar</button>
+          <div class="pdfnav" id="origPdfNav" style="display:none">
+            <button id="origPagePrev" class="btn ghost xs">‹</button>
+            <span id="origPageLbl">1/1</span>
+            <button id="origPageNext" class="btn ghost xs">›</button>
+          </div>
+        </div>
+        <div id="origPrep" class="prep" style="display:none"></div>
+        <input id="origFileInput" type="file" accept="application/pdf,image/*" style="display:none">
+      </div>
+
+      <!-- ARQUIVO -->
+      <div class="pane card">
+        <div class="pane-head">
+          <span class="pane-title">2 · ARQUIVO</span>
+          <span class="pane-sub" id="fileInfo">solte o PDF do arquivo</span>
+        </div>
+        <div id="fileDrop" class="stage droparea">
+          <div class="drop-hint" id="fileHint">
+            <div class="drop-ic">⤓</div>
+            <div>Solte o <b>PDF/imagem do arquivo</b><br>ou clique para escolher</div>
+          </div>
+          <canvas id="fileCanvas" class="stage-canvas" style="display:none"></canvas>
+          <div id="fileCropBox" class="crop-box" style="display:none"></div>
+        </div>
+        <div class="pane-tools">
+          <button id="btnPullDesktop" class="btn accent sm" title="Puxa o PDF que está no Desktop do operador">⤵ Desktop</button>
+          <button id="btnFilePickFile" class="btn ghost sm">Escolher…</button>
+          <button id="btnFileRotL" class="btn ghost sm" title="Girar 90° anti-horário">⟲</button>
+          <button id="btnFileRotR" class="btn ghost sm" title="Girar 90° horário">⟳</button>
+          <button id="btnFileReset" class="btn ghost sm" title="Recorte inteiro">▢ tudo</button>
+          <button id="btnFilePrep" class="btn ghost sm" title="Limpar cores/camadas antes de comparar" style="display:none">⚗ Limpar</button>
+          <div class="pdfnav" id="filePdfNav" style="display:none">
+            <button id="filePagePrev" class="btn ghost xs">‹</button>
+            <span id="filePageLbl">1/1</span>
+            <button id="filePageNext" class="btn ghost xs">›</button>
+          </div>
+        </div>
+        <div id="filePrep" class="prep" style="display:none"></div>
+        <input id="fileFileInput" type="file" accept="application/pdf,image/*" style="display:none">
+        <div id="deskPicker" class="picker" style="display:none">
+          <div class="picker-head"><span>Qual PDF comparar?</span><button id="deskPickerClose" class="btn ghost xs">✕</button></div>
+          <ul id="deskPickerList" class="picker-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOLERANCIAS (travadas por padrao; abrir so p/ calibrar) -->
+    <section class="card tol-card">
+      <details class="adv">
+      <summary>Avançado — tolerâncias (travadas)</summary>
+      <div class="tol-head">
+        <span class="pane-title">Tolerância</span>
+        <span class="tol-note">Posição = quanto de desalinho/borda ignorar (mata trapping e antialias). Cor = sensibilidade a mudança de tom.</span>
+      </div>
+      <div class="tol-grid">
+        <label class="tol">
+          <span>Cor <b id="tolColorV">45</b></span>
+          <input id="tolColor" type="range" min="0" max="160" value="45">
+          <small>diferença mín. de cor — maior = só as fortes</small>
+        </label>
+        <label class="tol">
+          <span>Posição <b id="tolThickV">1</b> px</span>
+          <input id="tolThick" type="range" min="0" max="6" value="1">
+          <small>tolera desalinho/borda (px)</small>
+        </label>
+        <label class="tol">
+          <span>Área mín. <b id="tolAreaV">3</b> px</span>
+          <input id="tolArea" type="range" min="1" max="400" value="3">
+          <small>ignora manchas pequenas</small>
+        </label>
+        <label class="tol">
+          <span>Captura <b id="dpiV">200</b> dpi</span>
+          <input id="dpi" type="range" min="72" max="400" step="4" value="200">
+          <small>resolução da prancheta</small>
+        </label>
+        <label class="tol">
+          <span>Trapping <b id="tolTrapV">3</b> px</span>
+          <input id="tolTrap" type="range" min="0" max="8" value="3">
+          <small>só no modo forma: tolera o spread</small>
+        </label>
+      </div>
+      <label class="ov-toggle" style="margin-top:6px"
+             title="Por padrão o modo é AUTOMÁTICO: cor quando os arquivos renderizam igual (revisões), forma quando têm tom/trapping diferente (original × tratado). Marque só para FORÇAR forma.">
+        <input id="modoForma" type="checkbox"> Forçar comparar por forma (senão é automático: cor ↔ forma)
+      </label>
+      </details>
+    </section>
+
+    <!-- Sensibilidade única (estilo Precision Proof): pixel preciso + OCR nativo p/ texto -->
+
+    <!-- BOTAO COMPARAR -->
+    <div class="cta-row">
+      <button id="btnCompare" class="btn cta" disabled>⚖ COMPARAR</button>
+      <label class="qual" title="Menor resolução = mais rápido (bom p/ arquivo pesado), com um pouco mais de ruído">Qualidade
+        <select id="workRes">
+          <option value="3400">Alta (precisa)</option>
+          <option value="2800">Média</option>
+          <option value="2200">Rápida (pesado)</option>
+        </select>
+      </label>
+      <div id="statusMsg" class="status-msg"></div>
+    </div>
+    <div id="progWrap" class="prog-wrap" style="display:none">
+      <div class="prog-bar"><div id="progFill" class="prog-fill"></div></div>
+      <span id="progLbl" class="prog-lbl"></span>
+    </div>
+
+    <!-- RESULTADO -->
+    <section id="resultSection" class="card result-card" style="display:none">
+      <div class="result-head">
+        <div class="result-summary">
+          <span class="sum-item"><b id="sumTotal">0</b> divergências</span>
+          <span class="sum-item miss"><span class="chip"></span><b id="sumMiss">0</b> faltando</span>
+          <span class="sum-item extra"><span class="chip"></span><b id="sumExtra">0</b> sobrando</span>
+          <span class="sum-item diff"><span class="chip"></span><b id="sumDiff">0</b> diferente</span>
+          <span class="sum-align" id="alignInfo"></span>
+        </div>
+        <div class="result-actions">
+          <label class="ov-toggle">Mostrar
+            <select id="modeSel">
+              <option value="all" selected>Tudo</option>
+              <option value="struct">Faltando + Sobrando</option>
+              <option value="miss">Só faltando</option>
+            </select>
+          </label>
+          <label class="ov-toggle"><input id="ovSwap" type="checkbox"> ver original</label>
+          <label class="blink-toggle" title="Alterna original ↔ arquivo na tela — a diferença salta ao olho">
+            <input id="ovBlink" type="checkbox">
+            <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt">⚡ piscar</span></span>
+          </label>
+          <span class="ov-toggle" title="Roda = zoom no cursor · arraste = mover · Shift+arraste = retângulo de zoom · botão direito = afastar · 2 cliques = ajustar">
+            <button id="ovZoomOut" class="btn ghost xs" title="Afastar (roda p/ baixo ou botão direito)">−</button>
+            <button id="ovZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques na imagem)">⛶</button>
+            <button id="ovZoomIn" class="btn ghost xs" title="Aproximar (roda p/ cima)">+</button>
+            <span id="ovZoomLbl" class="ov-zlbl">100%</span>
+            <button id="ovFullBtn" class="btn ghost xs" title="Tela cheia para inspecionar (Esc para sair)">⤢</button>
+          </span>
+        </div>
+      </div>
+      <div class="result-body">
+        <div class="overlay-wrap" id="ovWrap">
+          <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
+        </div>
+        <div class="difflist-wrap">
+          <button id="btnReport" class="btn accent sm btn-report-top">⤓ Gerar Relatório PDF</button>
+          <div class="difflist-head">
+            <button id="diffPrev" class="btn ghost xs">‹</button>
+            <span id="diffPos">–</span>
+            <button id="diffNext" class="btn ghost xs">›</button>
+            <button id="diffRestore" class="btn ghost xs" style="display:none" title="Restaurar as ignoradas">↺</button>
+          </div>
+          <ul id="diffList" class="difflist"></ul>
+        </div>
+      </div>
+      <!-- ZOOM do objeto selecionado -->
+      <div class="zoom-row" id="zoomRow" style="display:none">
+        <div class="zoom-cell"><span>Original</span><canvas id="zoomOrig"></canvas></div>
+        <div class="zoom-cell"><span>Arquivo</span><canvas id="zoomFile"></canvas></div>
+        <div class="zoom-cell"><span>Diferença</span><canvas id="zoomDiff"></canvas></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- LUPA de recorte (segue o cursor) -->
+  <canvas id="loupe" class="loupe" style="display:none"></canvas>
+
+  <!-- TELA CHEIA de inspeção: recebe o MESMO viewer (o ovWrap é movido pra cá) -->
+  <div id="ovFull" class="ov-full" style="display:none">
+    <div class="ov-full-bar">
+      <span class="ov-full-title">🔍 Inspeção</span>
+      <button id="fsPrev" class="btn ghost xs" title="Divergência anterior (←)">‹</button>
+      <span id="fsPos" class="ov-full-pos">—</span>
+      <button id="fsNext" class="btn ghost xs" title="Próxima divergência (→)">›</button>
+      <span id="fsDesc" class="ov-full-desc"></span>
+      <span class="ov-full-sp"></span>
+      <label class="ov-toggle"><input id="fsSwap" type="checkbox"> ver original</label>
+      <label class="blink-toggle" title="Alterna original ↔ arquivo (B)">
+        <input id="fsBlink" type="checkbox">
+        <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt">⚡ piscar</span></span>
+      </label>
+      <button id="fsZoomOut" class="btn ghost xs" title="Afastar">−</button>
+      <button id="fsZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques)">⛶</button>
+      <button id="fsZoomIn" class="btn ghost xs" title="Aproximar">+</button>
+      <span id="ovZoomLbl2" class="ov-zlbl">100%</span>
+      <button id="fsClose" class="btn ghost xs" title="Fechar (Esc)">✕ fechar</button>
+    </div>
+    <div class="ov-full-body" id="ovFullBody"></div>
+  </div>
+
+  <!-- Alpha Proof: shim que substitui as APIs do CEP por Node (roda no Electron) -->
+  <script src="./js/cep_shim.js"></script>
+  <script src="./js/nativeocr.js"></script>
+  <!-- libs vendorizadas -->
+  <script src="./lib/pdfium/pdfrender.js"></script>
+  <script src="./lib/jspdf.umd.min.js"></script>
+  <script src="./lib/jsQR.js"></script>
+  <script src="./lib/zxing.min.js"></script>
+  <script src="./js/barcode.js"></script>
+  <script src="./js/textcheck.js"></script>
+  <script src="./js/octext.js"></script>
+  <script src="./js/compare.js"></script>
+  <script src="./js/report.js"></script>
+  <script src="./js/main.js"></script>
+</body>
+</html>

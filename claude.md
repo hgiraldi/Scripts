@@ -32,6 +32,9 @@ situar. Toda mudança estrutural deve ser refletida no .md da frente.
 | **AlphaPack** (trapping, barcode, white underprint — estilo DeskPack) | `AlphaPack/README.md` + `AlphaPack/ROADMAP.md` |
 | **AlphaScreening** (Ink Manager, screening por tinta, XML da OS, XMP) | `AlphaScreening/README.md` |
 | **Alpha Screen** (app Electron que junta colorantes mantendo screening) | `AlphaScreenApp/README.md` |
+| **Alpha Faca** (app Electron de orçamento de faca via DXF) | `AlphaFaca/ARQUITETURA.md` |
+| **Alpha Ondulado** (app Electron: PDF ripado → grupos por cor → laudo de orçamento) | `AlphaOndulado/ARQUITETURA.md` |
+| **Alpha Compare (app)** (app Electron = o painel Alpha Compare fora do CEP, com OCR nativo p/ texto pixel-invisível tipo DUX 28→29) | `AlphaCompareApp/ARQUITETURA.md` |
 | Visual / CSS / HTML (AlphaForms, páginas, identidade Alpha) | `design.md` |
 
 Regras de uso:
@@ -48,7 +51,7 @@ Regras de uso:
 # Deploy × Commit (pastas `Alpha*`)
 
 **Toda pasta que começa com `Alpha` (`AlphaCompare/`, `AlphaPack/`, `AlphaScreening/`,
-`AlphaScreenApp/`, e qualquer `Alpha…` futura) NÃO vai para produção.**
+`AlphaScreenApp/`, `AlphaCompareApp/`, e qualquer `Alpha…` futura) NÃO vai para produção.**
 
 * **Nunca** copiar essas pastas para a pasta de rede da produção
   (`\\192.168.1.15\uteis\_Padroes_clientes_Alpha\_Scripts\Scripts`).

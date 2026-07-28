@@ -1,0 +1,12 @@
+node_modules/
+dist/
+__pycache__/
+# build do OCR congelado (PyInstaller) - pesado, refeito no build do instalavel
+build/ocr_dist/
+build/pyi_work/
+build/pyi_spec/
+build/ocr_server/
+build/*.txt
+build/ocrtest.png
+# manter: build/icon.png (fica versionado)
+!build/icon.png
