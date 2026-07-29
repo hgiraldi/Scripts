@@ -35,11 +35,16 @@ jobs:
         run: |
           curl -L -o /tmp/mf.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-x86_64.sh
           bash /tmp/mf.sh -b -p "$HOME/mf-x64"
+          # ambiente x64 com Python 3.12 (IGUAL ao Windows) — o base do Miniforge pode vir 3.13,
+          # e aí o pip resolve um rapidocr ANTIGO (ch_ppocr_v3_det, import dinamico) que quebra congelado.
+          arch -x86_64 "$HOME/mf-x64/bin/conda" create -y -n b python=3.12
 
-      - name: Congelar o OCR em x64 (via Rosetta)
+      - name: Congelar o OCR em x64 (via Rosetta, Python 3.12 + rapidocr 1.4.4)
         run: |
-          PY="$HOME/mf-x64/bin/python"
-          arch -x86_64 "$PY" -m pip install --upgrade pip pyinstaller rapidocr-onnxruntime
+          PY="$HOME/mf-x64/envs/b/bin/python"
+          # PIN rapidocr-onnxruntime==1.4.4: usa import ESTATICO (ch_ppocr_det) que o PyInstaller
+          # bundla certo. Versoes antigas carregam o detector por caminho -> "has no attribute TextDetector".
+          arch -x86_64 "$PY" -m pip install --upgrade pip pyinstaller "rapidocr-onnxruntime==1.4.4"
           arch -x86_64 "$PY" -m PyInstaller --noconfirm --onedir --console --name ocr_server \
             --collect-data rapidocr_onnxruntime \
             --collect-all onnxruntime \
