@@ -69,15 +69,46 @@ function gateRede() {
   });
 }
 
+// SPLASH (tela de carregamento estilo Photoshop/Illustrator): janelinha sem moldura com o logo
+// enquanto o painel pesado (pdfium/wasm) carrega. Fecha sozinha quando o app termina de carregar.
+let splashWin = null;
+function createSplash() {
+  try {
+    splashWin = new BrowserWindow({
+      width: 480, height: 320, frame: false, transparent: true, resizable: false,
+      alwaysOnTop: true, center: true, show: false, skipTaskbar: true,
+      backgroundColor: "#00000000", hasShadow: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true }
+    });
+    splashWin.loadFile(path.join(__dirname, "src", "panel", "splash.html"));
+    splashWin.once("ready-to-show", function () { try { if (splashWin) splashWin.show(); } catch (e) {} });
+  } catch (e) { boot("createSplash ERRO: " + (e && e.stack || e)); splashWin = null; }
+}
+function fecharSplash() {
+  try { if (splashWin && !splashWin.isDestroyed()) splashWin.close(); } catch (e) {}
+  splashWin = null;
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 1100, minHeight: 700,
     backgroundColor: "#0e1f43",
     icon: path.join(__dirname, "build", "icon.png"),
     title: "Alpha Compare",
+    show: false,   // só aparece quando o painel terminar de carregar (a splash cobre a espera)
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
   win.removeMenu();
+  // mostra a janela principal e fecha a splash quando o painel carregou (ou por segurança, no máx 20s)
+  var _mostrou = false;
+  function mostrarApp() {
+    if (_mostrou) return; _mostrou = true;
+    try { win.show(); win.focus(); } catch (e) {}
+    fecharSplash();
+  }
+  win.webContents.once("did-finish-load", function () { setTimeout(mostrarApp, 250); });
+  var _splashGuard = setTimeout(mostrarApp, 20000);   // rede de segurança: nunca deixa preso na splash
+  win.on("closed", function () { clearTimeout(_splashGuard); });
   // encaminha erros/logs do renderer pro terminal (diagnostico)
   win.webContents.on("console-message", function (_e, level, message, line, src) {
     if (level >= 2) console.log("[renderer] " + message + "  (" + (src || "").split(/[\\/]/).pop() + ":" + line + ")");
@@ -96,8 +127,9 @@ app.whenReady().then(function () {
   gateRede().then(function (liberado) {
     boot("gateRede -> liberado=" + liberado);
     if (!liberado) { app.quit(); return; }
+    createSplash();   // tela de carregamento primeiro
     try { createWindow(); boot("createWindow OK"); }
-    catch (e) { boot("createWindow ERRO: " + (e && e.stack || e)); }
+    catch (e) { boot("createWindow ERRO: " + (e && e.stack || e)); fecharSplash(); }
     app.on("activate", function () { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   }).catch(function (e) { boot("gateRede ERRO: " + (e && e.stack || e)); });
 }).catch(function (e) { boot("whenReady ERRO: " + (e && e.stack || e)); });
