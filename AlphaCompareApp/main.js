@@ -20,7 +20,9 @@ process.on("unhandledRejection", function (e) { boot("UNHANDLED_REJECTION: " + (
 const NET_HOSTS = [                       // hostname sobrevive à troca de IP; IPs são reforço
   { host: "aeserver16", port: 445 },
   { host: "192.168.1.15", port: 445 },
-  { host: "192.168.1.96", port: 445 }
+  { host: "192.168.1.96", port: 445 },
+  { host: "172.16.11.15", port: 445 },   // rede nova (a fabrica tem as duas faixas)
+  { host: "172.16.11.96", port: 445 }
 ];
 const NET_SUBNETS = ["192.168.", "172."]; // prefixos IPv4 da rede da empresa (172 = rede nova)
 function canReach(host, port, timeout) {

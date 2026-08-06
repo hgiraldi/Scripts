@@ -205,8 +205,9 @@
     // Mac: o teste TCP por IP nao e confiavel (monta por nome) -> le a rede DIRETO,
     // senao o painel fica so no operacoes.json empacotado (sem o Geral).
     if (IS_MAC) { lerOperacoesRede(); return; }
-    checkHost(SCRIPTS_IP, function (ok) {
-      if (!ok) return;
+    checkAny(SCRIPTS_IPS, function (ip) {
+      if (!ip) return;
+      evalScript("setRedeIps(" + q(ip) + ",'')"); // le o operacoes.json da rede que respondeu
       lerOperacoesRede();
     });
   }
@@ -228,8 +229,11 @@
   }
 
   // IPs das redes que precisam estar conectadas (ajuste aqui se mudar).
-  var SCRIPTS_IP = "192.168.1.15"; // servidor dos scripts/operacoes
-  var ENGINE_IP  = "192.168.1.96"; // servidor Engine
+  // Cada servidor pode estar em DUAS faixas (192.168.1.x e 172.16.11.x) -> testa
+  // as duas e usa a que responder. O IP que respondeu e avisado ao host.jsx
+  // (setRedeIps) pra ele nao perder tempo com o UNC da rede que nao existe.
+  var SCRIPTS_IPS = ["192.168.1.15", "172.16.11.15"]; // servidor dos scripts/operacoes (uteis)
+  var ENGINE_IPS  = ["192.168.1.96", "172.16.11.96"]; // servidor Engine
   // No MAC os volumes montam por NOME (nao por IP) e o teste TCP por IP nao da
   // timeout confiavel no Node do CEP -> "verificando" eterno. Entao no Mac pulamos
   // o teste TCP e usamos so a checagem de PASTAS (File.exists local em /Volumes).
@@ -266,6 +270,23 @@
     tentar();
   }
 
+  // testa VARIOS ips ao mesmo tempo e devolve o PRIMEIRO que responder ("" = nenhum).
+  // Em paralelo de proposito: em serie, a rede errada gastaria o timeout inteiro
+  // antes de tentar a certa (a bolinha ficaria ~15s em "verificando").
+  function checkAny(ips, cb) {
+    var pendentes = ips.length, feito = false, i;
+    function fim(ip) { if (feito) return; feito = true; cb(ip); }
+    function testar(ip) {
+      checkHost(ip, function (ok) {
+        pendentes--;
+        if (ok) fim(ip);
+        else if (pendentes === 0) fim("");
+      });
+    }
+    if (!pendentes) { cb(""); return; }
+    for (i = 0; i < ips.length; i++) { testar(ips[i]); }
+  }
+
   function setDot(on, txt) {
     dotEl.className = "dot " + (on ? "on" : "off");
     connLblEl.textContent = txt;
@@ -274,7 +295,9 @@
   // 2 etapas: (1) servidores respondem? (TCP, nao trava). (2) se sim, as PASTAS
   // estao acessiveis/montadas? (host -> File.exists no caminho real; rapido pq o
   // servidor ja respondeu). Verde so quando a pasta existe MESMO = o run funciona.
-  function verificarPastas() {
+  function verificarPastas(ipS, ipE) {
+    // avisa o host qual IP respondeu (some com a espera do SMB no UNC morto)
+    evalScript("setRedeIps(" + q(ipS || "") + "," + q(ipE || "") + ")");
     evalScript("statusRede()", function (st) {
       if (st === "OK") { setDot(true, "conectado às redes"); return; }
       if (st && st.indexOf("OFF|") === 0) { setDot(false, "pasta não montada: " + st.substring(4)); return; }
@@ -289,17 +312,17 @@
       verificarPastas();
       return;
     }
-    checkHost(SCRIPTS_IP, function (sOk) {
-      checkHost(ENGINE_IP, function (eOk) {
-        if (!sOk || !eOk) {
+    checkAny(SCRIPTS_IPS, function (ipS) {
+      checkAny(ENGINE_IPS, function (ipE) {
+        if (!ipS || !ipE) {
           var f = [];
-          if (!sOk) f.push("Scripts (" + SCRIPTS_IP + ")");
-          if (!eOk) f.push("Engine (" + ENGINE_IP + ")");
+          if (!ipS) f.push("Scripts (" + SCRIPTS_IPS.join(" / ") + ")");
+          if (!ipE) f.push("Engine (" + ENGINE_IPS.join(" / ") + ")");
           setDot(false, "servidor fora: " + f.join(" e "));
           return;
         }
         if (ocupado) return; // operacao comecou durante o teste TCP -> nao mexe no motor
-        verificarPastas();
+        verificarPastas(ipS, ipE);
       });
     });
   }

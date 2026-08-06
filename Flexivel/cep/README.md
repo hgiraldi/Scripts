@@ -43,10 +43,22 @@ Illustrator** → **Janela > Extensões > Ondulado**.
 
 ## Só precisa: instalar 1x + **internet** (fonte) + **rede** (scripts/operações).
 
-## Caminho de rede (ajustar se o Mac montar diferente)
-Em `host/host.jsx`, `CANDIDATOS_BASE` tem os caminhos testados em ordem:
-- Windows: `//192.168.1.15/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado`
-- macOS:   `/Volumes/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado`
+## Caminho de rede — DUAS faixas de IP (192.168.1.x e 172.16.11.x)
+Cada servidor pode estar em qualquer uma das duas redes; o painel testa as **duas**
+e usa a que responder.
+
+| Servidor | IPs testados | Pasta |
+|---|---|---|
+| Scripts (uteis) | `192.168.1.15` / `172.16.11.15` | `/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Flexivel` |
+| Engine | `aeserver16` (nome), `192.168.1.96` / `172.16.11.96` | `/Engine` |
+
+Onde muda: `js/main.js` → `SCRIPTS_IPS` / `ENGINE_IPS` (teste TCP, porta 445) e
+`host/host.jsx` → `IPS_SCRIPTS` / `IPS_ENGINE` (caminhos UNC). O painel avisa ao
+host qual IP respondeu (`setRedeIps`) para ele **não** esperar o timeout do SMB no
+UNC da rede que não existe. No macOS nada muda (monta por nome em `/Volumes`).
+
+Os **scripts** da rede resolvem o caminho pelas funções `alphaBaseEngine()` /
+`alphaBaseUteis()` do `Xml_upload.jsx` — mesma ideia, do lado do JSX.
 
 ## Estrutura
 ```

@@ -69,11 +69,16 @@ ipcMain.handle("excluir-orcamento", async function (_e, id) {
 
 // ---- cadastros compartilhados: caminho FIXO na rede (Windows UNC / Mac /Volumes) ----
 const CAD_FILE = "alphafaca_cadastros.json";
+const CAD_IPS = ["192.168.1.15", "172.16.11.15"]; // a fabrica tem duas faixas de rede
 function cadDir() {
   if (process.env.AF_CAD_DIR) return process.env.AF_CAD_DIR;   // override (testes/casos especiais)
-  // mesmo compartilhamento "uteis" em 192.168.1.15, montado conforme o SO
+  const sub = "\\uteis\\_Padroes_clientes_Alpha\\_Scripts\\BaseDados";
   if (process.platform === "darwin") return "/Volumes/uteis/_Padroes_clientes_Alpha/_Scripts/BaseDados";
-  return "\\\\192.168.1.15\\uteis\\_Padroes_clientes_Alpha\\_Scripts\\BaseDados";
+  for (const ip of CAD_IPS) {                      // usa a rede que responder
+    const p = "\\\\" + ip + sub;
+    try { if (fs.existsSync(p)) return p; } catch (e) {}
+  }
+  return "\\\\" + CAD_IPS[0] + sub;             // nenhuma acessivel -> erro claro depois
 }
 function cadFilePath() { return path.join(cadDir(), CAD_FILE); }
 

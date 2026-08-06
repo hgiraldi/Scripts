@@ -92,10 +92,17 @@ function apPing() {
  *  Retorno OK|<os>\x1f<produto>\x1e<ink>\x1e<ink>...
  *  ink = nome FS angulo FS lpi FS dot FS tipo FS ref FS isDual FS base
  * ============================================================ */
+// Engine: nome primeiro, depois os IPs das DUAS redes da fabrica (192.168.1.x / 172.16.11.x)
 function apScreenFolderOS(os) {
-    if ($.os.indexOf("Windows") !== -1)
-        return "\\\\aeserver16\\Engine\\_Jobfolder\\" + os + "\\_xml\\";
-    return "/Engine/_JobFolder/" + os + "/_xml/";
+    var bases = ($.os.indexOf("Windows") !== -1)
+        ? ["//aeserver16/Engine", "//192.168.1.96/Engine", "//172.16.11.96/Engine"]
+        : ["/Volumes/Engine", "/Engine"];
+    var i, p;
+    for (i = 0; i < bases.length; i++) {
+        p = bases[i] + "/_Jobfolder/" + os + "/_xml/";
+        try { if (new Folder(p).exists) return p; } catch (e) {}
+    }
+    return bases[0] + "/_Jobfolder/" + os + "/_xml/";
 }
 
 function apScreenPullOS(osArg) {

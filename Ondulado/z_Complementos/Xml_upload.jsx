@@ -43,6 +43,58 @@ function msgUsuario(texto, tipo) {
     alert(texto);
 }
 
+/* ================= REDE ALPHA (duas faixas de IP) =================
+ * A fabrica tem DUAS redes: 192.168.1.x e 172.16.11.x. Cada maquina enxerga
+ * uma delas -> nao da pra fixar o IP no caminho. Estas funcoes devolvem a raiz
+ * que REALMENTE responde: testam na ordem e MEMORIZAM o acerto em $.global (o
+ * timeout do SMB num UNC morto custa segundos -- nao pode pagar isso a cada uso).
+ * Barra pra FRENTE de proposito: File/Folder aceitam "//servidor/share" tambem no
+ * Windows, entao o caminho fica igual nos dois SOs (some o if de $.os).
+ * Mudou de IP? E so mexer nas duas listas abaixo.
+ * ================================================================= */
+var ALPHA_IPS_ENGINE = ["192.168.1.96", "172.16.11.96"]; // Engine (_Jobfolder)
+var ALPHA_IPS_UTEIS  = ["192.168.1.15", "172.16.11.15"]; // uteis (_Padroes_clientes_Alpha)
+if (!$.global.__alphaRede) { $.global.__alphaRede = {}; }
+
+function alphaPrimeiraPasta(caminhos) {
+    var i;
+    for (i = 0; i < caminhos.length; i++) {
+        try { if (new Folder(caminhos[i]).exists) return caminhos[i]; } catch (e) {}
+    }
+    return null;
+}
+
+// raiz do Engine, SEM barra no fim. Ex.: "//aeserver16/Engine"
+function alphaBaseEngine() {
+    if ($.global.__alphaRede.engine) return $.global.__alphaRede.engine;
+    var cands = [], i;
+    if ($.os.indexOf("Windows") !== -1) {
+        cands.push("//aeserver16/Engine"); // NOME primeiro (evita o conflito SMB 1219)
+        for (i = 0; i < ALPHA_IPS_ENGINE.length; i++) { cands.push("//" + ALPHA_IPS_ENGINE[i] + "/Engine"); }
+    } else {
+        cands.push("/Volumes/Engine");
+        cands.push("/Engine");
+    }
+    var ok = alphaPrimeiraPasta(cands);
+    if (ok) { $.global.__alphaRede.engine = ok; return ok; } // so memoriza o ACERTO
+    return cands[0]; // nada acessivel -> 1o caminho (o erro aparece depois, com caminho real)
+}
+
+// raiz do uteis, SEM barra no fim. Ex.: "//192.168.1.15/uteis"
+function alphaBaseUteis() {
+    if ($.global.__alphaRede.uteis) return $.global.__alphaRede.uteis;
+    var cands = [], i;
+    if ($.os.indexOf("Windows") !== -1) {
+        for (i = 0; i < ALPHA_IPS_UTEIS.length; i++) { cands.push("//" + ALPHA_IPS_UTEIS[i] + "/uteis"); }
+    } else {
+        cands.push("/Volumes/uteis");
+        cands.push("/uteis");
+    }
+    var ok = alphaPrimeiraPasta(cands);
+    if (ok) { $.global.__alphaRede.uteis = ok; return ok; }
+    return cands[0];
+}
+
 // Initialize global variables
 var xmlData = {};
 
@@ -83,12 +135,8 @@ if (xmlFilePath !== "") {
 function getFolderPath() {
     var folderPath = "";
 
-    // Check the operating system
-    if ($.os.indexOf("Windows") !== -1) {
-        folderPath = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_xml\\";
-    } else {
-        folderPath = "/Engine/_JobFolder/" + serviceOrderNumber + "/_xml/";
-    }
+    // caminho unico p/ Windows e Mac (alphaBaseEngine resolve a rede que responde)
+    folderPath = alphaBaseEngine() + "/_Jobfolder/" + serviceOrderNumber + "/_xml/";
 
     return folderPath;
 }

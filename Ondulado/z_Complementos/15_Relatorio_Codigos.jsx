@@ -72,9 +72,7 @@ function jsonStr(s) {
 
 // pasta _pdf do job no Engine (mesmo nivel da pasta reference). Cria se faltar.
 function pastaPdfDoJob(os) {
-    var bases = ($.os.indexOf("Windows") !== -1)
-        ? ["//aeserver16/Engine/_Jobfolder/", "//192.168.1.96/Engine/_Jobfolder/"]
-        : ["/Volumes/Engine/_Jobfolder/", "/Engine/_Jobfolder/"];
+    var bases = [alphaBaseEngine() + "/_Jobfolder/"];
     var i;
     for (i = 0; i < bases.length; i++) {
         var job = new Folder(bases[i] + os);

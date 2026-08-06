@@ -157,6 +157,30 @@ A mensagem final agora sai como `"Montagem e Label feitos — avisos: …"` (lin
 
 ---
 
+## 5.1. Caminhos de rede — DUAS faixas de IP
+
+A fábrica tem duas redes (`192.168.1.x` e `172.16.11.x`) e cada máquina enxerga uma
+delas. Nenhum script pode fixar o IP no caminho.
+
+`Xml_upload.jsx` (as duas versões, Flexivel e Ondulado) define o resolvedor usado por
+**todos** os complementos que gravam na rede:
+
+| Função | Devolve | Candidatos (Windows) |
+|---|---|---|
+| `alphaBaseEngine()` | raiz do Engine, sem barra final | `//aeserver16/Engine` → `//192.168.1.96/Engine` → `//172.16.11.96/Engine` |
+| `alphaBaseUteis()` | raiz do uteis, sem barra final | `//192.168.1.15/uteis` → `//172.16.11.15/uteis` |
+
+* Testa na ordem e **memoriza o acerto** em `$.global.__alphaRede` (um `Folder.exists`
+  em UNC morto custa o timeout do SMB — não pode repetir a cada uso). Só memoriza acerto.
+* No Mac: `/Volumes/Engine` → `/Engine` e `/Volumes/uteis` → `/uteis`.
+* Devolve barra pra **frente** nos dois SOs (`File`/`Folder` aceitam `//servidor/share`
+  também no Windows) — por isso sumiu o `if ($.os...)` de dentro de cada `getFolderPath*`.
+* Mudou de IP? Só as listas `ALPHA_IPS_ENGINE` / `ALPHA_IPS_UTEIS` no `Xml_upload.jsx`.
+* Os painéis CEP têm o equivalente próprio (`IPS_SCRIPTS`/`IPS_ENGINE` no `host.jsx` +
+  `SCRIPTS_IPS`/`ENGINE_IPS` no `main.js`) — ver `*/cep/README.md`.
+
+---
+
 ## 6. Xml_upload.jsx — variáveis globais (~70)
 
 CORE consumido por quase todos os complementos. Carrega o XML mais recente da O.S., converte para JSON e publica globais. Grupos principais:

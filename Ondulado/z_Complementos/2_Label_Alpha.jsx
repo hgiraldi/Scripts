@@ -1125,14 +1125,8 @@ var nomeArquivoTxt = nomeScript + "_" + cliente + "_" + serviceOrderNumber + "_"
 function getFolderPathUtilizacao() {
     var pastaDestino = "";
 
-    // Check the operating system
-    if ($.os.indexOf("Windows") !== -1) {
-        // Windows folder path
-        pastaDestino = "\\\\192.168.1.15\\uteis\\_Padroes_clientes_Alpha\\_Scripts\\Utilizacao\\Companion\\";
-    } else {
-        // Mac folder path
-        pastaDestino = "/uteis/_Padroes_clientes_Alpha/_Scripts/Utilizacao/Companion/";
-    }
+    // caminho unico p/ Windows e Mac (alphaBaseEngine/alphaBaseUteis resolvem a rede)
+    pastaDestino = alphaBaseUteis() + "/_Padroes_clientes_Alpha/_Scripts/Utilizacao/Companion/";
 
     return pastaDestino;
 }
@@ -1162,14 +1156,8 @@ arquivoTxt.close();
 function getFolderPathCopyLog() {
     var folderPathCopy = "";
 
-    // Check the operating system
-    if ($.os.indexOf("Windows") !== -1) {
-        // Windows folder path
-        folderPathCopy = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
-    } else {
-        // Mac folder path
-        folderPathCopy = "/Engine/_Jobfolder/" + serviceOrderNumber + "/_log/";
-    }
+    // caminho unico p/ Windows e Mac (alphaBaseEngine/alphaBaseUteis resolvem a rede)
+    folderPathCopy = alphaBaseEngine() + "/_Jobfolder/" + serviceOrderNumber + "/_log/";
 
     return folderPathCopy;
 }

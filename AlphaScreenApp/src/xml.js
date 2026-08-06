@@ -2,8 +2,14 @@
 const fs = require("fs");
 const path = require("path");
 
+const ENGINE_BASES = ["\\\\aeserver16\\Engine", "\\\\192.168.1.96\\Engine", "\\\\172.16.11.96\\Engine"];
+// a fabrica tem duas faixas de rede: usa a raiz do Engine que responder
+function engineBase() {
+  for (const b of ENGINE_BASES) { try { if (fs.existsSync(b)) return b; } catch (e) {} }
+  return ENGINE_BASES[0];
+}
 function folderOS(os) {
-  return "\\\\aeserver16\\Engine\\_Jobfolder\\" + os + "\\_xml\\";
+  return engineBase() + "\\_Jobfolder\\" + os + "\\_xml\\";
 }
 
 function latestXml(dir) {

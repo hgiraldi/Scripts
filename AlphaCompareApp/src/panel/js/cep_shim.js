@@ -11,7 +11,7 @@
   var os = require("os");
 
   // Engine: UNC no Windows, volume montado no Mac. Testa em ordem.
-  var ENGINES = ["\\\\aeserver16\\Engine", "\\\\192.168.1.96\\Engine", "//aeserver16/Engine", "/Volumes/Engine"];
+  var ENGINES = ["\\\\aeserver16\\Engine", "\\\\192.168.1.96\\Engine", "\\\\172.16.11.96\\Engine", "//aeserver16/Engine", "/Volumes/Engine"];
   function engineDir() {
     for (var i = 0; i < ENGINES.length; i++) { try { if (fs.existsSync(ENGINES[i])) return ENGINES[i]; } catch (e) {} }
     return null;

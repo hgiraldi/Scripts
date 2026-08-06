@@ -30,11 +30,8 @@ function saveXMLToFile(xmlContent, filePath) {
 
 function getFolderPathCopyLog() {
     var folderPathCopy = "";
-    if ($.os.indexOf("Windows") !== -1) {
-        folderPathCopy = "\\\\aeserver16\\Engine\\_Jobfolder\\" + serviceOrderNumber + "\\_log\\";
-    } else {
-        folderPathCopy = "/Engine/_Jobfolder/" + serviceOrderNumber + "/_log/";
-    }
+    // caminho unico p/ Windows e Mac (alphaBaseEngine resolve a rede que responde)
+    folderPathCopy = alphaBaseEngine() + "/_Jobfolder/" + serviceOrderNumber + "/_log/";
     return folderPathCopy;
 }
 

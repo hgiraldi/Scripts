@@ -1,7 +1,8 @@
 /* ============================================================
  * Ondulado - ponte JSX do painel CEP (PC + Mac)
  * Dispara os scripts .jsx da REDE. Caminho resolvido por SO. Checa DUAS redes:
- * a dos scripts (192.168.1.15) e a Engine (192.168.1.96) -> avisa qual caiu.
+ * a dos scripts (uteis) e a Engine -> avisa qual caiu. Cada uma pode estar na
+ * faixa 192.168.1.x OU 172.16.11.x (a fabrica tem as duas) -> tenta as duas.
  * Reinstala so quando muda o VISUAL do painel (logica/operacoes vem da rede).
  * ============================================================ */
 
@@ -12,14 +13,61 @@
 // File.exists nele pode TRAVAR o Mac; no Windows nao checar /Volumes. $.os diz o SO.
 var __ehWin = ($.os.indexOf("Windows") !== -1);
 var TESTE_BASE = String(Folder.desktop.fsName).replace(/\\/g, "/") + "/AlphaTeste/Ondulado";
-var CANDIDATOS_BASE = __ehWin
-    ? [TESTE_BASE, "//192.168.1.15/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado"]
-    : [TESTE_BASE, "/Volumes/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado",
-                   "/Volumes/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado"];
+
+// IPs possiveis de cada servidor (mesma pasta, redes diferentes).
+var IPS_SCRIPTS = ["192.168.1.15", "172.16.11.15"]; // uteis (scripts/operacoes)
+var IPS_ENGINE  = ["192.168.1.96", "172.16.11.96"]; // Engine (_Jobfolder)
+var SUB_SCRIPTS = "/uteis/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado";
+
+// IP que o PAINEL confirmou por TCP (setRedeIps). No Windows um File.exists num
+// UNC morto so retorna depois do timeout do SMB -> testar o IP errado primeiro
+// SEGURARIA o Illustrator. Por isso o que respondeu vai pra frente da fila.
+var __ipScripts = "";
+var __ipEngine  = "";
+function setRedeIps(ipS, ipE) {
+    __ipScripts = (ipS ? String(ipS) : "");
+    __ipEngine  = (ipE ? String(ipE) : "");
+    return "OK";
+}
+
+// devolve 'lista' com 'preferido' na frente (se estiver nela)
+function ordenarPref(lista, preferido) {
+    var out = [], i;
+    if (preferido) {
+        for (i = 0; i < lista.length; i++) { if (lista[i] === preferido) out.push(lista[i]); }
+    }
+    for (i = 0; i < lista.length; i++) { if (lista[i] !== preferido) out.push(lista[i]); }
+    return out;
+}
+
+// caminhos de PRODUCAO dos scripts (sem o modo teste)
+function basesProducao() {
+    var out = [], ips, i;
+    if (__ehWin) {
+        ips = ordenarPref(IPS_SCRIPTS, __ipScripts);
+        for (i = 0; i < ips.length; i++) { out.push("//" + ips[i] + SUB_SCRIPTS); }
+    } else {
+        out.push("/Volumes" + SUB_SCRIPTS);
+        out.push("/Volumes/_Padroes_clientes_Alpha/_Scripts/Scripts/Ondulado");
+    }
+    return out;
+}
+// todos os candidatos dos scripts: modo teste primeiro, depois producao
+function basesScripts() { return [TESTE_BASE].concat(basesProducao()); }
+
 // --- pasta Engine que tambem precisa estar conectada/montada ---
-var CANDIDATOS_ENGINE = __ehWin
-    ? ["//aeserver16/Engine", "//192.168.1.96/Engine"]  // Windows: NOME (evita conflito SMB 1219) + IP fallback
-    : ["/Volumes/Engine", "/Engine"];                    // Mac: montado em /Volumes (ou raiz)
+function basesEngine() {
+    var out = [], ips, i;
+    if (__ehWin) {
+        out.push("//aeserver16/Engine"); // NOME primeiro (evita conflito SMB 1219)
+        ips = ordenarPref(IPS_ENGINE, __ipEngine);
+        for (i = 0; i < ips.length; i++) { out.push("//" + ips[i] + "/Engine"); }
+    } else {
+        out.push("/Volumes/Engine"); // Mac: montado em /Volumes (ou raiz)
+        out.push("/Engine");
+    }
+    return out;
+}
 
 // ---- mensagens NO PAINEL (em vez de abrir janela do Illustrator) ----
 // Janelas ScriptUI (new Window) entram em loop quando o script roda pelo CEP.
@@ -47,18 +95,23 @@ function primeiroQueExiste(lista) {
     return null;
 }
 // resolve o BASE NA HORA (se o share for montado depois, passa a achar).
-function getBase() { return primeiroQueExiste(CANDIDATOS_BASE) || CANDIDATOS_BASE[0]; }
+// Nada acessivel -> devolve o caminho de PRODUCAO (nunca o do modo teste): a msg
+// de erro tem que mostrar a REDE que faltou, nao o Desktop/AlphaTeste da maquina.
+function getBase() { return primeiroQueExiste(basesScripts()) || basesProducao()[0]; }
+
+// rotulo do servidor pra mensagem: o IP que respondeu, ou os dois possiveis
+function rotuloIps(ips, pref) { return pref ? pref : ips.join(" ou "); }
 
 // status das DUAS PASTAS (resolvido na hora). "OK" se as duas estao ACESSIVEIS
 // (montadas), senao "OFF|<quais nao acessiveis>". So e chamado pelo painel DEPOIS
 // de confirmar que os servidores respondem (TCP), entao isto e rapido (nao trava).
 function statusRede() {
-    var scriptsOk = (primeiroQueExiste(CANDIDATOS_BASE) !== null);
-    var engineOk = (primeiroQueExiste(CANDIDATOS_ENGINE) !== null);
+    var scriptsOk = (primeiroQueExiste(basesScripts()) !== null);
+    var engineOk = (primeiroQueExiste(basesEngine()) !== null);
     if (scriptsOk && engineOk) return "OK";
     var faltam = [];
-    if (!scriptsOk) faltam.push("Scripts (192.168.1.15)");
-    if (!engineOk) faltam.push("Engine (192.168.1.96)");
+    if (!scriptsOk) faltam.push("Scripts (" + rotuloIps(IPS_SCRIPTS, __ipScripts) + ")");
+    if (!engineOk) faltam.push("Engine (" + rotuloIps(IPS_ENGINE, __ipEngine) + ")");
     return "OFF|" + faltam.join(" e ");
 }
 
@@ -91,7 +144,10 @@ function rodarOperacao(arq, os, pasta, token) {
         if (app.documents.length === 0) return "ERRO: nenhum documento aberto.";
         var BASE = getBase();
         var pastaBase = new File(BASE);
-        if (!pastaBase.exists) return "ERRO: pasta nao montada/acessivel: " + BASE;
+        if (!pastaBase.exists) {
+            // BASE aqui e sempre um caminho de REDE (getBase nao cai no modo teste)
+            return "ERRO: pasta dos scripts nao acessivel. Tentado: " + basesProducao().join(" e ");
+        }
 
         $.global.serviceOrderNumber = String(os);
 

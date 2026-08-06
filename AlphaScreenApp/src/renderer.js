@@ -8,7 +8,13 @@ let pdfPath = null, colorants = [], screensPdf = {}, inksXml = {}, state = [], t
 
 function log(t, cls) { const e = $("log"); e.textContent = t; e.className = "log " + (cls || ""); }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, c => c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"); }
-function osPrepress(os) { return "\\\\aeserver16\\Engine\\_Jobfolder\\" + os + "\\_prepress\\"; }
+const ENGINE_BASES = ["\\\\aeserver16\\Engine", "\\\\192.168.1.96\\Engine", "\\\\172.16.11.96\\Engine"];
+// a fabrica tem duas faixas de rede: usa a raiz do Engine que responder
+function engineBase() {
+  for (const b of ENGINE_BASES) { try { if (fs.existsSync(b)) return b; } catch (e) {} }
+  return ENGINE_BASES[0];
+}
+function osPrepress(os) { return engineBase() + "\\_Jobfolder\\" + os + "\\_prepress\\"; }
 
 /* ---------- classificação / cor ---------- */
 function normKey(name) { let s = String(name).toLowerCase(); const d = /^##/.test(s), sl = /^\/\//.test(s); s = s.replace(/^##/, "").replace(/^\/\//, "").replace(/pantone/g, "").replace(/\bc\b/g, "").replace(/[\s_]+/g, ""); return (d ? "##" : sl ? "//" : "") + s; }
@@ -52,7 +58,7 @@ function pullXml() {
   if (!os) { log("Informe a ordem de serviço.", "warn"); $("os").focus(); return; }
   log("Puxando XML da OS…", "work");
   // usa o host? não — aqui é Node: lê direto (mesma lógica do Xml_upload)
-  const dir = "\\\\aeserver16\\Engine\\_Jobfolder\\" + os + "\\_xml\\";
+  const dir = engineBase() + "\\_Jobfolder\\" + os + "\\_xml\\";
   let file;
   try { const fl = fs.readdirSync(dir).filter(f => /\.xml$/i.test(f)).sort(); if (fl.length) file = dir + fl[fl.length - 1]; } catch (e) {}
   if (!file) { log("Sem XML acessível pra OS " + os + ".", "err"); return; }

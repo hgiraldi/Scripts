@@ -6,10 +6,10 @@
   Largura FIXA (380); altura com folga pra caber as operacoes.
 -->
 <ExtensionManifest Version="9.0" ExtensionBundleId="com.alpha.ondulado"
-    ExtensionBundleVersion="0.2.0" ExtensionBundleName="Ondulado"
+    ExtensionBundleVersion="0.2.1" ExtensionBundleName="Ondulado"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.alpha.ondulado.panel" Version="0.2.0"/>
+    <Extension Id="com.alpha.ondulado.panel" Version="0.2.1"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

@@ -5,10 +5,10 @@
   com o painel Ondulado. Largura ~300, altura flexivel (enche a coluna).
 -->
 <ExtensionManifest Version="9.0" ExtensionBundleId="com.alpha.flexivel"
-    ExtensionBundleVersion="0.2.0" ExtensionBundleName="Flexivel"
+    ExtensionBundleVersion="0.2.1" ExtensionBundleName="Flexivel"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.alpha.flexivel.panel" Version="0.2.0"/>
+    <Extension Id="com.alpha.flexivel.panel" Version="0.2.1"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

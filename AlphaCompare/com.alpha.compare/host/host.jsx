@@ -41,7 +41,7 @@ function acPastaJob(os) {
     try {
         os = String(os).replace(/[^0-9]/g, "");
         if (os.length < 5) return "NAO|os_invalida";
-        var engines = ["//aeserver16/Engine", "//192.168.1.96/Engine", "/Volumes/Engine"];   // Windows UNC + Mac (volume montado)
+        var engines = ["//aeserver16/Engine", "//192.168.1.96/Engine", "//172.16.11.96/Engine", "/Volumes/Engine"];   // Windows UNC + Mac (volume montado)
         var e;
         for (e = 0; e < engines.length; e++) {
             var f = new Folder(engines[e] + "/_Jobfolder/" + os);
@@ -60,7 +60,7 @@ function acBuscarOriginalDoJob(os) {
         os = String(os).replace(/[^0-9]/g, "");
         if (os.length < 5) return "ERRO|O.S. invalida";
 
-        var engines = ["//aeserver16/Engine", "//192.168.1.96/Engine", "/Volumes/Engine"];   // Windows UNC + Mac (volume montado)
+        var engines = ["//aeserver16/Engine", "//192.168.1.96/Engine", "//172.16.11.96/Engine", "/Volumes/Engine"];   // Windows UNC + Mac (volume montado)
         var subs = ["original", "_original", "Original"];
         var dir = null, i, s, e;
 
