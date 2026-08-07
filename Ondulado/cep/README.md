@@ -14,8 +14,17 @@ Painel **acoplável** e moderno (HTML/CSS, identidade Alpha) que dispara os scri
 **Mais informações > Executar assim mesmo**.
 
 ### macOS
-**2 cliques** em `install.command` (ou no Terminal: `bash install.command`).
-Se o Mac bloquear: botão direito > **Abrir**, ou `chmod +x install.command` antes.
+Descompacte o ZIP **no próprio Mac** (2 cliques no .zip) e dê **2 cliques** em
+`install.command`.
+
+1. **"Não pode ser aberto porque é de um desenvolvedor não identificado"** — é o
+   Gatekeeper, normal em script baixado. Botão direito no `install.command` >
+   **Abrir** > **Abrir**. (Só na primeira vez.)
+2. Se ainda assim não abrir, Terminal na pasta: `bash install.command` — sempre
+   funciona, não depende de permissão nem do Gatekeeper.
+3. **`permission denied`** só acontece se o ZIP for descompactado no **Windows** e a
+   pasta copiada pro Mac (o Windows perde o bit de execução). Aí: `chmod +x
+   install.command`. O ZIP entregue já vem com `-rwxr-xr-x` no `install.command`.
 
 Os dois instaladores: ligam o `PlayerDebugMode` (CSXS 9–12) e copiam o painel para
 a pasta de extensões CEP do usuário. **Precisam estar junto da pasta
