@@ -265,8 +265,16 @@ async function convert(inPath, outPath, plan, onProgress) {
   function encPdfName(x) { return String(x).replace(/#/g, "#23").replace(/ /g, "#20").replace(/\//g, "#2F"); }
   const t1cache = {};
   function t1ref(sc) { const k = sc.f + "|" + sc.a + "|" + sc.dot; if (!t1cache[k]) { const r = ctx.register(type1Dict(ctx, sc.f, sc.a, sc.dot)); created.push(r); t1cache[k] = r; } return t1cache[k]; }
-  // colorantes base (nao-##) com seus screens
+  // colorantes base (nao-##) com seus screens.
+  // IMPORTANTE: semeia a partir de TODAS as tintas do master original (screensFromPdf),
+  // nao so das do plano. Tinta declarada no job mas que nao aparece como colorspace usado
+  // (ex.: Magenta/Yellow de processo num arquivo que so pinta spots) fica de fora do
+  // plano/listColorants; se nao entrar no master, o RIP do Esko aborta com
+  // "Missing halftone information for colorant X" (ele exige cada tinta de processo
+  // explicita, nao aceita o /Default). O plano ainda tem precedencia (override do operador).
   const baseScreen = {};
+  const fullScreens = screensFromPdf(pdf);
+  for (const c in fullScreens) if (!/^(##|\/\/)/.test(c)) baseScreen[c] = fullScreens[c];
   for (const c in plan.screens) if (!/^(##|\/\/)/.test(c)) baseScreen[c] = plan.screens[c];
   const baseColorants = Object.keys(baseScreen);
   const defScreen = baseColorants.length ? baseScreen[baseColorants[0]] : { f: 150, a: 0, dot: "C" };
@@ -359,6 +367,13 @@ async function convert(inPath, outPath, plan, onProgress) {
     if (csDict instanceof PDFDict) for (const [key, val] of csDict.entries()) {
       const cs = val instanceof PDFRef ? ctx.lookup(val) : val;
       if (cs instanceof PDFArray && cs.get(0) === PDFName.of("Separation")) name2color[nameOf(key)] = decodeName(nameOf(cs.get(1)));
+      else if (cs instanceof PDFArray && cs.get(0) === PDFName.of("DeviceN")) {
+        // a borda ## pode ser pintada via DeviceN -> tem que pegar o master tb.
+        // Se o DeviceN tem um colorante ##, o bloco usa o master do ##; senao, o master base.
+        const names = cs.get(1); let hashC = null, baseC = null;
+        if (names instanceof PDFArray) for (let i = 0; i < names.size(); i++) { const c = decodeName(nameOf(names.get(i))); if (egByMerge[c]) hashC = c; else if (!baseC && baseScreen[c]) baseC = c; }
+        if (hashC) name2color[nameOf(key)] = hashC; else if (baseC) name2color[nameOf(key)] = baseC;
+      }
     }
     // imagens: /ImX -> colorante Separation (base ou ##; a cor esta no dict da imagem)
     const imgColor = {};
