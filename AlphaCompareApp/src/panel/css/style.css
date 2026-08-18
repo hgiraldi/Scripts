@@ -1,21 +1,22 @@
 /* ============================================================
-   Alpha Compare - estilo do painel (navy + verde Alpha, Poppins)
+   Alpha Compare - estilo do painel (Alpha UI: navy + blue + cyan, Inter)
    Tema segue o skin do Illustrator via classe .alpha-dark no <body>.
    ============================================================ */
 :root{
-  --navy:#12233b; --navy2:#1b3355; --accent:#33ae5b; --accent2:#2b9a50;
-  --bg:#f3f5f8; --card:#ffffff; --ink:#1d2735; --muted:#6a7686; --line:#e2e7ee;
+  /* Identidade Alpha UI: navy (estrutura) + blue (ação) + cyan (marca/foco). Sem laranja de marca. */
+  --navy:#062b49; --navy2:#0e3d61; --accent:#087aa8; --accent2:#066a92; --cyan:#19c3c8;
+  --bg:#f3f7f9; --card:#ffffff; --ink:#1d2735; --muted:#6a7686; --line:#e2e7ee;
   --miss:#e5484d; --extra:#3b82f6; --diff:#f59e0b;
   --radius:12px; --shadow:0 2px 10px rgba(20,35,60,.08);
 }
 body.alpha-dark{
-  --bg:#1e1f22; --card:#2a2c30; --ink:#e8ebef; --muted:#9aa4b1; --line:#3a3d42;
-  --navy:#0f1c30; --navy2:#16294a;
+  --bg:#061a2a; --card:#0c2437; --ink:#e8ebef; --muted:#9aa4b1; --line:#16324a;
+  --navy:#041d30; --navy2:#0e3d61;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{
-  font-family:'Poppins',system-ui,Arial,sans-serif;
+  font-family:'Inter',system-ui,'Segoe UI',Arial,sans-serif;
   background:var(--bg); color:var(--ink); font-size:13px; -webkit-font-smoothing:antialiased;
 }
 .app{padding:12px; display:flex; flex-direction:column; gap:12px; max-width:1400px; margin:0 auto}
@@ -57,11 +58,11 @@ body{
   display:flex; align-items:center; justify-content:center; user-select:none;
 }
 .droparea{cursor:pointer}
-.droparea.drag{border-color:var(--accent); background:rgba(51,174,91,.08)}
+.droparea.drag{border-color:var(--accent); background:rgba(8,122,168,.08)}
 .drop-hint{color:var(--muted); text-align:center; font-size:12px; line-height:1.5; pointer-events:none}
 .drop-ic{font-size:26px; margin-bottom:4px}
 .stage-canvas{position:absolute; top:0; left:0; width:100%; height:100%}
-.crop-box{position:absolute; border:1.5px solid var(--accent); background:rgba(51,174,91,.12);
+.crop-box{position:absolute; border:1.5px solid var(--accent); background:rgba(8,122,168,.12);
   box-shadow:0 0 0 9999px rgba(10,18,30,.35); cursor:move}
 .crop-box .h{position:absolute; width:10px; height:10px; background:#fff; border:1.5px solid var(--accent); border-radius:2px}
 .crop-box .h.br{right:-6px; bottom:-6px; cursor:nwse-resize}
@@ -94,9 +95,9 @@ body{
 .picker-head{display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--bg); font-size:11.5px; font-weight:600; color:var(--muted)}
 .picker-list{list-style:none; margin:0; padding:0; max-height:160px; overflow:auto}
 .picker-item{padding:8px 10px; border-top:1px solid var(--line); cursor:pointer; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.picker-item:hover{background:rgba(51,174,91,.12); color:var(--accent)}
+.picker-item:hover{background:rgba(8,122,168,.12); color:var(--accent)}
 .badge{font-size:9.5px; padding:2px 7px; border-radius:20px; font-weight:700; margin-left:6px; vertical-align:middle}
-.badge.dist{background:rgba(51,174,91,.16); color:var(--accent)}
+.badge.dist{background:rgba(8,122,168,.16); color:var(--accent)}
 .badge.norm{background:var(--line); color:var(--muted)}
 
 /* TOLERANCIAS */
@@ -120,12 +121,13 @@ body{
 .sens-btn{background:var(--card); color:var(--muted); border:0; padding:7px 14px; font-family:inherit; font-size:12.5px; cursor:pointer; border-right:1px solid var(--navy2); transition:.12s}
 .sens-btn:last-child{border-right:0}
 .sens-btn:hover{background:var(--navy2); color:#fff}
-.sens-btn.on{background:var(--accent); color:#06210f; font-weight:700}
+.sens-btn.on{background:var(--accent); color:#fff; font-weight:700}
 .sens-legenda{flex-basis:100%; font-size:11.5px; color:var(--muted); opacity:.9; line-height:1.4}
-.btn{font-family:inherit; font-weight:600; border:none; border-radius:9px; cursor:pointer; transition:.15s}
+.btn{font-family:inherit; font-weight:600; border:none; border-radius:9px; cursor:pointer; transition:.15s; display:inline-flex; align-items:center; gap:5px}
+.btn .bi{font-size:1.02em; line-height:0}
 .btn:disabled{opacity:.45; cursor:not-allowed}
-.btn.cta{background:var(--accent); color:#fff; font-size:15px; font-weight:700; padding:12px 26px; letter-spacing:.5px; box-shadow:var(--shadow)}
-.btn.cta:not(:disabled):hover{background:var(--accent2)}
+.btn.cta{background:linear-gradient(105deg,var(--accent),#0aa8b2); color:#fff; font-size:15px; font-weight:700; padding:12px 26px; letter-spacing:.5px; box-shadow:var(--shadow)}
+.btn.cta:not(:disabled):hover{background:linear-gradient(105deg,var(--accent2),#0898a2); box-shadow:0 4px 14px rgba(8,122,168,.35)}
 .btn.accent{background:var(--accent); color:#fff}
 .btn.accent:hover{background:var(--accent2)}
 .btn.ghost{background:var(--bg); color:var(--ink); border:1px solid var(--line)}
@@ -179,8 +181,8 @@ body{
 .ov-full-sp{flex:1}
 .ov-full-body{flex:1 1 auto; min-height:0; position:relative; display:flex}
 .overlay-wrap.full{height:100%; width:100%; max-height:none; border-radius:0; flex:1}
-.ov-marquee{position:fixed; z-index:9999; display:none; border:1.5px solid #33ae5b;
-  background:rgba(51,174,91,.14); pointer-events:none; border-radius:2px}
+.ov-marquee{position:fixed; z-index:9999; display:none; border:1.5px solid var(--accent);
+  background:rgba(8,122,168,.14); pointer-events:none; border-radius:2px}
 
 /* PISCAR — toggle-pill moderno */
 .blink-toggle{display:inline-flex; align-items:center; cursor:pointer}
@@ -190,7 +192,7 @@ body{
   font-size:11.5px; font-weight:600; color:var(--muted); transition:.2s; user-select:none}
 .blink-dot{width:14px; height:14px; border-radius:50%; background:var(--line); transition:.2s}
 .blink-toggle:hover .blink-pill{border-color:var(--accent); color:var(--accent)}
-.blink-toggle input:checked + .blink-pill{background:rgba(51,174,91,.14); border-color:var(--accent); color:var(--accent)}
+.blink-toggle input:checked + .blink-pill{background:rgba(8,122,168,.14); border-color:var(--accent); color:var(--accent)}
 .blink-toggle input:checked + .blink-pill .blink-dot{background:var(--accent); animation:blinkDot .55s steps(1) infinite}
 @keyframes blinkDot{0%,100%{background:#dc2626}50%{background:#2563eb}}
 
@@ -201,7 +203,7 @@ body{
 .difflist{list-style:none; margin:0; padding:0; overflow:auto; max-height:480px}
 .diff-item{display:flex; align-items:center; gap:8px; padding:8px 10px; border-top:1px solid var(--line); cursor:pointer; font-size:12px}
 .diff-item:hover{background:var(--bg)}
-.diff-item.active{background:rgba(51,174,91,.12); box-shadow:inset 3px 0 0 var(--accent)}
+.diff-item.active{background:rgba(8,122,168,.12); box-shadow:inset 3px 0 0 var(--accent)}
 .diff-item .tag{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
 /* ERRO (faltando/diferente) = VERMELHO ; A MAIS (sobrando/barcode) = AZUL */
 .diff-item.miss .tag,.diff-item.diff .tag{background:#dc2626}

@@ -40,10 +40,10 @@
         var serverExe = pi && pi.serverExe;
         console.warn("[nativeOCR] OCR resolvido = " + (serverExe ? "exe congelado: " + serverExe : "python: " + py));
         engine.run(
-          { file: o.arqPath, rot: o.arqRot || 0, hideTec: true },
-          { file: o.oriPath, rot: o.oriRot || 0, hideTec: true },
+          { file: o.arqPath, rot: o.arqRot || 0, hideTec: true, crop: o.arqCrop || null },
+          { file: o.oriPath, rot: o.oriRot || 0, hideTec: true, crop: o.oriCrop || null },
           {
-            python: py, serverExe: serverExe, alvoPx: 3600,
+            python: py, serverExe: serverExe, alvoPx: 3600,   // precisa dessa res p/ o full-page achar as anchors do texto pequeno (confirmado: pega o DUX 28→29)
             onProgress: function (m) { console.warn("[nativeOCR] " + m); if (o.onProgress) o.onProgress(pct(m), m); }
           }
         ).then(function (res) {

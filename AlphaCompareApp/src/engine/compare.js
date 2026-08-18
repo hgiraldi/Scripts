@@ -40,7 +40,7 @@ function run(arq, ori, opts) {
   return ocr.start({ python: opts.python, serverExe: opts.serverExe }).then(function () {
     prog("Renderizando…");
     var tR = Date.now();
-    return render.openDoc(arq.file, { hideTec: arq.hideTec, rot: arq.rot }).then(function (dA) {
+    return render.openDoc(arq.file, { hideTec: arq.hideTec, rot: arq.rot, crop: arq.crop }).then(function (dA) {
       docA = dA; fullA = render.renderFullImg(docA, alvo);
       timing.render = (Date.now() - tR) / 1000;
       var pA = tmpPng("arq"); render.writePNG(pA, fullA.img);
@@ -48,7 +48,7 @@ function run(arq, ori, opts) {
       var tO = Date.now();
       // Carrega o ORIGINAL na rotação dada em resolução CHEIA -> { O, mp } (fixa docO/fullO).
       function loadOriFull(rotDeg, F) {
-        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg }).then(function (d) {
+        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg, crop: ori.crop }).then(function (d) {
           docO = d; fullO = render.renderFullImg(d, alvo);
           var pO = tmpPng("ori"); render.writePNG(pO, fullO.img);
           return ocr.read(pO).then(function (O) {
@@ -60,7 +60,7 @@ function run(arq, ori, opts) {
       // Conta palavras de ALTA confiança do original numa rotação, em BAIXA resolução (pouca
       // memória): texto de cabeça-pra-baixo sai garbled/baixa-conf -> separa +90 de +270 barato.
       function ocrConf(rotDeg) {
-        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg }).then(function (d) {
+        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg, crop: ori.crop }).then(function (d) {
           var full = render.renderFullImg(d, 1500);
           var p = tmpPng("det"); render.writePNG(p, full.img);
           return ocr.read(p).then(function (O) {
@@ -72,7 +72,7 @@ function run(arq, ori, opts) {
       }
       // proporção da página do original numa rotação (barato: abre e mede, SEM OCR/render)
       function oriPortrait(rotDeg) {
-        return render.openDoc(ori.file, { hideTec: false, rot: rotDeg }).then(function (d) {
+        return render.openDoc(ori.file, { hideTec: false, rot: rotDeg, crop: ori.crop }).then(function (d) {
           var sw = (d.rot === 90 || d.rot === 270), ow = sw ? d.h.ph : d.h.pw, oh = sw ? d.h.pw : d.h.ph;
           render.closeDoc(d); return oh > ow;
         });
@@ -176,7 +176,49 @@ function run(arq, ori, opts) {
   });
 }
 
-module.exports = { run: run };
+// ===== OCR SÓ NAS REGIÕES QUE O PIXEL MARCOU, em MULTI-ROTAÇÃO (0°/90°) =====
+// A ideia (rápida): o pixel já sabe ONDE difere. Em vez de reler a página inteira, o OCR passa
+// só nessas regiões e, como o texto pode estar deitado, tenta 0° E 90° em cada lado e fica com a
+// orientação que lê melhor (mais confiança). Região que era só DESLOCAMENTO lê "texto igual" e
+// some; região de texto TROCADO vira diff confirmado. Cobre rótulo com texto em várias direções.
+// items: [{ id, f:{data,width,height}, o:{data,width,height} }]  (recortes JÁ ALINHADOS, ampliados)
+// -> Promise<[{ id, arq, ori, unread? }]>  (só regiões que diferem, ou ilegíveis p/ "conferir")
+function _confSum(ls) { var s = 0; for (var i = 0; i < ls.length; i++) if (String(ls[i].t).trim().length >= 1) s += ls[i].c; return s; }
+function _txt(ls) { return ls.map(function (l) { return l.t; }).join(" ").replace(/\s+/g, " ").trim(); }
+function ocrBestOrient(img, tag) {
+  // OCR em 0°; depois em 90°; fica com a que tem MAIS confiança (90° só se claramente melhor).
+  var p0 = tmpPng(tag + "0"); render.writePNG(p0, img);
+  return ocr.read(p0).then(function (l0) {
+    try { fs.unlinkSync(p0); } catch (e) {}
+    var r = render.rot90(img), p9 = tmpPng(tag + "9"); render.writePNG(p9, r);
+    return ocr.read(p9).then(function (l9) {
+      try { fs.unlinkSync(p9); } catch (e) {}
+      return (_confSum(l9) > _confSum(l0) * 1.15) ? l9 : l0;
+    });
+  }).catch(function () { return []; });
+}
+function ocrRegions(items, opts) {
+  opts = opts || {};
+  var prog = opts.onProgress || function () {};
+  return ocr.start({ python: opts.python, serverExe: opts.serverExe }).then(function () {
+    var out = [], n = items.length;
+    return items.reduce(function (chain, it, idx) {
+      return chain.then(function () {
+        prog("Conferindo região " + (idx + 1) + "/" + n + "…");
+        return ocrBestOrient(it.f, "rf" + it.id + "_").then(function (lf) {
+          return ocrBestOrient(it.o, "ro" + it.id + "_").then(function (lo) {
+            var tf = _txt(lf), to = _txt(lo);
+            if (!tf && !to) { out.push({ id: it.id, arq: "", ori: "", unread: true }); return; }
+            var dd = textdiff.diffPair(tf, to, 0.5);
+            if (dd && dd.length) out.push({ id: it.id, arq: tf, ori: to });
+          });
+        });
+      });
+    }, Promise.resolve()).then(function () { return out; });
+  });
+}
+
+module.exports = { run: run, ocrRegions: ocrRegions };
 
 // ---- CLI de teste ----
 if (require.main === module) {

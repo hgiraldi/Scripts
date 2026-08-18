@@ -58,6 +58,21 @@ jobs:
       - name: Conferir arquitetura do OCR (tem que ser x86_64)
         run: file build/ocr_dist/ocr_server/ocr_server
 
+      - name: Congelar o RENDER NATIVO (pdfium via pypdfium2) em x64
+        run: |
+          PY="$HOME/mf-x64/envs/b/bin/python"
+          arch -x86_64 "$PY" -m pip install pypdfium2 numpy
+          arch -x86_64 "$PY" -m PyInstaller --noconfirm --onedir --console --name render_server \
+            --collect-all pypdfium2 --collect-all pypdfium2_raw \
+            --exclude-module PyQt6 --exclude-module PySide6 --exclude-module PyQt5 \
+            --exclude-module pandas --exclude-module matplotlib --exclude-module scipy \
+            --exclude-module tkinter --exclude-module IPython --exclude-module notebook \
+            --distpath build/ocr_dist --workpath build/pyi_work_r --specpath build/pyi_spec_r \
+            src/render/render_server.py
+
+      - name: Conferir arquitetura do render (tem que ser x86_64)
+        run: file build/ocr_dist/render_server/render_server
+
       - name: Dependências do app (Electron)
         run: npm install
 
@@ -72,6 +87,9 @@ jobs:
           name: AlphaCompare-mac
           path: AlphaCompareApp/dist/*.dmg
           if-no-files-found: error
+          # o .dmg tambem vai pra Release (permanente e NAO conta no storage). O artefato serve so
+          # pra baixar logo apos o build -> retencao curta evita encher o Actions storage (0.5GB).
+          retention-days: 2
 
   release:
     name: Publicar Release

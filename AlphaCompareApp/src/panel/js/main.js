@@ -56,8 +56,9 @@
     window.addEventListener("unhandledrejection", function (e) { plog("unhandledrejection: " + ((e.reason && e.reason.stack) || e.reason)); });
   } catch (e) {}
   var _runSeq = 0;       // invalida OCR nativo de uma comparação ANTERIOR (corrida ao re-comparar)
+  var _compareStart = 0; // timestamp do clique no Comparar (p/ o log de tempo total no Desktop)
   var REPORT_MAX = 30;   // acima disso o relatorio fica travado (ruido/desalinhamento)
-  var WORKRES = 3400;    // resolucao de trabalho (Alta=3400, Media=2800, Rapida=2200)
+  var WORKRES = 2800;    // resolucao de trabalho FIXA (bom equilibrio precisao x velocidade)
 
   function osDigits() { return ($("os").value || "").replace(/\D/g, ""); }
 
@@ -74,7 +75,7 @@
         var p = r.split("|");
         F.name = p[1] || "";
         if (p[2] && !$("os").value) { $("os").value = p[2]; updateCompareEnabled(); }
-        $("jobName").textContent = p[1] || "—";
+        $("jobName").textContent = p[1] || "";
       }
     });
   }
@@ -511,6 +512,7 @@
   function ensureThenCompare() {
     if (!F.src) { setStatus("Carregue o arquivo (arraste, ⤵ Desktop ou Escolher…).", true); return; }
     _runSeq++;                                            // invalida qualquer OCR nativo em andamento
+    _compareStart = Date.now();                           // cronômetro: clique do Comparar -> fim de TUDO
     var b = $("btnCompare"); if (b) b.disabled = true;    // trava o botão até terminar
     progStart(); progSet(14, "preparando…");              // barra aparece NA HORA do clique
     if (!O.src && osDigits().length >= 5) { progSet(20, "buscando original…"); pullJob(runCompare); }
@@ -674,6 +676,140 @@
     }, 10);
   }
 
+  // DETECTOR DE DEFEITO DE FORMA (letra preenchida, ponto faltando, char quebrado) — roda sobre as
+  // imagens JÁ ALINHADAS do ACEngine, pega o que o OCR não pega. Adiciona comps kind:"shape".
+  // Só página inteira (precisa do frame alinhado); recorte/captura pula. É síncrono e rápido (~3-5s).
+  function addShapeDefects() {
+    try {
+      if (!RESULT || !window.ACShape || !RESULT.fileImg || !RESULT.origImg) return;
+      if (isCropped(F) || isCropped(O)) return;
+      var defs = window.ACShape.detect(RESULT.fileImg, RESULT.origImg, { workW: 2000, demW: 1200, minPx: 9, maxCands: 10 });
+      for (var i = 0; i < defs.length; i++) RESULT.comps.push(defs[i]);
+      RESULT._shapeN = defs.length;
+      if (defs.length) plog("shapeDefects: " + defs.length + " candidato(s) de forma");
+    } catch (e) { plog("shapeDefects ERRO: " + ((e && e.stack) || e)); }
+  }
+
+  // Fim do compare: roda FORMA (optical flow) + CÓDIGO + TEXTO (OCR) e só então mostra o
+  // resultado COMPLETO de uma vez (nada de aparecer em partes). Grava o tempo total no Desktop.
+  function finishCompare() {
+    var mySeq = _runSeq;
+    progSet(45, "conferindo forma…");
+    setTimeout(function () {
+      if (mySeq !== _runSeq) return;
+      addShapeDefects();                                   // ~3-4s (deformação local)
+      if (mySeq !== _runSeq) return;
+      progSet(70, "conferindo código…");
+      ensureBarcode(function () {
+        if (mySeq !== _runSeq) return;
+        // OCR de texto NATIVO: pega troca de conteúdo (DUX 28→29) que o pixel não vê. A re-leitura
+        // em ALTA lê o número pequeno. Roda dentro do orçamento de ~3min. Se rodar, ele finaliza
+        // no onDone; senão finaliza agora. (o gated+nativo p/ deixar isso rápido é o próximo passo)
+        if (!applyOcrTextCheck()) finalizeCompare(mySeq);
+      });
+    }, 30);
+  }
+
+  // Monta o resultado, PRÉ-RENDERIZA cada marcador em alta (nativo) e só então entrega pronto.
+  function finalizeCompare(mySeq) {
+    if (mySeq != null && mySeq !== _runSeq) return;
+    try { renderResult(); }
+    catch (eR) { plog("renderResult(final) ERRO: " + ((eR && eR.stack) || eR)); progEnd("erro"); setStatus("⚠ erro ao montar: " + ((eR && eR.message) || eR), true); logTempo(); return; }
+    // cada divergência achada vira um crop NÍTIDO do arquivo (motor nativo) -> zoom/relatório prontos
+    setStatus("✓ montando — renderizando marcadores em alta…");
+    prerenderMarkers(mySeq, function () {
+      if (mySeq != null && mySeq !== _runSeq) return;
+      try { if (typeof ACTIVE !== "undefined" && ACTIVE >= 0) drawZoom(ACTIVE); } catch (e) {}
+      progEnd("pronto");
+      var nF = (RESULT && RESULT._shapeN) || 0, nT = (RESULT && RESULT._textN) || 0;
+      setStatus("✓ pronto" + (nF ? " — forma: " + nF : "") + (nT ? " — texto: " + nT : ""));
+      if (window.ACPdf) ACPdf.reset();
+      logTempo();
+    });
+  }
+
+  // Re-renderiza CADA marcador no motor NATIVO em ALTA (crop pequeno = rápido) e guarda o pedaço
+  // nítido do ARQUIVO nele (c._hiF) + a caixa do defeito (c._hiBox). O original vem alinhado/warpado
+  // (mapa complexo), então fica no base; o ARQUIVO é o que se fiscaliza. Serial p/ não estourar memória.
+  function prerenderMarkers(mySeq, done) {
+    if (!RESULT || !RESULT._marker || !window.AlphaRender || !RESULT.view || !RESULT.view.length) { done(); return; }
+    var mk = RESULT._marker, fr = RESULT.fileRect || { w: RESULT.W, h: RESULT.H };
+    var list = RESULT.view.slice(0, 40), i = 0;
+    function next() {
+      if (mySeq != null && mySeq !== _runSeq) { done(); return; }
+      if (i >= list.length) { done(); return; }
+      var c = list[i++];
+      if (c._hiF || c.type === "ok") { next(); return; }               // barcode/ok não precisa
+      var pad = Math.max(c.w, c.h) * 0.9 + 8;
+      var rx0 = Math.max(0, c.x - pad), ry0 = Math.max(0, c.y - pad);
+      var rx1 = Math.min(fr.w, c.x + c.w + pad), ry1 = Math.min(fr.h, c.y + c.h + pad);
+      if (rx1 - rx0 < 4 || ry1 - ry0 < 4) { next(); return; }
+      // fração no RENDER (pós-rot). Se a comparação foi num CROP, o render é a região recortada:
+      // converte a fração-no-crop -> fração na PÁGINA rotacionada inteira antes de un-rotacionar.
+      var cf = { x: rx0 / fr.w, y: ry0 / fr.h, w: (rx1 - rx0) / fr.w, h: (ry1 - ry0) / fr.h };
+      if (mk.fCrop) cf = { x: mk.fCrop.x + cf.x * mk.fCrop.w, y: mk.fCrop.y + cf.y * mk.fCrop.h, w: cf.w * mk.fCrop.w, h: cf.h * mk.fCrop.h };
+      var pg = rotFracInv(cf, mk.fRot || 0);
+      var cropPts = [pg.x * mk.fPW, pg.y * mk.fPH, (pg.x + pg.w) * mk.fPW, (pg.y + pg.h) * mk.fPH];
+      var sHi = Math.min(14, (mk.sN || 3) * 4);                          // ~4× o base
+      // 1) ARQUIVO nítido
+      window.AlphaRender.render({ pdf: mk.pathF, scale: sHi, rot: mk.fRot || 0, crop: cropPts, hideTec: true })
+        .then(function (im) {
+          if (mySeq != null && mySeq !== _runSeq) { done(); return; }
+          c._hiF = window.AlphaRender.toCanvas(im);
+          c._hiBox = { x: (c.x - rx0) / (rx1 - rx0), y: (c.y - ry0) / (ry1 - ry0), w: c.w / (rx1 - rx0), h: c.h / (ry1 - ry0) };
+          // 2) ORIGINAL nítido: mapeia a MESMA região pelo origRect + offset do alinhamento
+          //    (aprox: ignora rotação/escala residuais, que são pequenas depois do registro).
+          var orr = mk.oRR || fr, ox = mk.alOx || 0, oy = mk.alOy || 0;
+          var orx0 = Math.max(0, rx0 - ox), ory0 = Math.max(0, ry0 - oy);
+          var orx1 = Math.min(orr.w, rx1 - ox), ory1 = Math.min(orr.h, ry1 - oy);
+          if (!mk.pathO || orx1 - orx0 < 4 || ory1 - ory0 < 4) { next(); return; }
+          var ocf = { x: orx0 / orr.w, y: ory0 / orr.h, w: (orx1 - orx0) / orr.w, h: (ory1 - ory0) / orr.h };
+          if (mk.oCrop) ocf = { x: mk.oCrop.x + ocf.x * mk.oCrop.w, y: mk.oCrop.y + ocf.y * mk.oCrop.h, w: ocf.w * mk.oCrop.w, h: ocf.h * mk.oCrop.h };
+          var opg = rotFracInv(ocf, mk.oRot || 0);
+          var oPts = [opg.x * mk.oPW, opg.y * mk.oPH, (opg.x + opg.w) * mk.oPW, (opg.y + opg.h) * mk.oPH];
+          window.AlphaRender.render({ pdf: mk.pathO, scale: sHi, rot: mk.oRot || 0, crop: oPts, hideTec: true })
+            .then(function (imo) {
+              if (mySeq != null && mySeq !== _runSeq) { done(); return; }
+              c._hiO = window.AlphaRender.toCanvas(imo);
+              c._hiBoxO = { x: (c.x - ox - orx0) / (orx1 - orx0), y: (c.y - oy - ory0) / (ory1 - ory0), w: c.w / (orx1 - orx0), h: c.h / (ory1 - ory0) };
+              next();
+            })
+            .catch(function (e) { plog("prerender ORIG @" + c.cx + " falhou: " + ((e && e.message) || e)); next(); });
+        })
+        .catch(function (e) { plog("prerender marcador @" + c.cx + "," + c.cy + " falhou: " + ((e && e.message) || e)); next(); });
+    }
+    next();
+  }
+  // desenha um crop nítido (c._hiF) preenchendo o painel de zoom + caixa do defeito
+  function paintZoomHi(cv, hiCanvas, hiBox) {
+    var DPR = 2, cssW = cv.clientWidth || 220, cssH = cv.clientHeight || 160;
+    cv.style.width = cssW + "px"; cv.style.height = cssH + "px";
+    var CW = cssW * DPR, CH = cssH * DPR; cv.width = CW; cv.height = CH;
+    var g = cv.getContext("2d");
+    g.fillStyle = "#0c1420"; g.fillRect(0, 0, CW, CH);
+    var sc = Math.min(CW / hiCanvas.width, CH / hiCanvas.height);
+    var dw = hiCanvas.width * sc, dh = hiCanvas.height * sc, ox = (CW - dw) / 2, oy = (CH - dh) / 2;
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+    g.drawImage(hiCanvas, ox, oy, dw, dh);
+    g.strokeStyle = "#19c3c8"; g.lineWidth = 1.5 * DPR;
+    g.strokeRect(ox + hiBox.x * dw, oy + hiBox.y * dh, hiBox.w * dw, hiBox.h * dh);
+  }
+
+  // Grava no Desktop o tempo do clique do Comparar até AQUI (fim de tudo).
+  function logTempo() {
+    try {
+      var os2 = require("os"), path2 = require("path"), fs2 = require("fs");
+      var dt = ((Date.now() - _compareStart) / 1000).toFixed(1);
+      var nomeF = (F && (F.name || F.srcPath)) ? String(F.name || F.srcPath).replace(/^.*[\\/]/, "") : "arquivo";
+      var nomeO = (O && (O.name || O.srcPath)) ? String(O.name || O.srcPath).replace(/^.*[\\/]/, "") : "original";
+      var nF = (RESULT && RESULT._shapeN) || 0, nT = (RESULT && RESULT._textN) || 0;
+      var linha = new Date().toLocaleString() + "  |  TOTAL " + dt + "s  |  " + nomeF + " x " + nomeO + "  |  forma:" + nF + " texto:" + nT + "\r\n";
+      var p = path2.join(os2.homedir(), "Desktop", "alphacompare_tempos.log");
+      fs2.appendFileSync(p, linha, "utf8");
+      plog("tempo total: " + dt + "s -> " + p);
+    } catch (e) { plog("logTempo ERRO: " + ((e && e.stack) || e)); }
+  }
+
   function runCompare() {
     if (!O.src || !F.src) {
       setStatus(!F.src ? "Carregue o arquivo (arraste, ⤵ Desktop ou Escolher…)."
@@ -720,36 +856,85 @@
         c2.getContext("2d").drawImage(cvR, cx0, cy0, cw, chh, 0, 0, cw, chh);
         return c2;
       }
-      // MEMÓRIA: cada lado é renderizado com seu próprio doc FRESCO, UM POR VEZ (withPdf
-      // carrega->render->destrói). Nunca há 2 docs de 705MB no heap ao mesmo tempo.
-      progStart(); progSet(15, "renderizando arquivo…");
-      withPdf(F, function (h) { applyHidesOn(h, F); }, function (h) {
-        return { cv: renderPaneCv(h, F), ph: photoRectsOf(h, F) };
-      }, function (errF, rf) {
-        if (errF) { progEnd("erro"); setStatus("Erro ao renderizar arquivo: " + errF, true); return; }
-        progSet(22, "renderizando original…");
-        withPdf(O, function (h) { applyHidesOn(h, O); }, function (h) {
-          return { cv: renderPaneCv(h, O), ph: photoRectsOf(h, O) };
-        }, function (errO, ro) {
-          if (errO) { progEnd("erro"); setStatus("Erro ao renderizar original: " + errO, true); return; }
-          progSet(28, "comparando…");
-          setTimeout(function () {
-            try {
-              var opt = readTol(); opt.prescaled = true; opt.maxWork = WORKRES;
-              opt.photoF = rf.ph; opt.photoO = ro.ph;
-              RESULT = window.ACEngine.compare(rf.cv, ro.cv, opt);
-              MANUAL = false;
-              // NÃO finaliza a barra aqui: se o OCR nativo vai rodar, ela segue mostrando o
-              // progresso e o resultado aparece COMPLETO no fim (progEnd no onDone). Só quando
-              // NÃO há OCR nativo é que mostra o resultado do pixel e fecha a barra agora.
-              // ensureBarcode: se o ACBarcode não leu, tenta o ZXing (grade em alta) antes de exibir.
-              ensureBarcode(function () {
-                if (!applyOcrTextCheck()) { try { renderResult(); progEnd("pronto"); } catch (eR) { plog("renderResult(pixel) ERRO: " + ((eR && eR.stack) || eR)); progEnd("erro"); setStatus("⚠ erro ao montar: " + ((eR && eR.message) || eR), true); } }
-              });
-            } catch (e) { progEnd("erro"); setStatus("Erro na comparação: " + e, true); }
-          }, 20);
+      // caminho do arquivo p/ o render NATIVO (srcPath OU bytes->temp)
+      function paneToPath(pane, tag) {
+        if (pane.srcPath) return pane.srcPath;
+        if (pane.bytes) { try {
+          var os2 = require("os"), path2 = require("path"), fs2 = require("fs");
+          var tp = path2.join(os2.tmpdir(), "alpharender_src_" + tag + "_" + (new Date().getTime()) + ".pdf");
+          fs2.writeFileSync(tp, Buffer.from(pane.bytes)); return tp;
+        } catch (e) { return null; } }
+        return null;
+      }
+      // FALLBACK (e sempre no crop): render WASM — fluxo original (carrega->render->destrói).
+      function wasmRender() {
+        progStart(); progSet(15, "renderizando arquivo…");
+        withPdf(F, function (h) { applyHidesOn(h, F); }, function (h) {
+          return { cv: renderPaneCv(h, F), ph: photoRectsOf(h, F) };
+        }, function (errF, rf) {
+          if (errF) { progEnd("erro"); setStatus("Erro ao renderizar arquivo: " + errF, true); return; }
+          progSet(22, "renderizando original…");
+          withPdf(O, function (h) { applyHidesOn(h, O); }, function (h) {
+            return { cv: renderPaneCv(h, O), ph: photoRectsOf(h, O) };
+          }, function (errO, ro) {
+            if (errO) { progEnd("erro"); setStatus("Erro ao renderizar original: " + errO, true); return; }
+            progSet(28, "comparando…");
+            setTimeout(function () {
+              try {
+                var opt = readTol(); opt.prescaled = true; opt.maxWork = WORKRES;
+                opt.photoF = rf.ph; opt.photoO = ro.ph;
+                RESULT = window.ACEngine.compare(rf.cv, ro.cv, opt);
+                MANUAL = false;
+                finishCompare();
+              } catch (e) { progEnd("erro"); setStatus("Erro na comparação: " + e, true); }
+            }, 20);
+          });
         });
-      });
+      }
+      // NATIVO (pdfium via render_server = igual ao Precision Proof: alta resolução, rápido).
+      // NATIVO também no CROP (mesmo caminho da página inteira): renderiza SÓ a região recortada.
+      var _pathF = paneToPath(F, "arq"), _pathO = paneToPath(O, "ori");
+      if (window.AlphaRender && _pathF && _pathO) {
+        // crop: fração (espaço ROTACIONADO) -> pontos de PÁGINA (un-rota) p/ o render nativo
+        function paneCropPts(pane) {
+          if (!isCropped(pane)) return null;
+          var pg = rotFracInv(pane.crop, pane.rot || 0);
+          return [pg.x * pane.pageW, pg.y * pane.pageH, (pg.x + pg.w) * pane.pageW, (pg.y + pg.h) * pane.pageH];
+        }
+        var cropF = paneCropPts(F), cropO = paneCropPts(O);
+        var dF = cropF ? Math.max(cropF[2] - cropF[0], cropF[3] - cropF[1]) : Math.max(F.pageW, F.pageH);
+        var dO = cropO ? Math.max(cropO[2] - cropO[0], cropO[3] - cropO[1]) : Math.max(O.pageW, O.pageH);
+        var NW = 3600, sN = Math.min(8, NW / Math.max(dF, dO));
+        progStart(); progSet(15, "render nativo…");
+        // fotos via WASM (rápido, sem render) — frações, servem em qualquer resolução
+        withPdf(F, function () {}, function (h) { return { ph: photoRectsOf(h, F) }; }, function (eF, rfp) {
+          withPdf(O, function () {}, function (h) { return { ph: photoRectsOf(h, O) }; }, function (eO, rop) {
+            progSet(30, "comparando…");
+            window.AlphaRender.render({ pdf: _pathF, scale: sN, rot: F.rot || 0, crop: cropF, hideTec: true }).then(function (imF) {
+              return window.AlphaRender.render({ pdf: _pathO, scale: sN, rot: O.rot || 0, crop: cropO, hideTec: true }).then(function (imO) {
+                var opt = readTol(); opt.prescaled = true; opt.maxWork = NW;
+                opt.photoF = (rfp && rfp.ph) || []; opt.photoO = (rop && rop.ph) || [];
+                RESULT = window.ACEngine.compare(window.AlphaRender.toCanvas(imF), window.AlphaRender.toCanvas(imO), opt);
+                MANUAL = false; RESULT._nativo = true;
+                // re-render de marcador em alta: guarda os dados p/ mapear ARQUIVO e ORIGINAL
+                RESULT._marker = { pathF: _pathF, pathO: _pathO, fRot: F.rot || 0, oRot: O.rot || 0,
+                                   fPW: F.pageW, fPH: F.pageH, oPW: O.pageW, oPH: O.pageH,
+                                   fW: imF.width, fH: imF.height, oW: imO.width, oH: imO.height, sN: sN,
+                                   fCrop: isCropped(F) ? F.crop : null, oCrop: isCropped(O) ? O.crop : null,
+                                   alOx: (RESULT.align && RESULT.align.ox) || 0, alOy: (RESULT.align && RESULT.align.oy) || 0,
+                                   oRR: RESULT.origRect || { w: RESULT.W, h: RESULT.H } };
+                plog("render NATIVO ok" + (cropF ? " (crop)" : "") + ": " + imF.width + "x" + imF.height + " / " + imO.width + "x" + imO.height);
+                finishCompare();
+              });
+            }).catch(function (e) {
+              plog("render NATIVO falhou -> WASM. " + ((e && e.stack) || e));
+              wasmRender();
+            });
+          });
+        });
+        return;
+      }
+      wasmRender();
       return;
     }
     // demais casos (imagem/captura): encaixa recorte-no-recorte
@@ -759,9 +944,7 @@
         var opt = readTol(); opt.maxWork = WORKRES;
         RESULT = window.ACEngine.compare(cropCanvas(F), cropCanvas(O), opt);
         MANUAL = false;
-        ensureBarcode(function () {
-          if (!applyOcrTextCheck()) { try { renderResult(); setStatus(""); progEnd("pronto"); } catch (eR) { plog("renderResult(img) ERRO: " + ((eR && eR.stack) || eR)); progEnd("erro"); setStatus("⚠ erro ao montar: " + ((eR && eR.message) || eR), true); } }
-        });
+        finishCompare();   // pixel na hora; forma + barcode + OCR em 2º plano
       } catch (e) { setStatus("Erro na comparação: " + e, true); progEnd("erro"); }
     }, 30);
   }
@@ -827,6 +1010,8 @@
   }
   // marca como "auto" todo bloco parecido com algum que o operador marcou à mão
   function autoIgnoreSimilar() {
+    return;   // DESLIGADO (pedido do Henrique): não marca mais "parecidos" sozinho — cada ✕ some só com aquele
+    /* eslint-disable no-unreachable */
     if (!RESULT || !RESULT.ignored) return;
     var sigs = [];
     RESULT.comps.forEach(function (c) { if (RESULT.ignored[keyOf(c)] === "manual") sigs.push(computeSig(c)); });
@@ -1159,44 +1344,32 @@
     var _arqPath = paneToPath(F, "arq"), _oriPath = paneToPath(O, "ori");
     console.warn("[nativeOCR] disponivel=" + (!!window.AlphaNativeOCR) + " arqPath=" + (!!_arqPath) + " oriPath=" + (!!_oriPath) +
       " Fcrop=" + JSON.stringify(F.crop) + " Ocrop=" + JSON.stringify(O.crop) + " Frot=" + F.rot + " Orot=" + O.rot + " mode=" + (RESULT && RESULT.mode));
-    if (RESULT && window.AlphaNativeOCR && _arqPath && _oriPath && !isCropped(F) && !isCropped(O)) {
+    if (RESULT && window.AlphaNativeOCR && _arqPath && _oriPath) {   // crop também: passa o recorte pro OCR
       var mySeq = _runSeq;   // esta comparação; se o usuário re-comparar, _runSeq muda e isto aborta
       // WATCHDOG: se o OCR nativo travar de vez (nunca chamar onDone), a barra NÃO fica infinita —
       // após 8 min fecha com aviso. Cancelado no onDone. (rede de segurança do "montando… ∞")
       var _ocrWatchdog = setTimeout(function () {
         if (mySeq !== _runSeq) return;
         plog("WATCHDOG: OCR nativo passou de 8min sem terminar");
-        try { progEnd("erro"); } catch (e) {}
-        setStatus("⚠ OCR nativo demorou demais — tente de novo (ou reduza a Qualidade)", true);
-        if (window.ACPdf) ACPdf.reset();
+        if (RESULT) RESULT._textN = 0;
+        setStatus("⚠ OCR de texto demorou demais (montando o que já temos)", true);
+        finalizeCompare(mySeq);          // mostra o resultado + grava o tempo mesmo assim
       }, 8 * 60 * 1000);
-      progSet(30, "lendo textos (OCR nativo)…");
+      // === OCR de texto (ÚLTIMA etapa) — o resultado COMPLETO só aparece quando isto termina ===
+      progSet(75, "conferindo texto…");
       window.AlphaNativeOCR.run({
-        arqPath: _arqPath, arqRot: F.rot || 0,
-        oriPath: _oriPath, oriRot: O.rot || 0,
-        onProgress: function (p, m) { if (mySeq === _runSeq) progSet(p, m); },
+        arqPath: _arqPath, arqRot: F.rot || 0, arqCrop: isCropped(F) ? F.crop : null,
+        oriPath: _oriPath, oriRot: O.rot || 0, oriCrop: isCropped(O) ? O.crop : null,
+        onProgress: function (p, m) { if (mySeq === _runSeq) progSet(Math.max(75, p || 0), m); },
         onDone: function (err, diffs, arqW) {
           clearTimeout(_ocrWatchdog);      // OCR terminou -> cancela o watchdog
           if (mySeq !== _runSeq) return;   // comparação nova começou -> ignora este resultado velho
-          try { if (!err && diffs && diffs.length) mergeNativeDiffs(diffs, arqW); }
+          var houve = !err && diffs && diffs.length;
+          try { if (houve) mergeNativeDiffs(diffs, arqW); }
           catch (eM) { plog("mergeNativeDiffs ERRO: " + ((eM && eM.stack) || eM)); }
-          // barra em "montando resultado…" -> pinta -> monta (trava ~1-2s) -> pinta o resultado ->
-          // SÓ ENTÃO some a barra. Sem "barra some, espera, aparece".
-          progSet(100, "montando resultado…");
-          requestAnimationFrame(function () {
-            if (mySeq !== _runSeq) return;
-            // BLINDAGEM: se renderResult lançar, a barra NÃO pode ficar infinita — captura,
-            // loga e mesmo assim fecha a barra com "erro" (antes: exceção -> progEnd nunca rodava).
-            var erro = err;
-            try { renderResult(); }
-            catch (eR) { erro = "montagem: " + ((eR && eR.message) || eR); plog("renderResult ERRO: " + ((eR && eR.stack) || eR)); }
-            requestAnimationFrame(function () {
-              if (mySeq !== _runSeq) return;
-              progEnd(erro ? "erro" : "pronto");
-              setStatus(erro ? ("⚠ " + erro) : ("OCR nativo: " + ((diffs && diffs.length) || 0) + " diferença(s) de texto"), !!erro);
-              if (window.ACPdf) ACPdf.reset();
-            });
-          });
+          if (RESULT) RESULT._textN = houve ? diffs.length : 0;
+          if (err) plog("OCR nativo erro: " + err);
+          finalizeCompare(mySeq);          // monta o resultado COMPLETO + grava o tempo total
         }
       });
       return true;
@@ -1469,6 +1642,10 @@
         else if (c.type === "diff") titulo = "T Texto trocado: " + (c.textOrig || "?") + " → " + (c.textFile || "?");
         else if (c.type === "miss") titulo = "T Texto faltando: " + (c.textOrig || "?");
         else titulo = "T Texto a mais: " + (c.textFile || "?");
+      } else if (c.kind === "shape") {
+        titulo = (c.shape === "fill"
+          ? "◆ Forma: tinta a MAIS (letra preenchida / borrão?) — conferir"
+          : "◇ Forma: tinta FALTANDO (ponto, pingo do i, char quebrado?) — conferir");
       } else {
         titulo = LABEL[c.type];
       }
@@ -1528,20 +1705,25 @@
     var sx = Math.max(0, c.x - pad), sy = Math.max(0, c.y - pad);
     var ex = Math.min(RESULT.W, c.x + c.w + pad), ey = Math.min(RESULT.H, c.y + c.h + pad);
     var box = { sx: sx, sy: sy, sw: ex - sx, sh: ey - sy };
-    paintZoom($("zoomOrig"), RESULT.canOrig, box, c);
-    paintZoom($("zoomFile"), RESULT.canFile, box, c);
+    if (c._hiO) paintZoomHi($("zoomOrig"), c._hiO, c._hiBoxO);   // ORIGINAL em alta (crop nativo)
+    else paintZoom($("zoomOrig"), RESULT.canOrig, box, c);
+    if (c._hiF) paintZoomHi($("zoomFile"), c._hiF, c._hiBox);   // ARQUIVO em alta (crop nativo pré-renderizado)
+    else paintZoom($("zoomFile"), RESULT.canFile, box, c);
     paintZoom($("zoomDiff"), RESULT.canOverlay, box, c);
   }
   function paintZoom(cv, srcCanvas, box, blob) {
-    var CW = cv.clientWidth || 220, CH = cv.clientHeight || 160;
-    cv.width = CW; cv.height = CH;
+    var DPR = 3;                                   // SUPERSAMPLE: canvas 3× o tamanho de tela -> texto nítido (fonte já é 4800px)
+    var cssW = cv.clientWidth || 220, cssH = cv.clientHeight || 160;
+    cv.style.width = cssW + "px"; cv.style.height = cssH + "px";  // trava o tamanho de exibição
+    var CW = cssW * DPR, CH = cssH * DPR;
+    cv.width = CW; cv.height = CH;                  // resolução interna 3×
     var g = cv.getContext("2d");
     g.fillStyle = "#0c1420"; g.fillRect(0, 0, CW, CH);
     var sc = Math.min(CW / box.sw, CH / box.sh);
     var dw = box.sw * sc, dh = box.sh * sc, ox = (CW - dw) / 2, oy = (CH - dh) / 2;
-    g.imageSmoothingEnabled = true;
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     g.drawImage(srcCanvas, box.sx, box.sy, box.sw, box.sh, ox, oy, dw, dh);
-    g.strokeStyle = "#33ae5b"; g.lineWidth = 1.5;
+    g.strokeStyle = "#19c3c8"; g.lineWidth = 1.5 * DPR;
     g.strokeRect(ox + (blob.x - box.sx) * sc, oy + (blob.y - box.sy) * sc, blob.w * sc, blob.h * sc);
   }
 
@@ -1577,7 +1759,7 @@
     }
     if (highlight >= 0 && RESULT.view[highlight]) {
       var c = RESULT.view[highlight], pad = 3;
-      g.lineWidth = Math.max(2, RESULT.W / 400); g.strokeStyle = "#33ae5b";
+      g.lineWidth = Math.max(2, RESULT.W / 400); g.strokeStyle = "#19c3c8";
       g.strokeRect(c.x - pad, c.y - pad, c.w + 2 * pad, c.h + 2 * pad);
     }
   }
@@ -1714,7 +1896,7 @@
     var sx = Math.max(0, c.x - pad), sy = Math.max(0, c.y - pad);
     var ex = Math.min(RESULT.W, c.x + c.w + pad), ey = Math.min(RESULT.H, c.y + c.h + pad);
     var bw = ex - sx, bh = ey - sy;
-    var CH = 150, CW = Math.max(70, Math.min(Math.round(CH * bw / bh), 420));
+    var CH = 340, CW = Math.max(150, Math.min(Math.round(CH * bw / bh), 920));   // célula grande = texto nítido no zoom/relatório
     var gap = 6, W = CW * 3 + gap * 2, H = CH;
     var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     var g = cv.getContext("2d");
@@ -1722,6 +1904,17 @@
     var srcs = [RESULT.canOrig, RESULT.canFile, RESULT.canOverlay];
     for (var i = 0; i < 3; i++) {
       var offx = i * (CW + gap);
+      // ORIGINAL (i=0) e ARQUIVO (i=1) com crop NÍTIDO pré-renderizado (nativo): preenche a célula
+      var hi = (i === 0) ? c._hiO : (i === 1) ? c._hiF : null, hiBox = (i === 0) ? c._hiBoxO : c._hiBox;
+      if (hi && hiBox) {
+        var hsc = Math.min(CW / hi.width, CH / hi.height);
+        var hdw = hi.width * hsc, hdh = hi.height * hsc, hdx = offx + (CW - hdw) / 2, hdy = (CH - hdh) / 2;
+        g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+        g.drawImage(hi, hdx, hdy, hdw, hdh);
+        g.strokeStyle = "#19c3c8"; g.lineWidth = 0.7;
+        g.strokeRect(hdx + hiBox.x * hdw, hdy + hiBox.y * hdh, hiBox.w * hdw, hiBox.h * hdh);
+        continue;
+      }
       var sc = Math.min(CW / bw, CH / bh), dw = bw * sc, dh = bh * sc;
       var dx = offx + (CW - dw) / 2, dy = (CH - dh) / 2;
       g.imageSmoothingEnabled = true;
@@ -1729,7 +1922,7 @@
       // caixa só no ORIGINAL e ARQUIVO (aponta onde olhar, sem cobrir); a DIFERENÇA já tem a
       // moldura do overlay. Fina, cantos só (não fecha por cima do texto).
       if (i < 2) {
-        g.strokeStyle = "#33ae5b"; g.lineWidth = 0.7;
+        g.strokeStyle = "#19c3c8"; g.lineWidth = 0.7;
         g.strokeRect(dx + (c.x - sx) * sc - 1, dy + (c.y - sy) * sc - 1, c.w * sc + 2, c.h * sc + 2);
       }
     }
@@ -1914,7 +2107,7 @@
     on($("btnReset"), "click", resetAll);
     on($("btnPullDesktop"), "click", pullDesktop);
     on($("deskPickerClose"), "click", function () { $("deskPicker").style.display = "none"; });
-    on($("workRes"), "change", function () { WORKRES = +this.value; });
+    // Qualidade removida: WORKRES é fixo (sem configuração).
     on($("btnCompare"), "click", ensureThenCompare);
     on($("btnReport"), "click", gerarRelatorio);
     on($("ovSwap"), "change", function () { if ($("ovSwap").checked && $("ovBlink").checked) { $("ovBlink").checked = false; setBlink(false); } drawOverlay(ACTIVE); });

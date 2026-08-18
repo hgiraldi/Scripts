@@ -35,7 +35,7 @@ situar. Toda mudança estrutural deve ser refletida no .md da frente.
 | **Alpha Faca** (app Electron de orçamento de faca via DXF) | `AlphaFaca/ARQUITETURA.md` |
 | **Alpha Ondulado** (app Electron: PDF ripado → grupos por cor → laudo de orçamento) | `AlphaOndulado/ARQUITETURA.md` |
 | **Alpha Compare (app)** (app Electron = o painel Alpha Compare fora do CEP, com OCR nativo p/ texto pixel-invisível tipo DUX 28→29) | `AlphaCompareApp/ARQUITETURA.md` |
-| Visual / CSS / HTML (AlphaForms, páginas, identidade Alpha) | `design.md` |
+| **Qualquer UI / tela / CSS / HTML / restilização** (identidade visual Alpha) | **INVOCAR o skill `alpha-ui`** (design system oficial: navy+blue+cyan, Bootstrap 5 + Bootstrap Icons, Inter, SEM laranja de marca) — depois `design.md` como apoio |
 
 Regras de uso:
 

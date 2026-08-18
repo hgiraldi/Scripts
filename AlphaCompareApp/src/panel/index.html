@@ -6,7 +6,8 @@
   <title>Alpha Compare</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="./lib/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
@@ -31,9 +32,9 @@
       <div class="os-row">
         <label class="field-label" for="os">O.S.</label>
         <input id="os" type="text" inputmode="numeric" maxlength="7" placeholder="0000000" autocomplete="off">
-        <button id="btnPullJob" class="btn accent sm" title="Puxa o original (normal) do job no Engine">⤵ Puxar do Job</button>
-        <span id="jobName" class="job-name">—</span>
-        <button id="btnReset" class="btn ghost sm" style="margin-left:auto" title="Limpar tudo e começar outro job">↺ Novo job</button>
+        <button id="btnPullJob" class="btn accent sm" title="Puxa o original (normal) do job no Engine"><i class="bi bi-box-arrow-in-down"></i> Puxar do Job</button>
+        <span id="jobName" class="job-name"></span>
+        <button id="btnReset" class="btn ghost sm" style="margin-left:auto" title="Limpar tudo e começar outro job"><i class="bi bi-arrow-counterclockwise"></i> Novo job</button>
       </div>
     </section>
 
@@ -47,22 +48,22 @@
         </div>
         <div id="origDrop" class="stage droparea">
           <div class="drop-hint">
-            <div class="drop-ic">⇪</div>
+            <div class="drop-ic"><i class="bi bi-cloud-arrow-up"></i></div>
             <div>Arraste o <b>PDF / imagem</b> do cliente<br>ou clique para escolher</div>
           </div>
           <canvas id="origCanvas" class="stage-canvas" style="display:none"></canvas>
           <div id="origCropBox" class="crop-box" style="display:none"></div>
         </div>
         <div class="pane-tools">
-          <button id="btnOrigPickFile" class="btn ghost sm">Escolher…</button>
-          <button id="btnOrigRotL" class="btn ghost sm" title="Girar 90° anti-horário">⟲</button>
-          <button id="btnOrigRotR" class="btn ghost sm" title="Girar 90° horário">⟳</button>
-          <button id="btnOrigReset" class="btn ghost sm" title="Recorte inteiro">▢ tudo</button>
-          <button id="btnOrigPrep" class="btn ghost sm" title="Limpar cores/camadas antes de comparar" style="display:none">⚗ Limpar</button>
+          <button id="btnOrigPickFile" class="btn ghost sm"><i class="bi bi-folder2-open"></i> Escolher…</button>
+          <button id="btnOrigRotL" class="btn ghost sm" title="Girar 90° anti-horário"><i class="bi bi-arrow-counterclockwise"></i></button>
+          <button id="btnOrigRotR" class="btn ghost sm" title="Girar 90° horário"><i class="bi bi-arrow-clockwise"></i></button>
+          <button id="btnOrigReset" class="btn ghost sm" title="Recorte inteiro"><i class="bi bi-square"></i> tudo</button>
+          <button id="btnOrigPrep" class="btn ghost sm" title="Limpar cores/camadas antes de comparar" style="display:none"><i class="bi bi-eraser"></i> Limpar</button>
           <div class="pdfnav" id="origPdfNav" style="display:none">
-            <button id="origPagePrev" class="btn ghost xs">‹</button>
+            <button id="origPagePrev" class="btn ghost xs"><i class="bi bi-chevron-left"></i></button>
             <span id="origPageLbl">1/1</span>
-            <button id="origPageNext" class="btn ghost xs">›</button>
+            <button id="origPageNext" class="btn ghost xs"><i class="bi bi-chevron-right"></i></button>
           </div>
         </div>
         <div id="origPrep" class="prep" style="display:none"></div>
@@ -77,36 +78,38 @@
         </div>
         <div id="fileDrop" class="stage droparea">
           <div class="drop-hint" id="fileHint">
-            <div class="drop-ic">⤓</div>
+            <div class="drop-ic"><i class="bi bi-cloud-arrow-down"></i></div>
             <div>Solte o <b>PDF/imagem do arquivo</b><br>ou clique para escolher</div>
           </div>
           <canvas id="fileCanvas" class="stage-canvas" style="display:none"></canvas>
           <div id="fileCropBox" class="crop-box" style="display:none"></div>
         </div>
         <div class="pane-tools">
-          <button id="btnPullDesktop" class="btn accent sm" title="Puxa o PDF que está no Desktop do operador">⤵ Desktop</button>
-          <button id="btnFilePickFile" class="btn ghost sm">Escolher…</button>
-          <button id="btnFileRotL" class="btn ghost sm" title="Girar 90° anti-horário">⟲</button>
-          <button id="btnFileRotR" class="btn ghost sm" title="Girar 90° horário">⟳</button>
-          <button id="btnFileReset" class="btn ghost sm" title="Recorte inteiro">▢ tudo</button>
-          <button id="btnFilePrep" class="btn ghost sm" title="Limpar cores/camadas antes de comparar" style="display:none">⚗ Limpar</button>
+          <button id="btnPullDesktop" class="btn accent sm" title="Puxa o PDF que está no Desktop do operador"><i class="bi bi-display"></i> Desktop</button>
+          <button id="btnFilePickFile" class="btn ghost sm"><i class="bi bi-folder2-open"></i> Escolher…</button>
+          <button id="btnFileRotL" class="btn ghost sm" title="Girar 90° anti-horário"><i class="bi bi-arrow-counterclockwise"></i></button>
+          <button id="btnFileRotR" class="btn ghost sm" title="Girar 90° horário"><i class="bi bi-arrow-clockwise"></i></button>
+          <button id="btnFileReset" class="btn ghost sm" title="Recorte inteiro"><i class="bi bi-square"></i> tudo</button>
+          <button id="btnFilePrep" class="btn ghost sm" title="Limpar cores/camadas antes de comparar" style="display:none"><i class="bi bi-eraser"></i> Limpar</button>
           <div class="pdfnav" id="filePdfNav" style="display:none">
-            <button id="filePagePrev" class="btn ghost xs">‹</button>
+            <button id="filePagePrev" class="btn ghost xs"><i class="bi bi-chevron-left"></i></button>
             <span id="filePageLbl">1/1</span>
-            <button id="filePageNext" class="btn ghost xs">›</button>
+            <button id="filePageNext" class="btn ghost xs"><i class="bi bi-chevron-right"></i></button>
           </div>
         </div>
         <div id="filePrep" class="prep" style="display:none"></div>
         <input id="fileFileInput" type="file" accept="application/pdf,image/*" style="display:none">
         <div id="deskPicker" class="picker" style="display:none">
-          <div class="picker-head"><span>Qual PDF comparar?</span><button id="deskPickerClose" class="btn ghost xs">✕</button></div>
+          <div class="picker-head"><span>Qual PDF comparar?</span><button id="deskPickerClose" class="btn ghost xs"><i class="bi bi-x-lg"></i></button></div>
           <ul id="deskPickerList" class="picker-list"></ul>
         </div>
       </div>
     </section>
 
     <!-- TOLERANCIAS (travadas por padrao; abrir so p/ calibrar) -->
-    <section class="card tol-card">
+    <!-- Tolerâncias FIXAS (sem configuração, estilo Precision Proof): a seção fica oculta mas os
+         inputs seguem no DOM com os valores travados que o readTol() lê. -->
+    <section class="card tol-card" style="display:none">
       <details class="adv">
       <summary>Avançado — tolerâncias (travadas)</summary>
       <div class="tol-head">
@@ -151,14 +154,7 @@
 
     <!-- BOTAO COMPARAR -->
     <div class="cta-row">
-      <button id="btnCompare" class="btn cta" disabled>⚖ COMPARAR</button>
-      <label class="qual" title="Menor resolução = mais rápido (bom p/ arquivo pesado), com um pouco mais de ruído">Qualidade
-        <select id="workRes">
-          <option value="3400">Alta (precisa)</option>
-          <option value="2800">Média</option>
-          <option value="2200">Rápida (pesado)</option>
-        </select>
-      </label>
+      <button id="btnCompare" class="btn cta" disabled><i class="bi bi-arrow-left-right"></i> COMPARAR</button>
       <div id="statusMsg" class="status-msg"></div>
     </div>
     <div id="progWrap" class="prog-wrap" style="display:none">
@@ -187,14 +183,14 @@
           <label class="ov-toggle"><input id="ovSwap" type="checkbox"> ver original</label>
           <label class="blink-toggle" title="Alterna original ↔ arquivo na tela — a diferença salta ao olho">
             <input id="ovBlink" type="checkbox">
-            <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt">⚡ piscar</span></span>
+            <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt"><i class="bi bi-lightning-charge-fill"></i> piscar</span></span>
           </label>
           <span class="ov-toggle" title="Roda = zoom no cursor · arraste = mover · Shift+arraste = retângulo de zoom · botão direito = afastar · 2 cliques = ajustar">
-            <button id="ovZoomOut" class="btn ghost xs" title="Afastar (roda p/ baixo ou botão direito)">−</button>
-            <button id="ovZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques na imagem)">⛶</button>
-            <button id="ovZoomIn" class="btn ghost xs" title="Aproximar (roda p/ cima)">+</button>
+            <button id="ovZoomOut" class="btn ghost xs" title="Afastar (roda p/ baixo ou botão direito)"><i class="bi bi-dash-lg"></i></button>
+            <button id="ovZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques na imagem)"><i class="bi bi-aspect-ratio"></i></button>
+            <button id="ovZoomIn" class="btn ghost xs" title="Aproximar (roda p/ cima)"><i class="bi bi-plus-lg"></i></button>
             <span id="ovZoomLbl" class="ov-zlbl">100%</span>
-            <button id="ovFullBtn" class="btn ghost xs" title="Tela cheia para inspecionar (Esc para sair)">⤢</button>
+            <button id="ovFullBtn" class="btn ghost xs" title="Tela cheia para inspecionar (Esc para sair)"><i class="bi bi-arrows-fullscreen"></i></button>
           </span>
         </div>
       </div>
@@ -203,12 +199,12 @@
           <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
         </div>
         <div class="difflist-wrap">
-          <button id="btnReport" class="btn accent sm btn-report-top">⤓ Gerar Relatório PDF</button>
+          <button id="btnReport" class="btn accent sm btn-report-top"><i class="bi bi-file-earmark-pdf"></i> Gerar Relatório PDF</button>
           <div class="difflist-head">
-            <button id="diffPrev" class="btn ghost xs">‹</button>
+            <button id="diffPrev" class="btn ghost xs"><i class="bi bi-chevron-left"></i></button>
             <span id="diffPos">–</span>
-            <button id="diffNext" class="btn ghost xs">›</button>
-            <button id="diffRestore" class="btn ghost xs" style="display:none" title="Restaurar as ignoradas">↺</button>
+            <button id="diffNext" class="btn ghost xs"><i class="bi bi-chevron-right"></i></button>
+            <button id="diffRestore" class="btn ghost xs" style="display:none" title="Restaurar as ignoradas"><i class="bi bi-arrow-counterclockwise"></i></button>
           </div>
           <ul id="diffList" class="difflist"></ul>
         </div>
@@ -229,22 +225,22 @@
   <!-- TELA CHEIA de inspeção: recebe o MESMO viewer (o ovWrap é movido pra cá) -->
   <div id="ovFull" class="ov-full" style="display:none">
     <div class="ov-full-bar">
-      <span class="ov-full-title">🔍 Inspeção</span>
-      <button id="fsPrev" class="btn ghost xs" title="Divergência anterior (←)">‹</button>
+      <span class="ov-full-title"><i class="bi bi-search"></i> Inspeção</span>
+      <button id="fsPrev" class="btn ghost xs" title="Divergência anterior (←)"><i class="bi bi-chevron-left"></i></button>
       <span id="fsPos" class="ov-full-pos">—</span>
-      <button id="fsNext" class="btn ghost xs" title="Próxima divergência (→)">›</button>
+      <button id="fsNext" class="btn ghost xs" title="Próxima divergência (→)"><i class="bi bi-chevron-right"></i></button>
       <span id="fsDesc" class="ov-full-desc"></span>
       <span class="ov-full-sp"></span>
       <label class="ov-toggle"><input id="fsSwap" type="checkbox"> ver original</label>
       <label class="blink-toggle" title="Alterna original ↔ arquivo (B)">
         <input id="fsBlink" type="checkbox">
-        <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt">⚡ piscar</span></span>
+        <span class="blink-pill"><span class="blink-dot"></span><span class="blink-txt"><i class="bi bi-lightning-charge-fill"></i> piscar</span></span>
       </label>
-      <button id="fsZoomOut" class="btn ghost xs" title="Afastar">−</button>
-      <button id="fsZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques)">⛶</button>
-      <button id="fsZoomIn" class="btn ghost xs" title="Aproximar">+</button>
+      <button id="fsZoomOut" class="btn ghost xs" title="Afastar"><i class="bi bi-dash-lg"></i></button>
+      <button id="fsZoomFit" class="btn ghost xs" title="Ajustar à tela (2 cliques)"><i class="bi bi-aspect-ratio"></i></button>
+      <button id="fsZoomIn" class="btn ghost xs" title="Aproximar"><i class="bi bi-plus-lg"></i></button>
       <span id="ovZoomLbl2" class="ov-zlbl">100%</span>
-      <button id="fsClose" class="btn ghost xs" title="Fechar (Esc)">✕ fechar</button>
+      <button id="fsClose" class="btn ghost xs" title="Fechar (Esc)"><i class="bi bi-x-lg"></i> fechar</button>
     </div>
     <div class="ov-full-body" id="ovFullBody"></div>
   </div>
@@ -252,6 +248,7 @@
   <!-- Alpha Proof: shim que substitui as APIs do CEP por Node (roda no Electron) -->
   <script src="./js/cep_shim.js"></script>
   <script src="./js/nativeocr.js"></script>
+  <script src="./js/nativerender.js"></script>
   <!-- libs vendorizadas -->
   <script src="./lib/pdfium/pdfrender.js"></script>
   <script src="./lib/jspdf.umd.min.js"></script>
@@ -261,6 +258,7 @@
   <script src="./js/textcheck.js"></script>
   <script src="./js/octext.js"></script>
   <script src="./js/compare.js"></script>
+  <script src="./js/shapediff.js"></script>
   <script src="./js/report.js"></script>
   <script src="./js/main.js"></script>
 </body>

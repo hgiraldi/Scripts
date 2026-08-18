@@ -152,11 +152,21 @@ function openDoc(file, opts) {
   return ready().then(function (m) {
     var h = open(m, file);
     if (opts.hideTec) hideTec(m, h);
-    return { m: m, h: h, rot: (((opts.rot || 0) % 360) + 360) % 360 };
+    // crop: fração da página ROTACIONADA (mesmo espaço do pane.crop do painel). null = página inteira.
+    return { m: m, h: h, rot: (((opts.rot || 0) % 360) + 360) % 360, crop: opts.crop || null };
   });
 }
 function renderFullImg(doc, alvoPx, maxScale) {
   var m = doc.m, h = doc.h;
+  if (doc.crop) {
+    // renderiza SÓ a região recortada: rotacionada->crua, renderCrop, depois gira
+    var raw = doc.rot ? rotFracInv(doc.crop, doc.rot) : doc.crop;
+    var dim = Math.max(raw.w * h.pw, raw.h * h.ph);
+    var sC = Math.min(maxScale || 8, (alvoPx || 3600) / dim);
+    var imgC = renderCrop(m, h, raw.x, raw.y, raw.x + raw.w, raw.y + raw.h, sC);
+    if (doc.rot) imgC = rotImg(imgC, doc.rot);
+    return { img: imgC, scale: sC, rotW: imgC.width, rotH: imgC.height, rects: imageRects(m, h) };
+  }
   var s = Math.min(maxScale || 8, (alvoPx || 3600) / Math.max(h.pw, h.ph));
   var img = renderFull(m, h, s);
   if (doc.rot) img = rotImg(img, doc.rot);
@@ -171,6 +181,8 @@ function renderLineHi(doc, bbox, rotW, rotH, targetH, margin) {
   var rx1 = Math.min(rotW, bbox.x + bbox.w + mx), ry1 = Math.min(rotH, bbox.y + bbox.h + my);
   var rect = { x: rx0, y: ry0, w: rx1 - rx0, h: ry1 - ry0 };
   var fr = { x: rx0 / rotW, y: ry0 / rotH, w: (rx1 - rx0) / rotW, h: (ry1 - ry0) / rotH };
+  // se o render foi um CROP, fr está no frame do crop -> converte p/ a PÁGINA rotacionada inteira
+  if (doc.crop) fr = { x: doc.crop.x + fr.x * doc.crop.w, y: doc.crop.y + fr.y * doc.crop.h, w: fr.w * doc.crop.w, h: fr.h * doc.crop.h };
   var raw = doc.rot ? rotFracInv(fr, doc.rot) : fr;   // fracao no espaco rotacionado -> cru
   var altPt = (doc.rot === 90 || doc.rot === 270) ? raw.w * h.pw : raw.h * h.ph;
   var s = Math.max(1, Math.min((targetH || 150) / Math.max(1, altPt), 40));

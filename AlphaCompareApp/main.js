@@ -189,6 +189,31 @@ ipcMain.handle("python-info", function () {
   return { serverExe: exe, env: exe ? null : resolvePython() };
 });
 
+// Localiza o RENDER NATIVO congelado (PyInstaller -> render_server.exe = pdfium nativo).
+// Empacotado: <resources>/render/render_server.exe. Dev: build/ocr_dist/render_server.
+let _renderExeCache;
+function resolveRenderExe() {
+  if (_renderExeCache !== undefined) return _renderExeCache;
+  const names = process.platform === "win32" ? ["render_server.exe"] : ["render_server"];
+  const dirs = [];
+  if (app.isPackaged) dirs.push(path.join(process.resourcesPath, "render"));
+  dirs.push(path.join(__dirname, "build", "ocr_dist", "render_server"), path.join(__dirname, "build", "render"));
+  for (const d of dirs) for (const n of names) {
+    const p = path.join(d, n);
+    try { if (fs.existsSync(p)) { _renderExeCache = p; return p; } } catch (e) {}
+  }
+  _renderExeCache = null; return null;
+}
+// serverExe = exe congelado (sem Python); senão {env, script} p/ rodar via Python (dev).
+ipcMain.handle("render-info", function () {
+  const exe = resolveRenderExe();
+  return {
+    serverExe: exe,
+    env: exe ? null : resolvePython(),
+    script: exe ? null : path.join(__dirname, "src", "render", "render_server.py")
+  };
+});
+
 // gera o laudo em PDF a partir de um HTML (identidade Alpha), como no AlphaOndulado
 ipcMain.handle("gerar-laudo", async function (_e, payload) {
   const r = await dialog.showSaveDialog({

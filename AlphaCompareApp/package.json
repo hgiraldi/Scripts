@@ -35,6 +35,10 @@
       {
         "from": "build/ocr_dist/ocr_server",
         "to": "ocr"
+      },
+      {
+        "from": "build/ocr_dist/render_server",
+        "to": "render"
       }
     ],
     "win": {
