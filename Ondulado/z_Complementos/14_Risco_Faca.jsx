@@ -870,6 +870,40 @@ function marcaSeContem(textoBase, palavra) {
 }
 
 
+// ======================================
+// AGRUPAMENTO DAS CORES DA O.S. (1 risco por COR REAL)
+// ======================================
+// A O.S. pode trazer a MESMA cor repetida com sufixo numerico (ex.: Preto, Preto1 e
+// Preto2 = 3 tintas na O.S.). No poliester elas sao a MESMA cor: agrupa por BASE do
+// nome (baseCor) -> 3 cores da O.S. viram 1 arquivo de risco.
+// Representante do grupo = o nome SEM numero, se existir na O.S. (Preto vence
+// Preto1); senao o 1o que aparecer (so Preto1/Preto2 -> Preto1).
+// 'indicesCoresRisco' guarda o indice ORIGINAL em 'cores' (as etiquetas usam esse
+// indice p/ pegar referenciaCor / o codigo da cor da Penha).
+// RODA ANTES DO 'mapping' de proposito: o CABECALHO (Cor1..Cor6) usa 'coresRisco',
+// entao a cor que aparece no cabecalho e a MESMA que gerou o arquivo do risco
+// (Cor1 = 1o grupo, Cor2 = 2o grupo...). 'cores' (lista crua da O.S.) continua
+// existindo p/ o remap das spots do documento, que precisa de TODAS as tintas.
+var coresRisco = [];
+var indicesCoresRisco = [];
+var _cgBases = [];
+for (var _cgI = 0; _cgI < cores.length; _cgI++) {
+    var _cgB = baseCor(cores[_cgI]);
+    var _cgAchou = -1;
+    for (var _cgJ = 0; _cgJ < _cgBases.length; _cgJ++) {
+        if (_cgBases[_cgJ] === _cgB) { _cgAchou = _cgJ; break; }
+    }
+    if (_cgAchou === -1) {
+        _cgBases.push(_cgB);
+        coresRisco.push(String(cores[_cgI]));
+        indicesCoresRisco.push(_cgI);
+    } else if (normalizarNomeCor(cores[_cgI]) === _cgB && normalizarNomeCor(coresRisco[_cgAchou]) !== _cgB) {
+        // apareceu o nome SEM numero (e o representante atual e numerado) -> troca
+        coresRisco[_cgAchou] = String(cores[_cgI]);
+        indicesCoresRisco[_cgAchou] = _cgI;
+    }
+}
+
 var q = 2;
 if (cores.length > 1) {
     q = 3;
@@ -887,12 +921,16 @@ var mapping = {
     "descr": cabVal(function(){ return clienteOnd; }),
     "medint": cabVal(function(){ return medInt; }),
     "fi": cabVal(function(){ return np; }),
-    "Cor1": cabVal(function(){ return cores[0]; }),
-    "Cor2": cabVal(function(){ return cores[1]; }),
-    "Cor3": cabVal(function(){ return cores[2]; }),
-    "Cor4": cabVal(function(){ return cores[3]; }),
-    "Cor5": cabVal(function(){ return cores[4]; }),
-    "Cor6": cabVal(function(){ return cores[5]; }),
+    // Cor1..Cor6 = cores AGRUPADAS (coresRisco), a MESMA lista que gera os arquivos
+    // de risco -> a cor do cabecalho bate com a cor do arquivo. Ex.: O.S. com Black,
+    // Black1 e Black2 mostra "Black" em Cor1 e a proxima cor real em Cor2 (nao
+    // "Black1"/"Black2"). Grupo que nao existe -> cabVal devolve vazio.
+    "Cor1": cabVal(function(){ return coresRisco[0]; }),
+    "Cor2": cabVal(function(){ return coresRisco[1]; }),
+    "Cor3": cabVal(function(){ return coresRisco[2]; }),
+    "Cor4": cabVal(function(){ return coresRisco[3]; }),
+    "Cor5": cabVal(function(){ return coresRisco[4]; }),
+    "Cor6": cabVal(function(){ return coresRisco[5]; }),
     "data": cabVal(function(){ return getDataAtualFormatada(); }),
     "rep": cabVal(function(){ return repetitions; }),
     "pist": cabVal(function(){ return lanes; }),
@@ -1618,8 +1656,9 @@ function centralizarNoMais(tf, pMais, vertical) {
     }
 }
 
-// expande os bounds da arte∪marcas pelas margens do cut -> area DENTRO do cut onde o
-// label pode ficar (inclui a faixa da margem) sem crescer o cut.
+// expande os bounds da arte∪marcas pela faixa de busca do LABEL (margensCut) -> area
+// onde o label pode ser posicionado. Como o cut nao tem mais margem, essa faixa e
+// VIRTUAL: o cut cresce depois ate onde o label REALMENTE ficou (PASSO 5).
 function expandirCut(uni) {
     if (!margensCut) return uni;
     return [uni[0] - margensCut[0], uni[1] + margensCut[1], uni[2] + margensCut[2], uni[3] - margensCut[3]];
@@ -1738,7 +1777,9 @@ function posicionarLabel(tf, pMais, pX, markHalf, refB, arteOwn) {
 }
 
 // desenha um par (+ e x) em REG_<cor> nas posicoes dadas; texto (label) opcional
-// junto do "+". Retorna os bounds SO das marcas (o label nunca cresce o cut).
+// junto do "+". Retorna os bounds das MARCAS UNIDOS ao do LABEL -> o cut engloba
+// tambem o label quando ele fica fora do grupo (o texto nao vai pro poliester, mas
+// o risco precisa abraca-lo).
 function desenharPar(registrosLayer, pMais, pX, cor, nomeCor, markHalf, stroke, comTexto, refB, arteOwn) {
     var grupoReg = registrosLayer.groupItems.add();
     grupoReg.name = "REG_" + nomeCor;
@@ -1773,6 +1814,12 @@ function desenharPar(registrosLayer, pMais, pX, cor, nomeCor, markHalf, stroke, 
             // recolorirRegistro remove o TextFrame "LABEL" na separacao (fonte nao vai
             // pro poliester). Sem createOutline -> nada de label duplicado.
             posicionarLabel(tf, pMais, pX, markHalf, refB, arteOwn);
+            // o LABEL CONTA no cut: se ficou fora do grupo, o cut cresce ate ele
+            // (PASSO 5 ainda trava crescimento absurdo em 80mm alem do bounds).
+            try {
+                var gbLbl = tf.geometricBounds; // [left, top, right, bottom]
+                marcasB = unirBounds(marcasB, gbLbl);
+            } catch (eBL) {}
             tf.move(grupoReg, ElementPlacement.PLACEATEND);
         } catch (eLabel) {}
     }
@@ -2148,8 +2195,16 @@ function criarRiscosArte(doc) {
     nomesLayersRisco = [];
     for (var _nf = 0; _nf < fontesRisco.length; _nf++) nomesLayersRisco.push(fontesRisco[_nf].name);
 
-    var margens = getMargensCliente(); // [left, top, right, bottom] em pt (por cliente, via JSON)
-    margensCut = margens; // o label pode ocupar a area do cut (com a margem), sem crescer o cut
+    // Cut SEM margem: o risco sai do TAMANHO EXATO do grupo (arte). Ele so cresce
+    // para englobar os REGISTROS e o LABEL que fiquem FORA do grupo (PASSO 5).
+    // getMargensCliente()/margens_clientes.json continuam no arquivo, mas FORA do
+    // fluxo (margem zerada a pedido da producao).
+    var margens = [0, 0, 0, 0];
+    // Faixa VIRTUAL em volta da arte onde o LABEL pode ser posicionado. NAO e margem
+    // do cut (o cut nao cresce por causa dela): so da espaco pro label ficar ao lado
+    // do "+" sem cair em cima da arte. Onde o label ficar de verdade, o cut cresce
+    // ate ele (o label agora CONTA no cut).
+    margensCut = [mmToPt(12), mmToPt(12), mmToPt(12), mmToPt(12)];
 
     var cutLayer;
     try { cutLayer = doc.layers.getByName("cut"); }
@@ -2333,9 +2388,9 @@ function criarRiscosArte(doc) {
         if (bComp) maior.marcasB = unirBounds(maior.marcasB, bComp);
     }
 
-    // ===== PASSO 5: cut = (arte + margens), expandido SO p/ englobar marcas que
-    // saiam dele. Se as marcas couberam dentro, o cut NAO cresce (sem margem extra
-    // em volta das marcas). Se sairam, cresce o minimo ate a marca. =====
+    // ===== PASSO 5: cut = TAMANHO EXATO do grupo (arte, margens = 0), expandido SO
+    // p/ englobar as MARCAS e o LABEL que saiam dele. Se tudo coube dentro do grupo,
+    // o cut fica igualzinho ao grupo; se saiu, cresce o minimo ate a marca/label. =
     for (var c = 0; c < grupos.length; c++) {
         var g = grupos[c];
 
@@ -2343,20 +2398,24 @@ function criarRiscosArte(doc) {
         var cutT = g.vb[1] + margens[1];
         var cutR = g.vb[2] + margens[2];
         var cutB = g.vb[3] - margens[3];
-        // se as marcas saem do cut, ele cresce ate elas COM a mesma margem (nao
-        // encostado nas marcas). CLAMP de seguranca: as marcas nunca crescem o cut
+        // se as marcas/label saem do grupo, o cut cresce ate elas (+1mm de folga).
+        // CLAMP de seguranca: as marcas nunca crescem o cut
         // mais que 80mm alem do bounds (marcas legitimas ficam a <=40mm; alem disso
         // e bug de coordenada -> ignora, p/ nunca gerar cut gigante).
-        if (g.marcasB) {
+        // folga aplicada SO no lado que cresce por causa da marca/label: 1mm p/ a
+        // linha do corte nao passar em cima da ponta do registro / do texto. Os
+        // lados que nao cresceram continuam COLADOS no grupo (tamanho exato).
+        var folgaMarcas = mmToPt(1);
+        if (g.marcasB) { // marcasB = registros (+/x) UNIDOS ao label
             var lim = mmToPt(80);
             var mbL = Math.max(g.marcasB[0], g.vb[0] - lim);
             var mbT = Math.min(g.marcasB[1], g.vb[1] + lim);
             var mbR = Math.min(g.marcasB[2], g.vb[2] + lim);
             var mbB = Math.max(g.marcasB[3], g.vb[3] - lim);
-            if (mbL - margens[0] < cutL) cutL = mbL - margens[0];
-            if (mbT + margens[1] > cutT) cutT = mbT + margens[1];
-            if (mbR + margens[2] > cutR) cutR = mbR + margens[2];
-            if (mbB - margens[3] < cutB) cutB = mbB - margens[3];
+            if (mbL - margens[0] - folgaMarcas < cutL) cutL = mbL - margens[0] - folgaMarcas;
+            if (mbT + margens[1] + folgaMarcas > cutT) cutT = mbT + margens[1] + folgaMarcas;
+            if (mbR + margens[2] + folgaMarcas > cutR) cutR = mbR + margens[2] + folgaMarcas;
+            if (mbB - margens[3] - folgaMarcas < cutB) cutB = mbB - margens[3] - folgaMarcas;
         }
 
         var left = cutL;
@@ -2389,17 +2448,12 @@ function normalizarNomeCor(nome) {
         .replace(/ c/g, '');
 }
 
-// Um RISCO_/REG_ "nomeCor" pertence a separacao "alvo" (cor da O.S.) se for a
-// MESMA base: nomeCor == alvo OU nomeCor == alvo + numero. Assim as variacoes que
-// o RemapCores cria (preto1, preto2, preto3...) caem TODAS no risco do "preto".
-// So agrupa o sufixo NUMERICO -> nao funde cores realmente diferentes.
+// Um RISCO_/REG_ "nomeCor" pertence a separacao "alvo" (cor da O.S.) quando os dois
+// tem a MESMA BASE (baseCor): preto, preto1, preto2 e "preto 2" caem TODOS no risco
+// do "preto" - inclusive quando a O.S. so tem as variacoes numeradas (alvo=preto1).
+// So agrupa o sufixo NUMERICO -> nao funde cores realmente diferentes (485 x 486).
 function pertenceASeparacao(nomeCor, alvo) {
-    var n = normalizarNomeCor(nomeCor);
-    if (n === alvo) return true;
-    if (n.length > alvo.length && n.substring(0, alvo.length) === alvo) {
-        return /^[0-9]+$/.test(n.substring(alvo.length));
-    }
-    return false;
+    return baseCor(nomeCor) === baseCor(alvo);
 }
 
 // Base da cor para COMPARAR duas cores (encaixe): tira o sufixo numerico
@@ -2407,7 +2461,10 @@ function pertenceASeparacao(nomeCor, alvo) {
 // para nao fundir cores cujo nome ja e so numero (ex.: Pantone 485 vs 486).
 function baseCor(nome) {
     var n = normalizarNomeCor(nome);
-    var semNum = n.replace(/[0-9]+$/, '');
+    // tira o sufixo numerico E o separador antes dele ("preto 2" / "preto-2" /
+    // "preto_2" / "preto2" -> "preto") e apara os espacos das pontas.
+    var semNum = n.replace(/[\s_\-]*[0-9]+$/, '');
+    semNum = semNum.replace(/^\s+|\s+$/g, '');
     return semNum.length > 0 ? semNum : n;
 }
 
@@ -2632,14 +2689,15 @@ function substituirSpotCor(doc, nomeNovaCor) {
 // CONFIGURAÇÕES
 // ======================================
 
-// Quantidade de documentos que serão criados
-var quantidadeDocumentos = cores.length;
+// Quantidade de documentos que serão criados: 1 por cor AGRUPADA ('coresRisco' e
+// montado la em cima, antes do 'mapping', porque o cabecalho tambem usa ele).
+var quantidadeDocumentos = coresRisco.length;
 
 var nomesDocumentos = [];
 
-for (var i = 0; i < cores.length; i++) {
+for (var i = 0; i < coresRisco.length; i++) {
 
-    var corAtual = String(cores[i]).toUpperCase();
+    var corAtual = String(coresRisco[i]).toUpperCase();
 
     nomesDocumentos.push(
         produtoComUnderline +
@@ -3088,7 +3146,7 @@ function criarEtiquetaCentro(docAlvo, indiceCor) {
     for (k in mapping) {
         if (mapping.hasOwnProperty(k)) mapaCentro[k] = mapping[k];
     }
-    mapaCentro["cor"] = cores[indiceCor];
+    mapaCentro["cor"] = coresRisco[indiceCor];
 
     var grupoNoAlvo = abrirTemplateParaDoc(
         docAlvo,
@@ -3117,9 +3175,9 @@ function criarEtiquetaCentro(docAlvo, indiceCor) {
 // alinhadas as laterais da faca, abaixo da faca (40mm se entrada>=100, senao
 // 3mm) e espelha.
 function criarEtiquetaDeCor(docAlvo, indiceCor) {
-    var qtdc = (indiceCor + 1) + "/" + cores.length;
+    var qtdc = (indiceCor + 1) + "/" + coresRisco.length;
     var mapaCor = {
-        "cor": cabVal(function(){ return cores[indiceCor]; }),
+        "cor": cabVal(function(){ return coresRisco[indiceCor]; }),
         "ref": cabVal(function(){ return ref; }),
         "descr": cabVal(function(){ return clienteOnd; }),
         "qtdc": qtdc,
@@ -3158,12 +3216,15 @@ function criarEtiquetaDeCor(docAlvo, indiceCor) {
 // --- cria as 2 etiquetas Penha (1/4 e 3/4) para a cor indiceCor ---
 function criarEtiquetasPenha(docAlvo, indiceCor) {
     var fiBarra = cabVal(function(){ return extrairAntesDaBarra(np); });
-    var codcorAtual = cabVal(function(){ return extrairDepoisDaBarraSeguro(referenciaCor[indiceCor]); });
-    var qtdc = (indiceCor + 1) + "/" + cores.length;
+    // referenciaCor e indexado pela O.S. -> converte o indice da cor AGRUPADA no
+    // indice ORIGINAL da tinta representante do grupo.
+    var _idxOS = (indicesCoresRisco && indicesCoresRisco.length > indiceCor) ? indicesCoresRisco[indiceCor] : indiceCor;
+    var codcorAtual = cabVal(function(){ return extrairDepoisDaBarraSeguro(referenciaCor[_idxOS]); });
+    var qtdc = (indiceCor + 1) + "/" + coresRisco.length;
 
     // Tokens [[...]] do template (keys sem colchetes; replaceInTextFrames cuida do regex)
     var mapaPenha = {
-        "cor": cabVal(function(){ return cores[indiceCor]; }),
+        "cor": cabVal(function(){ return coresRisco[indiceCor]; }),
         "data": cabVal(function(){ return getDataAtualFormatada(); }),
         "esp": cabVal(function(){ return espessura; }),
         "maq": cabVal(function(){ return maquina ? primeirasDuasPalavras(maquina) : ""; }),
@@ -3326,7 +3387,7 @@ for (var i = 0; i < quantidadeDocumentos; i++) {
     );
 
     // Separacao NAO leva a layer da arte; na "cut" mantem so os riscos da cor.
-    prepararSeparacao(novoDoc, cores[i]);
+    prepararSeparacao(novoDoc, coresRisco[i]);
 
     try {
 
@@ -3350,7 +3411,7 @@ for (var i = 0; i < quantidadeDocumentos; i++) {
 
     // Mapping individual da separação
     var mappingCor = {
-        "cor": cores[i]
+        "cor": coresRisco[i]
     };
 
     replaceInTextFrames(novoDoc, mappingCor);
@@ -3385,7 +3446,7 @@ for (var i = 0; i < quantidadeDocumentos; i++) {
 
     substituirSpotCor(
         novoDoc,
-        cores[i]
+        coresRisco[i]
     );
 
     // Definir o local do desktop
@@ -3419,7 +3480,7 @@ try {
     var _segundos = ((_tFim - _tInicio) / 1000).toFixed(1);
     var _arqTempo = new File("~/Desktop/" + produtoComUnderline + "/montado/tempo_geracao.txt");
     _arqTempo.open("a");
-    _arqTempo.write(getDataAtualFormatada() + "  -  " + cores.length + " cor(es)  -  " + _segundos + "s\n");
+    _arqTempo.write(getDataAtualFormatada() + "  -  " + coresRisco.length + " cor(es)  -  " + _segundos + "s\n");
     _arqTempo.close();
 } catch (e) {}
 
