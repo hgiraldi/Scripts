@@ -752,7 +752,8 @@
       var cropPts = [pg.x * mk.fPW, pg.y * mk.fPH, (pg.x + pg.w) * mk.fPW, (pg.y + pg.h) * mk.fPH];
       var sHi = Math.min(14, (mk.sN || 3) * 4);                          // ~4× o base
       // 1) ARQUIVO nítido
-      window.AlphaRender.render({ pdf: mk.pathF, scale: sHi, rot: mk.fRot || 0, crop: cropPts, hideTec: true })
+      var hF = mk.hidesF || {}, hO = mk.hidesO || {};
+      window.AlphaRender.render({ pdf: mk.pathF, scale: sHi, rot: mk.fRot || 0, crop: cropPts, hideTec: true, hideLayers: hF.hideLayers, hideImages: hF.hideImages, hideColors: hF.hideColors })
         .then(function (im) {
           if (mySeq != null && mySeq !== _runSeq) { done(); return; }
           c._hiF = window.AlphaRender.toCanvas(im);
@@ -767,7 +768,7 @@
           if (mk.oCrop) ocf = { x: mk.oCrop.x + ocf.x * mk.oCrop.w, y: mk.oCrop.y + ocf.y * mk.oCrop.h, w: ocf.w * mk.oCrop.w, h: ocf.h * mk.oCrop.h };
           var opg = rotFracInv(ocf, mk.oRot || 0);
           var oPts = [opg.x * mk.oPW, opg.y * mk.oPH, (opg.x + opg.w) * mk.oPW, (opg.y + opg.h) * mk.oPH];
-          window.AlphaRender.render({ pdf: mk.pathO, scale: sHi, rot: mk.oRot || 0, crop: oPts, hideTec: true })
+          window.AlphaRender.render({ pdf: mk.pathO, scale: sHi, rot: mk.oRot || 0, crop: oPts, hideTec: true, hideLayers: hO.hideLayers, hideImages: hO.hideImages, hideColors: hO.hideColors })
             .then(function (imo) {
               if (mySeq != null && mySeq !== _runSeq) { done(); return; }
               c._hiO = window.AlphaRender.toCanvas(imo);
@@ -901,7 +902,18 @@
           var pg = rotFracInv(pane.crop, pane.rot || 0);
           return [pg.x * pane.pageW, pg.y * pane.pageH, (pg.x + pg.w) * pane.pageW, (pg.y + pg.h) * pane.pageH];
         }
+        // hides MANUAIS da tela "Limpar" (camadas/cores/imagens) -> o render nativo tem que aplicar
+        // TAMBÉM, senão a comparação/tela mostra o que foi limpado (branco, faca, spot, foto).
+        function paneHides(pane) {
+          var layers = [], colors = [], k, p;
+          if (pane) {
+            for (k in pane.hideL) if (pane.hideL.hasOwnProperty(k) && pane.hideL[k]) layers.push(k);
+            for (k in pane.hideC) if (pane.hideC.hasOwnProperty(k) && pane.hideC[k]) { p = k.split(","); colors.push([+p[0], +p[1], +p[2]]); }
+          }
+          return { hideTec: true, hideLayers: layers, hideImages: !!(pane && pane.hideImg), hideColors: colors };
+        }
         var cropF = paneCropPts(F), cropO = paneCropPts(O);
+        var hidesF = paneHides(F), hidesO = paneHides(O);
         var dF = cropF ? Math.max(cropF[2] - cropF[0], cropF[3] - cropF[1]) : Math.max(F.pageW, F.pageH);
         var dO = cropO ? Math.max(cropO[2] - cropO[0], cropO[3] - cropO[1]) : Math.max(O.pageW, O.pageH);
         var NW = 3600, sN = Math.min(8, NW / Math.max(dF, dO));
@@ -910,8 +922,8 @@
         withPdf(F, function () {}, function (h) { return { ph: photoRectsOf(h, F) }; }, function (eF, rfp) {
           withPdf(O, function () {}, function (h) { return { ph: photoRectsOf(h, O) }; }, function (eO, rop) {
             progSet(30, "comparando…");
-            window.AlphaRender.render({ pdf: _pathF, scale: sN, rot: F.rot || 0, crop: cropF, hideTec: true }).then(function (imF) {
-              return window.AlphaRender.render({ pdf: _pathO, scale: sN, rot: O.rot || 0, crop: cropO, hideTec: true }).then(function (imO) {
+            window.AlphaRender.render({ pdf: _pathF, scale: sN, rot: F.rot || 0, crop: cropF, hideTec: true, hideLayers: hidesF.hideLayers, hideImages: hidesF.hideImages, hideColors: hidesF.hideColors }).then(function (imF) {
+              return window.AlphaRender.render({ pdf: _pathO, scale: sN, rot: O.rot || 0, crop: cropO, hideTec: true, hideLayers: hidesO.hideLayers, hideImages: hidesO.hideImages, hideColors: hidesO.hideColors }).then(function (imO) {
                 var opt = readTol(); opt.prescaled = true; opt.maxWork = NW;
                 opt.photoF = (rfp && rfp.ph) || []; opt.photoO = (rop && rop.ph) || [];
                 RESULT = window.ACEngine.compare(window.AlphaRender.toCanvas(imF), window.AlphaRender.toCanvas(imO), opt);
@@ -921,6 +933,7 @@
                                    fPW: F.pageW, fPH: F.pageH, oPW: O.pageW, oPH: O.pageH,
                                    fW: imF.width, fH: imF.height, oW: imO.width, oH: imO.height, sN: sN,
                                    fCrop: isCropped(F) ? F.crop : null, oCrop: isCropped(O) ? O.crop : null,
+                                   hidesF: hidesF, hidesO: hidesO,
                                    alOx: (RESULT.align && RESULT.align.ox) || 0, alOy: (RESULT.align && RESULT.align.oy) || 0,
                                    oRR: RESULT.origRect || { w: RESULT.W, h: RESULT.H } };
                 plog("render NATIVO ok" + (cropF ? " (crop)" : "") + ": " + imF.width + "x" + imF.height + " / " + imO.width + "x" + imO.height);

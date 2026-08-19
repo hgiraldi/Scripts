@@ -11,35 +11,53 @@ import sys, json, os, re, ctypes
 # MESMO regex das camadas TÉCNICAS do render.js (branco/verniz/faca/registro/cotas...).
 TEC = re.compile(r'^(branco|white|verniz|varnish|uv|faca|corte|cut|dieline|vinco|crease|cotas?|medidas?|registro|marcas?|tecnic|sangria|bleed|guias?)', re.I)
 
-def hide_tec(pr, page):
-    # esconde objetos cuja camada (mark "Name") casa TEC -> mesmo comportamento do render.js
+def apply_hides(pr, page, hide_tec_flag, hide_layers, hide_images, hide_colors):
+    # Aplica os MESMOS hides do painel: TEC (auto, por nome de camada) + o que o operador limpou
+    # na tela "Limpar": camadas (hideLayers), imagens (hideImages) e cores (hideColors, tol 6).
     try:
         n = pr.FPDFPage_CountObjects(page)
     except Exception:
         return
-    buf = (ctypes.c_ushort * 128)()          # pdfium escreve UTF-16LE -> buffer de ushort
-    nbytes = ctypes.sizeof(buf)              # 256 bytes
-    outlen = ctypes.c_ulong(0)
+    hl = set((x or "").lower() for x in (hide_layers or []))
+    hc = hide_colors or []
+    need_name = bool(hide_tec_flag) or bool(hl)
+    buf = (ctypes.c_ushort * 128)(); nbytes = ctypes.sizeof(buf); outlen = ctypes.c_ulong(0)
+    r = ctypes.c_uint(0); g = ctypes.c_uint(0); b = ctypes.c_uint(0); al = ctypes.c_uint(0)
     for i in range(n):
         obj = pr.FPDFPage_GetObject(page, i)
-        try:
-            nm = pr.FPDFPageObj_CountMarks(obj)
-        except Exception:
-            nm = 0
-        lyr = ""
-        for j in range(nm):
-            mk = pr.FPDFPageObj_GetMark(obj, j)
-            # nas artes do Illustrator o NOME da camada vem no param "Title" (tag do mark = "Layer")
-            if pr.FPDFPageObjMark_GetParamStringValue(mk, b"Title", buf, nbytes, ctypes.byref(outlen)):
-                L = outlen.value            # comprimento em BYTES (inclui o \0 final)
-                if L > 2:
-                    lyr = bytes(buf)[:L].decode("utf-16-le", "ignore").rstrip("\x00")
-                    break
-        if lyr and TEC.match(lyr):
+        kill = False
+        # 1) camada (mark "Title" -> nome da camada do Illustrator): TEC auto OU limpada na mao
+        if need_name:
+            try: nm = pr.FPDFPageObj_CountMarks(obj)
+            except Exception: nm = 0
+            lyr = ""
+            for j in range(nm):
+                mk = pr.FPDFPageObj_GetMark(obj, j)
+                if pr.FPDFPageObjMark_GetParamStringValue(mk, b"Title", buf, nbytes, ctypes.byref(outlen)):
+                    L = outlen.value
+                    if L > 2:
+                        lyr = bytes(buf)[:L].decode("utf-16-le", "ignore").rstrip("\x00"); break
+            if lyr:
+                if hide_tec_flag and TEC.match(lyr): kill = True
+                elif lyr.lower() in hl: kill = True
+        # 2) imagem (foto) limpada
+        if not kill and hide_images:
             try:
-                pr.FPDFPageObj_SetIsActive(obj, False)
-            except Exception:
-                pass
+                if pr.FPDFPageObj_GetType(obj) == 3:   # FPDF_PAGEOBJ_IMAGE
+                    kill = True
+            except Exception: pass
+        # 3) cor de preenchimento limpada (spot z_/x_/w_, branco etc.), com tolerancia 6
+        if not kill and hc:
+            try:
+                if pr.FPDFPageObj_GetFillColor(obj, ctypes.byref(r), ctypes.byref(g), ctypes.byref(b), ctypes.byref(al)):
+                    rv, gv, bv = r.value, g.value, b.value
+                    for c in hc:
+                        if abs(rv - c[0]) <= 6 and abs(gv - c[1]) <= 6 and abs(bv - c[2]) <= 6:
+                            kill = True; break
+            except Exception: pass
+        if kill:
+            try: pr.FPDFPageObj_SetIsActive(obj, False)
+            except Exception: pass
 
 def emit(obj):
     sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -75,8 +93,9 @@ def main():
         try:
             doc = pdfium.PdfDocument(req["pdf"])
             pg = doc[int(req.get("page", 0))]
-            if req.get("hideTec"):
-                hide_tec(pr, pg.raw)
+            hL = req.get("hideLayers"); hC = req.get("hideColors"); hI = req.get("hideImages")
+            if req.get("hideTec") or hL or hC or hI:
+                apply_hides(pr, pg.raw, req.get("hideTec"), hL, hI, hC)
             scale = float(req.get("scale", 1.0))
             rot = int(req.get("rot", 0))
             crop = req.get("crop")   # [x0,y0,x1,y1] em pontos (origem topo-esq)
