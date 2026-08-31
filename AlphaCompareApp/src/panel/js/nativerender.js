@@ -2,7 +2,8 @@
  * Alpha Compare - ponte do painel p/ o RENDER NATIVO (pdfium via pypdfium2).
  * Sobe o render_server (exe congelado OU python+script), fala o protocolo JSON por stdin/stdout
  * e devolve o bitmap RGBA. Mesmo motor do Precision Proof: alta resolução, rápido.
- *   AlphaRender.render({pdf, scale, rot, crop, hideTec}) -> Promise<{data:Uint8ClampedArray, width, height}>
+ *   AlphaRender.render({pdf, scale, rot, crop, hideTec, hideLayers, hideImages, hideColors})
+ *      -> Promise<{data:Uint8ClampedArray, width, height}>
  * ============================================================ */
 (function () {
   "use strict";
@@ -48,7 +49,11 @@
     return _readyP;
   }
 
-  // opts: {pdf, scale, rot, crop:[x0,y0,x1,y1] em pontos, hideTec} -> {data(RGBA), width, height}
+  // opts: {pdf, scale, rot, crop:[x0,y0,x1,y1] em pontos, hideTec, hideLayers, hideImages, hideColors}
+  //   -> {data(RGBA), width, height}
+  // hideLayers/hideImages/hideColors = a LIMPEZA MANUAL da tela "Limpar" (pane.hideL/hideImg/hideC).
+  // TEM que ir no protocolo: sem isso o render nativo (= o que a comparacao consome) volta a
+  // mostrar o que o operador limpou e a limpeza vira so um preview.
   function render(opts) {
     return start().then(function () {
       var id = ++_seq;
@@ -56,7 +61,9 @@
       return new Promise(function (resolve, reject) {
         _pend[id] = { resolve: resolve, reject: reject };
         _proc.stdin.write(JSON.stringify({ id: id, pdf: opts.pdf, page: opts.page || 0,
-          scale: opts.scale || 1, rot: opts.rot || 0, crop: opts.crop || null, hideTec: !!opts.hideTec, out: out }) + "\n");
+          scale: opts.scale || 1, rot: opts.rot || 0, crop: opts.crop || null, hideTec: !!opts.hideTec,
+          hideLayers: opts.hideLayers || [], hideImages: !!opts.hideImages, hideColors: opts.hideColors || [],
+          out: out }) + "\n");
       }).then(function (m) {
         var W = m.w, H = m.h, raw = fs.readFileSync(out);
         try { fs.unlinkSync(out); } catch (e) {}

@@ -409,6 +409,18 @@
     for (k in pane.hideC) if (pane.hideC.hasOwnProperty(k) && pane.hideC[k]) { p = k.split(","); ACPdf.setColorActive(h, idx, +p[0], +p[1], +p[2], false, 6); }
   }
 
+  // os MESMOS hides no formato do render NATIVO/motor de texto (nomes de camada, cores RGB).
+  // Usado pela comparacao, pelo re-render dos marcadores e pelo OCR nativo - tudo tem que
+  // enxergar o arquivo JA LIMPO, senao a limpeza fica so no preview.
+  function paneHidesOf(pane) {
+    var layers = [], colors = [], k, p;
+    if (pane) {
+      for (k in pane.hideL) if (pane.hideL.hasOwnProperty(k) && pane.hideL[k]) layers.push(k);
+      for (k in pane.hideC) if (pane.hideC.hasOwnProperty(k) && pane.hideC[k]) { p = k.split(","); colors.push([+p[0], +p[1], +p[2]]); }
+    }
+    return { hideTec: true, hideLayers: layers, hideImages: !!(pane && pane.hideImg), hideColors: colors };
+  }
+
   // aplica a limpeza e re-renderiza o preview do pane (carrega fresco, aplica hides, destrói)
   function reloadWithPrep(pane) {
     progStart(); progSet(30, "aplicando limpeza…");
@@ -902,18 +914,9 @@
           var pg = rotFracInv(pane.crop, pane.rot || 0);
           return [pg.x * pane.pageW, pg.y * pane.pageH, (pg.x + pg.w) * pane.pageW, (pg.y + pg.h) * pane.pageH];
         }
-        // hides MANUAIS da tela "Limpar" (camadas/cores/imagens) -> o render nativo tem que aplicar
-        // TAMBÉM, senão a comparação/tela mostra o que foi limpado (branco, faca, spot, foto).
-        function paneHides(pane) {
-          var layers = [], colors = [], k, p;
-          if (pane) {
-            for (k in pane.hideL) if (pane.hideL.hasOwnProperty(k) && pane.hideL[k]) layers.push(k);
-            for (k in pane.hideC) if (pane.hideC.hasOwnProperty(k) && pane.hideC[k]) { p = k.split(","); colors.push([+p[0], +p[1], +p[2]]); }
-          }
-          return { hideTec: true, hideLayers: layers, hideImages: !!(pane && pane.hideImg), hideColors: colors };
-        }
         var cropF = paneCropPts(F), cropO = paneCropPts(O);
-        var hidesF = paneHides(F), hidesO = paneHides(O);
+        // hides MANUAIS da tela "Limpar" -> o render nativo (= o que a comparação consome) aplica
+        var hidesF = paneHidesOf(F), hidesO = paneHidesOf(O);
         var dF = cropF ? Math.max(cropF[2] - cropF[0], cropF[3] - cropF[1]) : Math.max(F.pageW, F.pageH);
         var dO = cropO ? Math.max(cropO[2] - cropO[0], cropO[3] - cropO[1]) : Math.max(O.pageW, O.pageH);
         var NW = 3600, sN = Math.min(8, NW / Math.max(dF, dO));
@@ -1373,6 +1376,8 @@
       window.AlphaNativeOCR.run({
         arqPath: _arqPath, arqRot: F.rot || 0, arqCrop: isCropped(F) ? F.crop : null,
         oriPath: _oriPath, oriRot: O.rot || 0, oriCrop: isCropped(O) ? O.crop : null,
+        // a limpeza da tela "Limpar" vale TAMBEM no motor de texto (senao o OCR le o que sumiu)
+        arqHides: paneHidesOf(F), oriHides: paneHidesOf(O),
         onProgress: function (p, m) { if (mySeq === _runSeq) progSet(Math.max(75, p || 0), m); },
         onDone: function (err, diffs, arqW) {
           clearTimeout(_ocrWatchdog);      // OCR terminou -> cancela o watchdog

@@ -32,16 +32,20 @@
   }
 
   window.AlphaNativeOCR = {
-    // o: {arqPath, arqRot, oriPath, oriRot, onProgress(pct,msg), onDone(err,diffs,arqW)}
+    // o: {arqPath, arqRot, oriPath, oriRot, arqHides, oriHides, onProgress(pct,msg), onDone(err,diffs,arqW)}
+    //    arqHides/oriHides = limpeza manual da tela "Limpar" {hideLayers,hideImages,hideColors}
     run: function (o) {
       console.warn("[nativeOCR] run start arq=" + o.arqPath + " ori=" + o.oriPath + " rotA=" + (o.arqRot || 0) + " rotO=" + (o.oriRot || 0));
       ipcRenderer.invoke("python-info").then(function (pi) {
         var py = pi && pi.env;
         var serverExe = pi && pi.serverExe;
         console.warn("[nativeOCR] OCR resolvido = " + (serverExe ? "exe congelado: " + serverExe : "python: " + py));
+        var hA = o.arqHides || {}, hO = o.oriHides || {};
         engine.run(
-          { file: o.arqPath, rot: o.arqRot || 0, hideTec: true, crop: o.arqCrop || null },
-          { file: o.oriPath, rot: o.oriRot || 0, hideTec: true, crop: o.oriCrop || null },
+          { file: o.arqPath, rot: o.arqRot || 0, hideTec: true, crop: o.arqCrop || null,
+            hideLayers: hA.hideLayers || [], hideImages: !!hA.hideImages, hideColors: hA.hideColors || [] },
+          { file: o.oriPath, rot: o.oriRot || 0, hideTec: true, crop: o.oriCrop || null,
+            hideLayers: hO.hideLayers || [], hideImages: !!hO.hideImages, hideColors: hO.hideColors || [] },
           {
             python: py, serverExe: serverExe, alvoPx: 3600,   // precisa dessa res p/ o full-page achar as anchors do texto pequeno (confirmado: pega o DUX 28→29)
             onProgress: function (m) { console.warn("[nativeOCR] " + m); if (o.onProgress) o.onProgress(pct(m), m); }

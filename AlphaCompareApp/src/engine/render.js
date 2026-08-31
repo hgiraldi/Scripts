@@ -47,6 +47,42 @@ function hideTec(m, h) {
   mfree(m, buf); mfree(m, outP);
 }
 
+// aplica a LIMPEZA MANUAL da tela "Limpar" (mesmas regras do pdfrender.js do painel):
+// camadas por NOME exato, imagens (fotos) e cores de preenchimento (tolerancia 6 por canal).
+// Sem isso o motor de TEXTO leria o que o operador limpou e voltaria a acusar diferenca ali.
+function applyHides(m, h, opts) {
+  var layers = opts.hideLayers || [], colors = opts.hideColors || [], images = !!opts.hideImages;
+  if (!layers.length && !colors.length && !images) return;
+  var hl = {}, i;
+  for (i = 0; i < layers.length; i++) hl[String(layers[i]).toLowerCase()] = true;
+  var page = h.pg, n = m.FPDFPage_CountObjects(page);
+  var buf = mal(m, 256), outP = mal(m, 4);
+  var rP = mal(m, 4), gP = mal(m, 4), bP = mal(m, 4), aP = mal(m, 4);
+  for (i = 0; i < n; i++) {
+    var obj = m.FPDFPage_GetObject(page, i), kill = false;
+    if (!kill && layers.length) {
+      var nm = m.FPDFPageObj_CountMarks(obj), lyr = "";
+      for (var j = 0; j < nm; j++) {
+        var mk = m.FPDFPageObj_GetMark(obj, j);
+        if (m.FPDFPageObjMark_GetParamStringValue(mk, "Name", buf, 256, outP)) {
+          var L = m.pdfium.HEAPU32[outP >> 2];
+          if (L > 1) { var t = ""; for (var k = 0; k < L - 1; k += 2) { var cc = m.pdfium.HEAPU8[buf + k] | (m.pdfium.HEAPU8[buf + k + 1] << 8); if (cc) t += String.fromCharCode(cc); } lyr = t; break; }
+        }
+      }
+      if (lyr && hl[lyr.toLowerCase()]) kill = true;
+    }
+    if (!kill && images && m.FPDFPageObj_GetType(obj) === 3) kill = true;
+    if (!kill && colors.length && m.FPDFPageObj_GetFillColor(obj, rP, gP, bP, aP)) {
+      var cr = m.pdfium.HEAPU32[rP >> 2], cg = m.pdfium.HEAPU32[gP >> 2], cb = m.pdfium.HEAPU32[bP >> 2];
+      for (var c = 0; c < colors.length; c++) {
+        if (Math.abs(cr - colors[c][0]) <= 6 && Math.abs(cg - colors[c][1]) <= 6 && Math.abs(cb - colors[c][2]) <= 6) { kill = true; break; }
+      }
+    }
+    if (kill) m.FPDFPageObj_SetIsActive(obj, false);
+  }
+  mfree(m, buf); mfree(m, outP); mfree(m, rP); mfree(m, gP); mfree(m, bP); mfree(m, aP);
+}
+
 // retangulos das IMAGENS (fotos) em fracao da pagina — p/ o modo pixel mascarar depois
 function imageRects(m, h) {
   var n = m.FPDFPage_CountObjects(h.pg), lP = mal(m, 4), bP = mal(m, 4), rP = mal(m, 4), tP = mal(m, 4), out = [];
@@ -136,6 +172,7 @@ function renderPdf(file, opts) {
   return ready().then(function (m) {
     var h = open(m, file);
     if (opts.hideTec) hideTec(m, h);
+    applyHides(m, h, opts);
     var alvo = opts.alvoPx || 3600;
     var s = Math.min(opts.maxScale || 6, alvo / Math.max(h.pw, h.ph));
     var rects = imageRects(m, h);
@@ -152,6 +189,7 @@ function openDoc(file, opts) {
   return ready().then(function (m) {
     var h = open(m, file);
     if (opts.hideTec) hideTec(m, h);
+    applyHides(m, h, opts);
     // crop: fração da página ROTACIONADA (mesmo espaço do pane.crop do painel). null = página inteira.
     return { m: m, h: h, rot: (((opts.rot || 0) % 360) + 360) % 360, crop: opts.crop || null };
   });
@@ -193,6 +231,6 @@ function renderLineHi(doc, bbox, rotW, rotH, targetH, margin) {
 function closeDoc(doc) { try { if (doc && doc.m && doc.h) close(doc.m, doc.h); } catch (e) {} }
 
 module.exports = {
-  ready: ready, renderPdf: renderPdf, writePNG: writePNG, rot90: rot90, rotImg: rotImg,
+  ready: ready, renderPdf: renderPdf, writePNG: writePNG, rot90: rot90, rotImg: rotImg, applyHides: applyHides,
   openDoc: openDoc, renderFullImg: renderFullImg, renderLineHi: renderLineHi, closeDoc: closeDoc
 };

@@ -26,17 +26,23 @@ def apply_hides(pr, page, hide_tec_flag, hide_layers, hide_images, hide_colors):
     for i in range(n):
         obj = pr.FPDFPage_GetObject(page, i)
         kill = False
-        # 1) camada (mark "Title" -> nome da camada do Illustrator): TEC auto OU limpada na mao
+        # 1) camada (OCG): TEC auto OU limpada na mao.
+        # O nome da camada vem no param "Name" do mark (mark "OC") - o MESMO param que o
+        # pdfrender.js do painel le em objLayer(). "Title" so existe em PDF tagged: aqui
+        # nao casava NENHUM objeto, entao nem o TEC nem a limpeza manual pegavam no nativo.
         if need_name:
             try: nm = pr.FPDFPageObj_CountMarks(obj)
             except Exception: nm = 0
             lyr = ""
             for j in range(nm):
                 mk = pr.FPDFPageObj_GetMark(obj, j)
-                if pr.FPDFPageObjMark_GetParamStringValue(mk, b"Title", buf, nbytes, ctypes.byref(outlen)):
-                    L = outlen.value
-                    if L > 2:
-                        lyr = bytes(buf)[:L].decode("utf-16-le", "ignore").rstrip("\x00"); break
+                for key in (b"Name", b"Title"):
+                    if pr.FPDFPageObjMark_GetParamStringValue(mk, key, buf, nbytes, ctypes.byref(outlen)):
+                        L = outlen.value
+                        if L > 2:
+                            lyr = bytes(buf)[:L].decode("utf-16-le", "ignore").rstrip("\x00")
+                            break
+                if lyr: break
             if lyr:
                 if hide_tec_flag and TEC.match(lyr): kill = True
                 elif lyr.lower() in hl: kill = True

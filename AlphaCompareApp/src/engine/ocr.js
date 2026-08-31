@@ -5,7 +5,8 @@ var cp = require("child_process");
 var path = require("path");
 var readline = require("readline");
 
-var SERVER = path.join(__dirname, "..", "ocr", "ocr_server.py");
+// no app empacotado o .py mora no app.asar.unpacked (Python nao le de dentro do asar)
+var SERVER = path.join(__dirname, "..", "ocr", "ocr_server.py").replace(/app\.asar([\\/])/, "app.asar.unpacked$1");
 // POOL=1 é o mais rápido: o gargalo do re-read é o render SÍNCRONO dos crops (pdfium single-thread),
 // não a inferência do OCR — mais workers só somam overhead de modelo/memória. (medido)
 var POOL = parseInt(process.env.ALPHAPROOF_OCR_POOL || "1", 10);

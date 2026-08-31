@@ -61,6 +61,33 @@ Puxar do Job (Engine) / Desktop  →  render pane (pdfium)  →  COMPARAR
 > caminho) roda só o pixel. Coord do texto mapeada por `RESULT.W / arqW` (página inteira, mesma
 > rotação); crop desliga o OCR nativo por ora.
 
+## A tela ⛗ Limpar vale para TODOS os motores
+
+O que o operador limpa (camadas, cores/tintas, fotos) vira `pane.hideL` / `pane.hideC` /
+`pane.hideImg`. **Esses hides têm que chegar em TODO caminho que renderiza o PDF** — senão a
+limpeza fica só no preview e a comparação roda no arquivo sujo (foi exatamente esse o bug:
+o operador limpava o original e comparava o não-limpado):
+
+| Caminho | Onde aplica |
+| --- | --- |
+| Preview do pane / fallback WASM | `applyHidesOn()` → `ACPdf.setLayerActive/setColorActive/setImagesActive` |
+| **Comparação (render NATIVO)** | `paneHidesOf(pane)` → `AlphaRender.render({hideLayers,hideImages,hideColors})` → protocolo JSON → `render_server.apply_hides()` |
+| Re-render de marcador em alta | `RESULT._marker.hidesF/hidesO` (mesmo `paneHidesOf`) |
+| **Motor de texto (OCR nativo)** | `arqHides/oriHides` → `engine.run()` → `render.openDoc({hideLayers,…})` → `applyHides()` do `src/engine/render.js` |
+
+`paneHidesOf(pane)` (em `src/panel/js/main.js`) é a **única** conversão pane → formato dos
+motores. Motor novo que renderize PDF: consumir dela, nunca reimplementar.
+
+Dois pontos que já quebraram e não podem voltar:
+
+1. **A ponte tem que repassar os campos.** `nativerender.js` escrevia só `hideTec` no stdin do
+   sidecar; `main.js` calculava os hides e eles morriam ali. Qualquer campo novo do render
+   entra no `JSON.stringify` da `render()`.
+2. **O nome da camada vem no param `Name` do mark (mark `OC`), não `Title`.** Medido nas artes
+   reais (43/43 objetos têm `Name`, 0 têm `Title`). `pdfrender.js` e `src/engine/render.js` já
+   liam `Name`; o `render_server.py` lia `Title` e não casava nada — nem TEC nem limpeza
+   manual. Hoje tenta `Name` e cai pra `Title`.
+
 ## Regras que NÃO podem ser violadas
 
 1. **Dígito diferente = SEMPRE erro real** (é o alvo: 28/29, 0763/0591). Nunca filtrar.
@@ -100,8 +127,38 @@ cd AlphaProof
 npm install
 ALPHAPROOF_PYTHON="<python.exe>" npx electron .     # ou npm start se python estiver no PATH
 ```
-Empacotar (portátil, por causa do bug do winCodeSign/symlink): `npm run dist:win` gera o portátil;
-dmg só no Mac. (Ver memórias `electron-builder-wincodesign-symlink`, `electron-run-as-node-gotcha`.)
+Empacotar Windows: `npm run dist:win` (NSIS). Se o winCodeSign estourar no symlink, ligar o
+Modo Desenvolvedor / rodar como Admin, ou distribuir o `dist/win-unpacked` zipado.
+
+**Empacotar Mac: pelo GitHub Actions** (`.github/workflows/build-mac.yml`) — não dá para
+gerar no Windows (o electron-builder recusa: *"Build for macOS is supported only on macOS"*) e
+os dois sidecars Python precisam ser congelados **para darwin**; o `.exe` do Windows não serve.
+
+```
+git push origin homologacao          # sobe o código
+git tag mac-v<N> && git push origin mac-v<N>
+```
+
+A tag `mac-v*` roda o workflow e ainda publica o `.dmg` numa **Release** (permanente, não pesa
+no storage do Actions). Sem tag, dá para disparar na mão em Actions > Build Mac DMG >
+"Run workflow" — aí o `.dmg` sai só como artefato (retention 2 dias).
+
+O runner é `macos-14` (arm64) mas o build é **x64 via Rosetta**, de propósito: um dmg x64
+roda em TODOS os Macs (Intel nativo + Apple Silicon por Rosetta), e os runners Intel
+(`macos-13`) foram aposentados. Detalhes que já custaram build quebrado e estão fixados no
+YAML: Python **3.12** do Miniforge x86_64 (o 3.13 puxa rapidocr antigo) e
+**`rapidocr-onnxruntime==1.4.4`** (import estático, que o PyInstaller bundla certo).
+
+O workflow congela os sidecars por **flags de CLI do PyInstaller** — não pelos `.spec` de
+`build/pyi_spec/`, que são locais do build Windows (a pasta `build/` é gitignored). Mexeu na
+receita de um, confira se o outro precisa da mesma mudança.
+
+Se um dia o app rodar no Mac **sem** sidecar congelado, ele cai no Python da máquina
+(`pypdfium2`/`rapidocr-onnxruntime`) lendo o `.py` do `app.asar.unpacked` (ver `asarUnpack` no
+`package.json` e o helper `unpacked()` do `main.js`; Python não lê de dentro do asar). O
+**pixel** continua funcionando de qualquer jeito (fallback WASM, com a limpeza aplicada).
+App não assinado: o Gatekeeper pede botão direito → Abrir na 1ª vez.
+(Ver memórias `electron-builder-wincodesign-symlink`, `electron-run-as-node-gotcha`.)
 
 ## Teste headless (sem UI)
 

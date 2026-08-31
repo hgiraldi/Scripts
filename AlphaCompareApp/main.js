@@ -204,13 +204,17 @@ function resolveRenderExe() {
   }
   _renderExeCache = null; return null;
 }
+// Python NAO le arquivo de dentro do app.asar: o .py vem do app.asar.unpacked (asarUnpack
+// no package.json). Fora do pacote a troca nao faz nada. Sem isso o Mac (que nao tem
+// sidecar congelado) sobe o render/OCR apontando p/ um caminho que nao existe.
+function unpacked(p) { return p ? p.replace(/app\.asar([\\/])/, "app.asar.unpacked$1") : p; }
 // serverExe = exe congelado (sem Python); senão {env, script} p/ rodar via Python (dev).
 ipcMain.handle("render-info", function () {
   const exe = resolveRenderExe();
   return {
     serverExe: exe,
     env: exe ? null : resolvePython(),
-    script: exe ? null : path.join(__dirname, "src", "render", "render_server.py")
+    script: exe ? null : unpacked(path.join(__dirname, "src", "render", "render_server.py"))
   };
 });
 

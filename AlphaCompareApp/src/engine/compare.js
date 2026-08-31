@@ -29,7 +29,8 @@ function readCropLines(doc, bbox, rotW, rotH) {
   }).catch(function () { try { fs.unlinkSync(p); } catch (e) {} return []; });
 }
 
-// arq/ori: {file, rot?, hideTec?}   opts: {python, onProgress, seed, reRead(=true)}
+// arq/ori: {file, rot?, hideTec?, hideLayers?, hideImages?, hideColors?}   (hide* = tela "Limpar")
+// opts: {python, onProgress, seed, reRead(=true)}
 function run(arq, ori, opts) {
   opts = opts || {};
   var prog = opts.onProgress || function () {};
@@ -40,7 +41,8 @@ function run(arq, ori, opts) {
   return ocr.start({ python: opts.python, serverExe: opts.serverExe }).then(function () {
     prog("Renderizando…");
     var tR = Date.now();
-    return render.openDoc(arq.file, { hideTec: arq.hideTec, rot: arq.rot, crop: arq.crop }).then(function (dA) {
+    return render.openDoc(arq.file, { hideTec: arq.hideTec, rot: arq.rot, crop: arq.crop,
+      hideLayers: arq.hideLayers, hideImages: arq.hideImages, hideColors: arq.hideColors }).then(function (dA) {
       docA = dA; fullA = render.renderFullImg(docA, alvo);
       timing.render = (Date.now() - tR) / 1000;
       var pA = tmpPng("arq"); render.writePNG(pA, fullA.img);
@@ -48,7 +50,8 @@ function run(arq, ori, opts) {
       var tO = Date.now();
       // Carrega o ORIGINAL na rotação dada em resolução CHEIA -> { O, mp } (fixa docO/fullO).
       function loadOriFull(rotDeg, F) {
-        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg, crop: ori.crop }).then(function (d) {
+        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg, crop: ori.crop,
+          hideLayers: ori.hideLayers, hideImages: ori.hideImages, hideColors: ori.hideColors }).then(function (d) {
           docO = d; fullO = render.renderFullImg(d, alvo);
           var pO = tmpPng("ori"); render.writePNG(pO, fullO.img);
           return ocr.read(pO).then(function (O) {
@@ -60,7 +63,8 @@ function run(arq, ori, opts) {
       // Conta palavras de ALTA confiança do original numa rotação, em BAIXA resolução (pouca
       // memória): texto de cabeça-pra-baixo sai garbled/baixa-conf -> separa +90 de +270 barato.
       function ocrConf(rotDeg) {
-        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg, crop: ori.crop }).then(function (d) {
+        return render.openDoc(ori.file, { hideTec: ori.hideTec, rot: rotDeg, crop: ori.crop,
+          hideLayers: ori.hideLayers, hideImages: ori.hideImages, hideColors: ori.hideColors }).then(function (d) {
           var full = render.renderFullImg(d, 1500);
           var p = tmpPng("det"); render.writePNG(p, full.img);
           return ocr.read(p).then(function (O) {
@@ -72,7 +76,8 @@ function run(arq, ori, opts) {
       }
       // proporção da página do original numa rotação (barato: abre e mede, SEM OCR/render)
       function oriPortrait(rotDeg) {
-        return render.openDoc(ori.file, { hideTec: false, rot: rotDeg, crop: ori.crop }).then(function (d) {
+        return render.openDoc(ori.file, { hideTec: false, rot: rotDeg, crop: ori.crop,
+          hideLayers: ori.hideLayers, hideImages: ori.hideImages, hideColors: ori.hideColors }).then(function (d) {
           var sw = (d.rot === 90 || d.rot === 270), ow = sw ? d.h.ph : d.h.pw, oh = sw ? d.h.pw : d.h.ph;
           render.closeDoc(d); return oh > ow;
         });
