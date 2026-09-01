@@ -41,6 +41,10 @@ body{
 
 /* BARRA DE ATUALIZACAO - cyan (marca/foco), so aparece quando ha novidade.
    Cor nunca sozinha: sempre com icone + texto dizendo o que esta acontecendo. */
+/* display:flex venceria o [hidden] do HTML (regra de autor > user-agent) e a barra
+   aparecia VAZIA com o app aberto. Por isso o [hidden] explicito - vale p/ a barra e
+   p/ a linha de progresso. */
+.upd[hidden], .upd-prog[hidden]{display:none !important}
 .upd{
   display:flex; align-items:center; gap:12px;
   background:var(--card); color:var(--ink);

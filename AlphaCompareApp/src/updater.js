@@ -157,18 +157,34 @@ function baixar(info, onProgress) {
 }
 
 // ---------------------------------------------------------------- aplicar
-// Windows: roda o instalador NSIS em modo silencioso. Via ShellExecute (Start-Process),
-// NAO via spawn direto: se a instalacao for "para todos os usuarios", o instalador
-// precisa subir privilegio, e o CreateProcess do spawn falharia com EACCES em vez de
-// mostrar o UAC. Depois o app fecha p/ liberar os arquivos; o /S --force-run reabre.
-function aplicarWin(caminho) {
+// Windows: instala e REABRE o app, por um ajudante que sobrevive ao app fechando.
+//
+// Sequencia (tudo dentro de um powershell solto, detached): espera o app fechar ->
+// roda o instalador silencioso e ESPERA ele terminar -> reabre o app.
+//
+// Dois detalhes que custaram teste:
+//  - Start-Process (ShellExecute), NAO spawn direto: numa instalacao "para todos os
+//    usuarios" o instalador precisa subir privilegio, e o CreateProcess do spawn
+//    falharia com EACCES em vez de mostrar o UAC.
+//  - quem reabre o app somos NOS, nao o --force-run do NSIS: medido, o --force-run nao
+//    reabriu o app quando o instalador rodou elevado. Sem isso o operador clica em
+//    "Atualizar" e o app simplesmente some - parece que quebrou.
+function aplicarWin(caminho, exePath) {
   return new Promise(function (resolve, reject) {
-    const ps = "Start-Process -FilePath " + JSON.stringify(caminho) + " -ArgumentList '/S','--force-run'";
-    cp.execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ps],
-      { windowsHide: true, timeout: 120000 }, function (err, so, se) {
-        if (err) { reject(new Error("nao consegui iniciar o instalador: " + ((se || "").trim() || err.message))); return; }
-        resolve({ reiniciar: true });
-      });
+    const q = function (x) { return JSON.stringify(String(x)); };
+    const ps = [
+      "Start-Sleep -Seconds 2",                                        // deixa o app fechar
+      "Start-Process -FilePath " + q(caminho) + " -ArgumentList '/S' -Wait",
+      "Start-Sleep -Seconds 1",
+      "Start-Process -FilePath " + q(exePath)                          // volta na versao nova
+    ].join("; ");
+    try {
+      const h = cp.spawn("powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps],
+        { detached: true, stdio: "ignore", windowsHide: true });
+      h.unref();
+    } catch (e) { reject(new Error("nao consegui iniciar o instalador: " + e.message)); return; }
+    resolve({ reiniciar: true });
   });
 }
 
@@ -208,7 +224,7 @@ function aplicarMac(caminho, exePath) {
 
 function aplicar(caminho, exePath) {
   if (process.platform === "darwin") return aplicarMac(caminho, exePath);
-  if (process.platform === "win32") return aplicarWin(caminho);
+  if (process.platform === "win32") return aplicarWin(caminho, exePath);
   return Promise.reject(new Error("plataforma sem atualizacao automatica: " + process.platform));
 }
 

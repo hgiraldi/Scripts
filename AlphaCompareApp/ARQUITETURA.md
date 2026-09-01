@@ -133,15 +133,22 @@ Decisões que não devem ser desfeitas sem pensar:
    fim — rede caindo no meio não pode virar instalador pela metade.
 5. **Windows aplica via `Start-Process` (ShellExecute), não `spawn`.** Se a instalação for
    "para todos os usuários", o instalador precisa subir privilégio; o `CreateProcess` do
-   `spawn` falharia com `EACCES` em vez de mostrar o UAC. Os argumentos são `/S --force-run`
-   (silencioso + reabre o app), os mesmos que o electron-updater usa.
-6. **Mac troca o bundle com `ditto`**, não `cp -R` (que quebra os symlinks do Electron
+   `spawn` falharia com `EACCES` em vez de mostrar o UAC. E **quem reabre o app somos nós**,
+   num ajudante PowerShell solto (`detached`) que espera o instalador terminar — não o
+   `--force-run` do NSIS. O `--force-run` funciona, mas é ele que decide se o operador vê o
+   app voltar; deixar isso por conta do instalador é apostar na experiência mais visível
+   do fluxo.
+6. **`.upd[hidden]{display:none}` no CSS.** A barra usa `display:flex`, e regra de autor
+   vence o `[hidden]` do user-agent: sem essa linha a barra aparece **vazia** (só o ícone)
+   com o app aberto. Aconteceu na 0.1.3.
+7. **Mac troca o bundle com `ditto`**, não `cp -R` (que quebra os symlinks do Electron
    Framework), guardando o antigo até a cópia terminar, e o destino sai do executável em
    execução — vale para `/Applications` ou `~/Applications` sem chutar.
 
 **Limite conhecido:** a atualização só funciona a partir de uma versão que **já tem** o
-Alpha Update. A 0.1.3 é a primeira; para sair da 0.1.2 (ou instalar numa máquina nova) ainda
-é preciso rodar o instalador uma vez na mão. Da 0.1.3 em diante é pelo botão.
+Alpha Update. A **0.1.4** é a primeira boa (a 0.1.3 mostrava a barra vazia); para chegar
+nela — ou numa máquina nova — ainda é preciso rodar o instalador uma vez na mão. Daí em
+diante é pelo botão.
 
 ## Regras que NÃO podem ser violadas
 
