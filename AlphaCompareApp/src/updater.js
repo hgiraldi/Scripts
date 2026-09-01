@@ -174,9 +174,12 @@ function aplicarWin(caminho, exePath) {
     const q = function (x) { return JSON.stringify(String(x)); };
     const ps = [
       "Start-Sleep -Seconds 2",                                        // deixa o app fechar
-      "Start-Process -FilePath " + q(caminho) + " -ArgumentList '/S' -Wait",
+      // try/catch NAO e decoracao: se o operador RECUSAR o UAC, o -Wait estoura e sem o
+      // catch o script morre aqui - o app teria sumido de vez. Assim ele sempre volta,
+      // na versao velha, e o operador pode tentar de novo.
+      "try { Start-Process -FilePath " + q(caminho) + " -ArgumentList '/S' -Wait -ErrorAction Stop } catch { }",
       "Start-Sleep -Seconds 1",
-      "Start-Process -FilePath " + q(exePath)                          // volta na versao nova
+      "Start-Process -FilePath " + q(exePath)                          // volta (nova, ou a velha se falhou)
     ].join("; ");
     try {
       const h = cp.spawn("powershell.exe",

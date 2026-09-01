@@ -146,7 +146,7 @@ Decisões que não devem ser desfeitas sem pensar:
    execução — vale para `/Applications` ou `~/Applications` sem chutar.
 
 **Limite conhecido:** a atualização só funciona a partir de uma versão que **já tem** o
-Alpha Update. A **0.1.4** é a primeira boa (a 0.1.3 mostrava a barra vazia); para chegar
+Alpha Update. A **0.1.5** é a primeira boa (a 0.1.3 mostrava a barra vazia); para chegar
 nela — ou numa máquina nova — ainda é preciso rodar o instalador uma vez na mão. Daí em
 diante é pelo botão.
 
