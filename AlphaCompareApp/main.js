@@ -261,10 +261,9 @@ ipcMain.handle("update-apply", function (e, info) {
     })
     .then(function (r) {
       boot("update: aplicado, reiniciando");
-      setTimeout(function () {
-        if (process.platform === "darwin" && r && r.destino) updater.reabrirMac(r.destino);
-        app.exit(0);   // exit(0) e nao quit(): tem que sair JA p/ liberar os arquivos
-      }, 1200);
+      // quem reabre o app e o ajudante, DEPOIS de ver este processo sair (ele espera o
+      // PID). Aqui so precisamos sair - exit(0) e nao quit(), p/ liberar os arquivos ja.
+      setTimeout(function () { app.exit(0); }, 800);
       return { ok: true };
     })
     .catch(function (err) {

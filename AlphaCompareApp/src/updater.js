@@ -157,71 +157,204 @@ function baixar(info, onProgress) {
 }
 
 // ---------------------------------------------------------------- aplicar
-// Windows: instala e REABRE o app, por um ajudante que sobrevive ao app fechando.
 //
-// Sequencia (tudo dentro de um powershell solto, detached): espera o app fechar ->
-// roda o instalador silencioso e ESPERA ele terminar -> reabre o app.
+// Os dois sistemas seguem a MESMA receita, num ajudante em ARQUIVO que roda solto:
+//   1. espera o app FECHAR de verdade (pelo PID, nao por um sleep chutado);
+//   2. instala;
+//   3. reabre o app.
 //
-// Dois detalhes que custaram teste:
-//  - Start-Process (ShellExecute), NAO spawn direto: numa instalacao "para todos os
-//    usuarios" o instalador precisa subir privilegio, e o CreateProcess do spawn
-//    falharia com EACCES em vez de mostrar o UAC.
-//  - quem reabre o app somos NOS, nao o --force-run do NSIS: medido, o --force-run nao
-//    reabriu o app quando o instalador rodou elevado. Sem isso o operador clica em
-//    "Atualizar" e o app simplesmente some - parece que quebrou.
+// Por que assim, e nao "manda instalar e tchau" (que foi o que quebrou na 0.1.5):
+//  - O instalador NSIS silencioso instala POR USUARIO por padrao. Se o app estava em
+//    "C:\Program Files" (todos os usuarios), ele desinstalava de la e instalava em
+//    %LOCALAPPDATA% -> o caminho que o ajudante ia reabrir nao existia mais e o app
+//    simplesmente sumia. Agora o modo e FIXADO (/allusers ou /currentuser) conforme
+//    onde o app esta hoje, e a reabertura ainda procura no registro se nao achar.
+//  - Instalar com o app ainda vivo faz o NSIS matar o app no meio; esperar o PID
+//    tira essa corrida.
+
+function tmpFile(nome) { return path.join(os.tmpdir(), "alphaupdate_" + Date.now() + "_" + nome); }
+
+// dispara um processo solto. No macOS o detached faz setsid() e o filho vira lider de
+// sessao - sobrevive ao app fechar. No WINDOWS isso NAO basta (medido: o ajudante morre
+// junto com o app), por isso la usamos o Agendador de Tarefas - ver dispararWin().
+function solto(cmd, args) {
+  const h = cp.spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: true });
+  h.unref();
+  return h;
+}
+
+// Windows: registra e roda uma tarefa AGENDADA de uma vez so. Ela roda pelo servico do
+// agendador, fora da arvore de processos do app - e o unico jeito que sobrevive ao app
+// fechar (testado: spawn detached nao sobrevive). O XML evita a briga de aspas do /tr.
+function dispararWin(script) {
+  const nome = "AlphaUpdate_" + path.basename(script).replace(/[^A-Za-z0-9_]/g, "").slice(0, 40);
+  const args = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + script + '"';
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-16"?>',
+    '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">',
+    '  <RegistrationInfo><Description>Alpha Update</Description></RegistrationInfo>',
+    '  <Triggers />',
+    '  <Principals><Principal id="Author"><LogonType>InteractiveToken</LogonType>',
+    '    <RunLevel>LeastPrivilege</RunLevel></Principal></Principals>',
+    '  <Settings>',
+    '    <MultipleInstancesPolicy>Parallel</MultipleInstancesPolicy>',
+    '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>',
+    '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>',
+    '    <AllowHardTerminate>false</AllowHardTerminate>',
+    '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>',
+    '    <IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings>',
+    '    <AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>false</Hidden>',
+    '    <RunOnlyIfIdle>false</RunOnlyIfIdle><WakeToRun>false</WakeToRun>',
+    '    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit><Priority>7</Priority>',
+    '  </Settings>',
+    '  <Actions Context="Author"><Exec>',
+    '    <Command>powershell.exe</Command>',
+    '    <Arguments>' + args.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") + '</Arguments>',
+    '  </Exec></Actions>',
+    '</Task>'
+  ].join("\r\n");
+
+  const xmlFile = script.replace(/\.ps1$/, ".xml");
+  fs.writeFileSync(xmlFile, Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(xml, "utf16le")]));  // schtasks exige UTF-16
+  cp.execFileSync("schtasks.exe", ["/create", "/tn", nome, "/xml", xmlFile, "/f"], { windowsHide: true, timeout: 30000 });
+  cp.execFileSync("schtasks.exe", ["/run", "/tn", nome], { windowsHide: true, timeout: 30000 });
+  return nome;
+}
+
+// valor -> literal de string do shell, ja escapado (aspas simples: dobra a aspa)
+function aspasPS(v) { return "'" + String(v).replace(/'/g, "''") + "'"; }
+function aspasSH(v) { return "'" + String(v).replace(/'/g, "'\\''") + "'"; }
+
+// Windows: helper .ps1. O modo de instalacao acompanha onde o app esta hoje, senao o
+// instalador "muda o app de lugar" no meio da atualizacao.
 function aplicarWin(caminho, exePath) {
   return new Promise(function (resolve, reject) {
-    const q = function (x) { return JSON.stringify(String(x)); };
+    const pf = (process.env["ProgramFiles"] || "C:\\Program Files").toLowerCase();
+    const pf86 = (process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)").toLowerCase();
+    const alvo = String(exePath || "").toLowerCase();
+    const modo = (alvo.indexOf(pf) === 0 || alvo.indexOf(pf86) === 0) ? "/allusers" : "/currentuser";
+    const script = tmpFile("aplicar.ps1");
+    const nomeTarefa = "AlphaUpdate_" + path.basename(script).replace(/[^A-Za-z0-9_]/g, "").slice(0, 40);
+
+    // Os valores vao ESCRITOS no script, sem param(): medido que, disparado pelo Node,
+    // "-File x.ps1 -Setup ..." nao casava os parametros e o ajudante saia sem fazer nada.
     const ps = [
-      "Start-Sleep -Seconds 2",                                        // deixa o app fechar
-      // try/catch NAO e decoracao: se o operador RECUSAR o UAC, o -Wait estoura e sem o
-      // catch o script morre aqui - o app teria sumido de vez. Assim ele sempre volta,
-      // na versao velha, e o operador pode tentar de novo.
-      "try { Start-Process -FilePath " + q(caminho) + " -ArgumentList '/S' -Wait -ErrorAction Stop } catch { }",
-      "Start-Sleep -Seconds 1",
-      "Start-Process -FilePath " + q(exePath)                          // volta (nova, ou a velha se falhou)
-    ].join("; ");
-    try {
-      const h = cp.spawn("powershell.exe",
-        ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps],
-        { detached: true, stdio: "ignore", windowsHide: true });
-      h.unref();
-    } catch (e) { reject(new Error("nao consegui iniciar o instalador: " + e.message)); return; }
-    resolve({ reiniciar: true });
+      '$AppPid = ' + parseInt(process.pid, 10),
+      '$Setup  = ' + aspasPS(caminho),
+      '$Exe    = ' + aspasPS(exePath),
+      '$Modo   = ' + aspasPS(modo),
+      '$Log    = ' + aspasPS(path.join(os.tmpdir(), "alphacompare_update.log")),
+      '$Tarefa = ' + aspasPS(nomeTarefa),
+      'function Reg($m) { try { Add-Content -Path $Log -Value ((Get-Date).ToString("s") + "  " + $m) } catch { } }',
+      'Reg "ajudante iniciou (modo $Modo)"',
+      '# 1) espera o app fechar (ate 60s) - instalar com ele vivo e corrida perdida',
+      'for ($i = 0; $i -lt 120; $i++) {',
+      '  if (-not (Get-Process -Id $AppPid -ErrorAction SilentlyContinue)) { break }',
+      '  Start-Sleep -Milliseconds 500',
+      '}',
+      'Reg "app fechou; instalando"',
+      '# 2) instala. try/catch: se o operador RECUSAR o UAC o -Wait estoura, e sem isso o',
+      '#    script morreria aqui - com o app ja fechado, ou seja, o app sumiria.',
+      'try { Start-Process -FilePath $Setup -ArgumentList $Modo,"/S" -Wait -ErrorAction Stop; Reg "instalador terminou" }',
+      'catch { Reg ("instalador FALHOU: " + $_.Exception.Message) }',
+      'Start-Sleep -Seconds 2',
+      '# 3) reabre. Se o caminho de antes nao existe mais (o instalador pode ter mudado o',
+      '#    app de pasta), procura onde ele registrou a instalacao.',
+      'if (-not (Test-Path $Exe)) {',
+      '  Reg "caminho antigo sumiu; procurando no registro"',
+      '  $nome = [IO.Path]::GetFileName($Exe)',
+      '  foreach ($k in @("HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*",',
+      '                   "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*")) {',
+      '    foreach ($x in (Get-ItemProperty $k -ErrorAction SilentlyContinue)) {',
+      '      if ($x.DisplayIcon) {',
+      '        $c = ($x.DisplayIcon -replace ",.*$", "").Trim(\'"\')',
+      '        if ($c -and (Split-Path $c -Leaf) -eq $nome -and (Test-Path $c)) { $Exe = $c; break }',
+      '      }',
+      '      if ($x.InstallLocation) {',
+      '        $c2 = Join-Path $x.InstallLocation $nome',
+      '        if (Test-Path $c2) { $Exe = $c2; break }',
+      '      }',
+      '    }',
+      '    if (Test-Path $Exe) { break }',
+      '  }',
+      '}',
+      'if (Test-Path $Exe) { Reg "reabrindo $Exe"; Start-Process -FilePath $Exe }',
+      'else { Reg "NAO achei o app para reabrir" }',
+      '# limpa a tarefa agendada que disparou este script (e os temporarios)',
+      'try { schtasks.exe /delete /tn $Tarefa /f | Out-Null } catch { }',
+      'try { Remove-Item $Setup, $PSCommandPath, ($PSCommandPath -replace "\\.ps1$", ".xml") -Force -ErrorAction SilentlyContinue } catch { }'
+    ].join("\r\n");
+
+    try { fs.writeFileSync(script, "\ufeff" + ps, "utf8"); }   // BOM: powershell le acentos certo
+    catch (e) { reject(new Error("nao consegui preparar o atualizador: " + e.message)); return; }
+
+    try { dispararWin(script); }
+    catch (e) {
+      // plano B: se o agendador estiver bloqueado, ao menos tenta o disparo comum
+      log("schtasks falhou (" + (e && e.message) + ") -> tentando spawn detached");
+      try { solto("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script]); }
+      catch (e2) { reject(new Error("nao consegui iniciar o atualizador: " + e2.message)); return; }
+    }
+    resolve({ reiniciar: true, modo: modo });
   });
 }
 
-// Mac: monta o .dmg, copia o .app POR CIMA do que esta instalado e desmonta.
-// O caminho de destino sai do proprio executavel em execucao - assim vale tanto p/
-// /Applications quanto p/ ~/Applications, sem chutar.
+// Mac: helper .sh, mesma receita (valores escritos dentro, sem depender de argumentos).
+// Trocar o bundle com o app AINDA RODANDO e pedir para travar - por isso o ajudante
+// tambem espera o PID sair antes do ditto.
 function aplicarMac(caminho, exePath) {
   return new Promise(function (resolve, reject) {
     // /Applications/Alpha Compare.app/Contents/MacOS/Alpha Compare -> .../Alpha Compare.app
-    const destino = exePath.replace(/\.app\/Contents\/MacOS\/[^/]+$/, ".app");
+    const destino = String(exePath || "").replace(/\.app\/Contents\/MacOS\/[^/]+$/, ".app");
     if (destino === exePath || destino.slice(-4) !== ".app") {
       reject(new Error("nao identifiquei o .app instalado (rodando fora de um bundle?)"));
       return;
     }
     const sh = [
-      "set -e",
-      "DMG=" + JSON.stringify(caminho),
-      "DEST=" + JSON.stringify(destino),
+      '#!/bin/bash',
+      'APPPID=' + parseInt(process.pid, 10),
+      'DMG=' + aspasSH(caminho),
+      'DEST=' + aspasSH(destino),
+      'LOG=' + aspasSH(path.join(os.tmpdir(), "alphacompare_update.log")),
+      'reg(){ echo "$(date +%FT%T)  $1" >> "$LOG" 2>/dev/null; }',
+      'reg "ajudante iniciou"',
+      '# 1) espera o app fechar (ate 60s)',
+      'for i in $(seq 1 120); do kill -0 "$APPPID" 2>/dev/null || break; sleep 0.5; done',
+      'reg "app fechou; montando o dmg"',
       'MNT=$(mktemp -d /tmp/alphaupd.XXXXXX)',
-      'hdiutil attach "$DMG" -nobrowse -noautoopen -quiet -mountpoint "$MNT"',
+      'if ! hdiutil attach "$DMG" -nobrowse -noautoopen -quiet -mountpoint "$MNT"; then',
+      '  reg "hdiutil falhou"; open -n "$DEST"; exit 1',
+      'fi',
       'APP=$(find "$MNT" -maxdepth 1 -name "*.app" | head -1)',
-      'if [ -z "$APP" ]; then hdiutil detach "$MNT" -quiet || true; echo "dmg sem .app dentro" >&2; exit 1; fi',
-      // ditto preserva permissao/symlink do bundle (cp -R quebra o Framework do Electron)
-      'rm -rf "$DEST.antigo" && mv "$DEST" "$DEST.antigo" 2>/dev/null || true',
-      'if ! ditto "$APP" "$DEST"; then mv "$DEST.antigo" "$DEST" 2>/dev/null || true; hdiutil detach "$MNT" -quiet || true; echo "sem permissao para substituir o app" >&2; exit 1; fi',
-      'rm -rf "$DEST.antigo" || true',
-      'xattr -dr com.apple.quarantine "$DEST" || true',
-      'hdiutil detach "$MNT" -quiet || true',
-      'rmdir "$MNT" 2>/dev/null || true'
+      'if [ -z "$APP" ]; then',
+      '  reg "dmg sem .app dentro"; hdiutil detach "$MNT" -quiet; rmdir "$MNT" 2>/dev/null; open -n "$DEST"; exit 1',
+      'fi',
+      '# 2) troca o bundle. ditto (nao cp -R) preserva symlink/permissao do Electron Framework.',
+      '#    Guarda o antigo ate a copia terminar: se falhar, devolve o que ja existia.',
+      'rm -rf "$DEST.antigo" 2>/dev/null',
+      'if mv "$DEST" "$DEST.antigo" 2>/dev/null; then',
+      '  if ditto "$APP" "$DEST"; then rm -rf "$DEST.antigo"; reg "app trocado"',
+      '  else rm -rf "$DEST"; mv "$DEST.antigo" "$DEST"; reg "ditto FALHOU - voltei o antigo"; fi',
+      'else',
+      '  ditto "$APP" "$DEST" && reg "app trocado (sem backup)" || reg "ditto FALHOU"',
+      'fi',
+      'xattr -dr com.apple.quarantine "$DEST" 2>/dev/null',
+      'hdiutil detach "$MNT" -quiet 2>/dev/null; rmdir "$MNT" 2>/dev/null',
+      '# 3) reabre - de um jeito ou de outro o operador tem o app de volta',
+      'reg "reabrindo $DEST"',
+      'open -n "$DEST"'
     ].join("\n");
-    cp.execFile("/bin/bash", ["-c", sh], { timeout: 300000 }, function (err, so, se) {
-      if (err) { reject(new Error(((se || "").trim().split("\n").pop()) || err.message)); return; }
-      resolve({ reiniciar: true, destino: destino });
-    });
+
+    let script;
+    try {
+      script = tmpFile("aplicar.sh");
+      fs.writeFileSync(script, sh, "utf8");
+      fs.chmodSync(script, 0o755);
+    } catch (e) { reject(new Error("nao consegui preparar o atualizador: " + e.message)); return; }
+
+    try { solto("/bin/bash", [script]); }
+    catch (e) { reject(new Error("nao consegui iniciar o atualizador: " + e.message)); return; }
+    resolve({ reiniciar: true, destino: destino });
   });
 }
 
@@ -231,9 +364,4 @@ function aplicar(caminho, exePath) {
   return Promise.reject(new Error("plataforma sem atualizacao automatica: " + process.platform));
 }
 
-// relanca o app depois da troca (so no Mac; no Windows quem reabre e o --force-run)
-function reabrirMac(destino) {
-  try { cp.spawn("/usr/bin/open", ["-n", destino], { detached: true, stdio: "ignore" }).unref(); } catch (e) {}
-}
-
-module.exports = { verificar: verificar, baixar: baixar, aplicar: aplicar, reabrirMac: reabrirMac, parseTxt: parseTxt, config: config };
+module.exports = { verificar: verificar, baixar: baixar, aplicar: aplicar, parseTxt: parseTxt, config: config };

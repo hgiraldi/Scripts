@@ -123,32 +123,43 @@ Decisões que não devem ser desfeitas sem pensar:
 1. **Dispara por versão DIFERENTE, não "maior".** É de propósito: publicar de novo a versão
    antiga no txt volta a frota atrás, sem tocar em máquina nenhuma.
 2. **`aeserver16` antes do IP.** `172.16.11.96` é o MESMO servidor; falar com ele pelos dois
-   nomes ao mesmo tempo derruba a sessão SMB (erro 1219). O IP é só reserva. Ver memória
-   `engine-ip-nao-hostname`.
+   nomes ao mesmo tempo derruba a sessão SMB (erro 1219). Ver `engine-ip-nao-hostname`.
 3. **Rede fora nunca vira erro na cara do operador.** Sem pasta, sem txt ou sem instalador =
-   "não há novidade", em silêncio; o app segue normal. Só a checagem **manual** (clique na
-   versão no cabeçalho) responde por escrito.
-4. **O instalador é copiado para o TEMP antes de rodar.** Rodar NSIS direto de `\\servidor`
-   falha, e no Mac o `.dmg` ficaria preso ao volume de rede. A cópia confere o tamanho no
-   fim — rede caindo no meio não pode virar instalador pela metade.
-5. **Windows aplica via `Start-Process` (ShellExecute), não `spawn`.** Se a instalação for
-   "para todos os usuários", o instalador precisa subir privilégio; o `CreateProcess` do
-   `spawn` falharia com `EACCES` em vez de mostrar o UAC. E **quem reabre o app somos nós**,
-   num ajudante PowerShell solto (`detached`) que espera o instalador terminar — não o
-   `--force-run` do NSIS. O `--force-run` funciona, mas é ele que decide se o operador vê o
-   app voltar; deixar isso por conta do instalador é apostar na experiência mais visível
-   do fluxo.
-6. **`.upd[hidden]{display:none}` no CSS.** A barra usa `display:flex`, e regra de autor
-   vence o `[hidden]` do user-agent: sem essa linha a barra aparece **vazia** (só o ícone)
-   com o app aberto. Aconteceu na 0.1.3.
-7. **Mac troca o bundle com `ditto`**, não `cp -R` (que quebra os symlinks do Electron
-   Framework), guardando o antigo até a cópia terminar, e o destino sai do executável em
-   execução — vale para `/Applications` ou `~/Applications` sem chutar.
+   "não há novidade", em silêncio. Só a checagem manual responde por escrito.
+4. **O instalador é copiado para o TEMP antes de rodar** e o tamanho é conferido no fim.
 
-**Limite conhecido:** a atualização só funciona a partir de uma versão que **já tem** o
-Alpha Update. A **0.1.5** é a primeira boa (a 0.1.3 mostrava a barra vazia); para chegar
-nela — ou numa máquina nova — ainda é preciso rodar o instalador uma vez na mão. Daí em
-diante é pelo botão.
+### As três armadilhas do "aplicar" (todas custaram uma versão quebrada)
+
+**a) O instalador muda o app de lugar.** O NSIS silencioso instala **por usuário** por padrão.
+Numa máquina onde o app estava em `C:\Program Files` (todos os usuários), o `/S` desinstalou de
+lá e instalou em `%LOCALAPPDATA%` — e o caminho que íamos reabrir não existia mais. O operador
+via o app fechar e nunca mais voltar; o app estava instalado, só que em outro lugar. **Foi isso
+que quebrou a 0.1.5.** Hoje o modo é FIXADO conforme onde o app está (`/allusers` se estiver
+sob Program Files, senão `/currentuser`) e a reabertura ainda procura no registro
+(`DisplayIcon` / `InstallLocation`) se o caminho antigo sumir.
+
+**b) `spawn(detached) + unref()` NÃO sobrevive ao app fechar no Windows.** Medido nesta
+máquina: o ajudante morre junto com o pai, e a atualização para no meio. Por isso o Windows
+dispara o ajudante pelo **Agendador de Tarefas** (`schtasks /create /xml` + `/run`): ele roda
+pelo serviço do Windows, fora da árvore de processos do app. O XML evita a briga de aspas do
+`/tr`. O ajudante apaga a própria tarefa no fim. Plano B: se o agendador estiver bloqueado,
+tenta o spawn comum.
+
+**c) Parâmetros de PowerShell não casam quando quem dispara é o Node.** Com
+`-File script.ps1 -AppPid 123 -Setup ...` o script saía com código 0 **sem fazer nada**. Hoje
+os valores são **escritos dentro do script** (`$AppPid = 123`, `$Setup = '...'`), sem `param()`.
+Mesma regra no `.sh` do Mac.
+
+Além disso: o ajudante **espera o PID do app sair** (não um `sleep` chutado) antes de instalar,
+e a instalação vai em `try/catch` — se o operador recusar o UAC, ele ainda chega no passo de
+reabrir o app. O app nunca fica sumido. Tudo o que o ajudante faz vai para
+`%TEMP%\alphacompare_update.log` — é o primeiro lugar a olhar quando "não atualizou".
+
+**Mac:** mesma receita, num `.sh`. Espera o PID, monta o dmg, troca o bundle com `ditto`
+(`cp -R` quebra os symlinks do Electron Framework) guardando o antigo até a cópia terminar,
+tira o quarantine e reabre. No Mac o `detached` faz `setsid()`, então ali o spawn comum
+sobrevive — não precisa de agendador. A pasta de versões no Mac é `/Volumes/Engine/versoes`,
+ou seja **o share precisa estar montado**; se não estiver, o app só não oferece atualização.
 
 ## Regras que NÃO podem ser violadas
 
