@@ -88,6 +88,61 @@ Dois pontos que já quebraram e não podem voltar:
    liam `Name`; o `render_server.py` lia `Title` e não casava nada — nem TEC nem limpeza
    manual. Hoje tenta `Name` e cai pra `Title`.
 
+## Atualização pela pasta de versões (Alpha Update)
+
+Para não ter que instalar na mão em cada máquina: o app olha um `.txt` numa pasta da rede e,
+se a versão publicada for **diferente** da que está rodando, mostra a barra *"Nova versão
+disponível"* com o botão **Atualizar agora**. O operador clica, o app copia o instalador da
+rede e o aplica sozinho.
+
+```
+\\aeserver16\Engine\versoes\AlphaCompare\
+     versao.txt
+     Alpha Compare Setup 0.1.3.exe
+     AlphaCompare-mac-0.1.3.dmg
+```
+
+`versao.txt` (chave=valor, `#` é comentário; um txt só com o número da versão também vale):
+
+```
+versao=0.1.3
+win=Alpha Compare Setup 0.1.3.exe
+mac=AlphaCompare-mac-0.1.3.dmg
+notas=limpeza da tela Limpar agora entra na comparação
+```
+
+| Peça | Papel |
+| --- | --- |
+| `src/updater.js` | Todo o motor: acha a pasta, lê o txt, copia o instalador com progresso, aplica. **Sem nada específico do Alpha Compare** — é o arquivo a copiar para os outros apps. |
+| `main.js` | IPC `update-check` / `update-apply` / `app-version` + o evento `update-progress`. |
+| `src/panel/js/update.js` | A barra na tela (novidade → baixando → erro) e a versão clicável no cabeçalho. |
+| `package.json` → `alphaUpdate` | `{ nome, pastas }` — o **único** ajuste por app. |
+
+Decisões que não devem ser desfeitas sem pensar:
+
+1. **Dispara por versão DIFERENTE, não "maior".** É de propósito: publicar de novo a versão
+   antiga no txt volta a frota atrás, sem tocar em máquina nenhuma.
+2. **`aeserver16` antes do IP.** `172.16.11.96` é o MESMO servidor; falar com ele pelos dois
+   nomes ao mesmo tempo derruba a sessão SMB (erro 1219). O IP é só reserva. Ver memória
+   `engine-ip-nao-hostname`.
+3. **Rede fora nunca vira erro na cara do operador.** Sem pasta, sem txt ou sem instalador =
+   "não há novidade", em silêncio; o app segue normal. Só a checagem **manual** (clique na
+   versão no cabeçalho) responde por escrito.
+4. **O instalador é copiado para o TEMP antes de rodar.** Rodar NSIS direto de `\\servidor`
+   falha, e no Mac o `.dmg` ficaria preso ao volume de rede. A cópia confere o tamanho no
+   fim — rede caindo no meio não pode virar instalador pela metade.
+5. **Windows aplica via `Start-Process` (ShellExecute), não `spawn`.** Se a instalação for
+   "para todos os usuários", o instalador precisa subir privilégio; o `CreateProcess` do
+   `spawn` falharia com `EACCES` em vez de mostrar o UAC. Os argumentos são `/S --force-run`
+   (silencioso + reabre o app), os mesmos que o electron-updater usa.
+6. **Mac troca o bundle com `ditto`**, não `cp -R` (que quebra os symlinks do Electron
+   Framework), guardando o antigo até a cópia terminar, e o destino sai do executável em
+   execução — vale para `/Applications` ou `~/Applications` sem chutar.
+
+**Limite conhecido:** a atualização só funciona a partir de uma versão que **já tem** o
+Alpha Update. A 0.1.3 é a primeira; para sair da 0.1.2 (ou instalar numa máquina nova) ainda
+é preciso rodar o instalador uma vez na mão. Da 0.1.3 em diante é pelo botão.
+
 ## Regras que NÃO podem ser violadas
 
 1. **Dígito diferente = SEMPRE erro real** (é o alvo: 28/29, 0763/0591). Nunca filtrar.

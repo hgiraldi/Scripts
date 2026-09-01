@@ -24,8 +24,20 @@
       <div class="conn">
         <span id="dot" class="dot"></span>
         <span id="connLbl" class="lbl">verificando…</span>
+        <span id="appVer" class="ver" title="Versão"></span>
       </div>
     </header>
+
+    <!-- ATUALIZAÇÃO (pasta de versões na rede) - escondida enquanto não há novidade -->
+    <section id="updBar" class="upd" hidden>
+      <i class="bi bi-arrow-down-circle-fill upd-ic"></i>
+      <div class="upd-txt">
+        <div id="updTxt" class="upd-t1"></div>
+        <div id="updSub" class="upd-t2"></div>
+        <div id="updProg" class="upd-prog" hidden><div id="updFill" class="upd-fill"></div></div>
+      </div>
+      <div id="updAcoes" class="upd-acoes"></div>
+    </section>
 
     <!-- O.S. -->
     <section class="card os-card">
@@ -260,6 +272,7 @@
   <script src="./js/compare.js"></script>
   <script src="./js/shapediff.js"></script>
   <script src="./js/report.js"></script>
+  <script src="./js/update.js"></script>
   <script src="./js/main.js"></script>
 </body>
 </html>

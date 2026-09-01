@@ -6,6 +6,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const net = require("net");
+const updater = require("./src/updater");
 
 // LOG DE BOOT (diagnóstico do empacotado): escreve num arquivo em %TEMP%. Sempre ligado por ora.
 const _bootLog = path.join(os.tmpdir(), "alphacompare_boot.log");
@@ -16,15 +17,13 @@ process.on("unhandledRejection", function (e) { boot("UNHANDLED_REJECTION: " + (
 
 // ===== TRAVA POR REDE: o app só abre na rede da empresa =====
 // Robusto à TROCA DE IP: usa o HOSTNAME (aeserver16 resolve mesmo mudando o IP) + confere se a
-// MÁQUINA está numa sub-rede da empresa (172.x ou 192.168.x). Fora da rede, avisa e não abre.
+// MÁQUINA está numa sub-rede da empresa (172.x). Fora da rede, avisa e não abre.
 const NET_HOSTS = [                       // hostname sobrevive à troca de IP; IPs são reforço
   { host: "aeserver16", port: 445 },
-  { host: "192.168.1.15", port: 445 },
-  { host: "192.168.1.96", port: 445 },
-  { host: "172.16.11.15", port: 445 },   // rede nova (a fabrica tem as duas faixas)
+  { host: "172.16.11.15", port: 445 },   // rede da fabrica (a faixa 192.168.1.x foi desativada)
   { host: "172.16.11.96", port: 445 }
 ];
-const NET_SUBNETS = ["192.168.", "172."]; // prefixos IPv4 da rede da empresa (172 = rede nova)
+const NET_SUBNETS = ["172."];            // prefixo IPv4 da rede da empresa (a antiga 192.168.1.x nao existe mais)
 function canReach(host, port, timeout) {
   return new Promise(function (resolve) {
     const sock = new net.Socket();
@@ -96,7 +95,7 @@ function createWindow() {
     width: 1400, height: 900, minWidth: 1100, minHeight: 700,
     backgroundColor: "#0e1f43",
     icon: path.join(__dirname, "build", "icon.png"),
-    title: "Alpha Compare",
+    title: "Alpha Compare " + app.getVersion(),
     show: false,   // só aparece quando o painel terminar de carregar (a splash cobre a espera)
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
@@ -239,3 +238,39 @@ ipcMain.handle("gerar-laudo", async function (_e, payload) {
     return { ok: false, error: String(err) };
   } finally { win.destroy(); }
 });
+
+// ===== ATUALIZACAO PELA PASTA DA REDE (ver src/updater.js) =====
+// O renderer pergunta; aqui so respondemos. Falha de rede NUNCA vira erro na cara do
+// operador: sem pasta/sem txt = "nao ha novidade" e segue o app normalmente.
+ipcMain.handle("update-check", function () {
+  return updater.verificar({ appRoot: __dirname, versaoLocal: app.getVersion() })
+    .then(function (r) { boot("update-check: local=" + r.versaoLocal + " rede=" + r.versaoRede + " temNova=" + r.temNova); return r; })
+    .catch(function (e) { boot("update-check ERRO: " + (e && e.stack || e)); return { ok: false, temNova: false, motivo: String(e && e.message || e) }; });
+});
+
+// Copia o instalador da rede (com progresso) e aplica. No fim, fecha o app: no Windows
+// quem reabre e o proprio instalador (--force-run); no Mac reabrimos o bundle novo.
+ipcMain.handle("update-apply", function (e, info) {
+  const wc = e.sender;
+  function prog(pct) { try { wc.send("update-progress", pct); } catch (e2) {} }
+  return updater.baixar(info, prog)
+    .then(function (b) {
+      boot("update: baixado " + b.caminho + " (" + b.total + " bytes)");
+      try { wc.send("update-progress", 100); } catch (e2) {}
+      return updater.aplicar(b.caminho, app.getPath("exe"));
+    })
+    .then(function (r) {
+      boot("update: aplicado, reiniciando");
+      setTimeout(function () {
+        if (process.platform === "darwin" && r && r.destino) updater.reabrirMac(r.destino);
+        app.exit(0);   // exit(0) e nao quit(): tem que sair JA p/ liberar os arquivos
+      }, 1200);
+      return { ok: true };
+    })
+    .catch(function (err) {
+      boot("update-apply ERRO: " + (err && err.stack || err));
+      return { ok: false, erro: String((err && err.message) || err) };
+    });
+});
+
+ipcMain.handle("app-version", function () { return app.getVersion(); });

@@ -1,10 +1,18 @@
 {
   "name": "alpha-compare-app",
   "productName": "Alpha Compare",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Conferencia original x tratado estilo Precision Proof: registro + diff de texto por OCR nativo (RapidOCR) e diff grafico por pixel (uso interno Alpha)",
   "author": "Alpha Clicheria",
   "main": "main.js",
+  "alphaUpdate": {
+    "nome": "AlphaCompare",
+    "pastas": [
+      "\\\\aeserver16\\Engine\\versoes",
+      "\\\\172.16.11.96\\Engine\\versoes",
+      "/Volumes/Engine/versoes"
+    ]
+  },
   "private": true,
   "scripts": {
     "start": "electron .",
